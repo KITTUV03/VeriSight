@@ -1,0 +1,48 @@
+----------------------------------------------------------------
+UVM_INFO @ 0 ns: reporter [RNTST] Running test alu_test...
+UVM_INFO @ 0 ns: uvm_test_top.env.agt.drv [DRV] Starting driver
+UVM_INFO @ 0 ns: uvm_test_top.env.agt.mon [MON] Starting monitor
+UVM_INFO @ 0 ns: uvm_test_top.env.scb [SCB] Starting scoreboard
+----------------------------------------------------------------
+UVM_INFO @ 20 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=0 a=a5 b=3c | result=xx carry=0 zero=0
+UVM_ERROR alu_scoreboard.sv(52) @ 20 ns: uvm_test_top.env.scb [SCB] MISMATCH: op=0 a=a5 b=3c | expected result=e1 carry=0 zero=0 | actual result=xx carry=0 zero=0
+UVM_INFO @ 40 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=1 a=7f b=20 | result=xx carry=0 zero=0
+UVM_ERROR alu_scoreboard.sv(52) @ 40 ns: uvm_test_top.env.scb [SCB] MISMATCH: op=1 a=7f b=20 | expected result=5f carry=0 zero=0 | actual result=xx carry=0 zero=0
+UVM_INFO @ 60 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=2 a=ff b=0f | result=xx carry=0 zero=0
+UVM_ERROR alu_scoreboard.sv(52) @ 60 ns: uvm_test_top.env.scb [SCB] MISMATCH: op=2 a=ff b=0f | expected result=0f carry=0 zero=0 | actual result=xx carry=0 zero=0
+UVM_INFO @ 80 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=0 a=80 b=80 | result=xx carry=1 zero=0
+UVM_ERROR alu_scoreboard.sv(52) @ 80 ns: uvm_test_top.env.scb [SCB] MISMATCH: op=0 a=80 b=80 | expected result=00 carry=1 zero=1 | actual result=xx carry=1 zero=0
+UVM_INFO @ 100 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=3 a=55 b=aa | result=ff carry=0 zero=0
+UVM_INFO @ 100 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=3 a=55 b=aa | result=ff carry=0 zero=0
+UVM_INFO @ 120 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=0 a=01 b=02 | result=03 carry=0 zero=0
+UVM_INFO @ 120 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=0 a=01 b=02 | result=03 carry=0 zero=0
+UVM_INFO @ 140 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=4 a=aa b=55 | result=ff carry=0 zero=0
+UVM_INFO @ 140 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=4 a=aa b=55 | result=ff carry=0 zero=0
+UVM_INFO @ 160 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=5 a=0f b=00 | result=f0 carry=0 zero=0
+UVM_INFO @ 160 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=5 a=0f b=00 | result=f0 carry=0 zero=0
+UVM_INFO @ 180 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=6 a=01 b=03 | result=08 carry=0 zero=0
+UVM_INFO @ 180 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=6 a=01 b=03 | result=08 carry=0 zero=0
+UVM_INFO @ 200 ns: uvm_test_top.env.agt.mon [MON] Observed: op_sel=7 a=80 b=02 | result=20 carry=0 zero=0
+UVM_INFO @ 200 ns: uvm_test_top.env.scb [SCB] PASS: op_sel=7 a=80 b=02 | result=20 carry=0 zero=0
+----------------------------------------------------------------
+UVM_INFO @ 240 ns: uvm_test_top [TEST] All sequences completed
+UVM_INFO @ 240 ns: reporter [UVMTOP] Phase: run - phase is ending
+----------------------------------------------------------------
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :    16
+UVM_WARNING :    0
+UVM_ERROR :    4
+UVM_FATAL :    0
+** Report counts by id
+[RNTST] :     1
+[DRV] :     1
+[MON] :    11
+[SCB] :    10
+[TEST] :     1
+[UVMTOP] :     1
+
+Simulation time: 240 ns
+Seed: 12345
+** TEST FAILED **
