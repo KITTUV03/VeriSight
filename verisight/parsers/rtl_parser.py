@@ -262,7 +262,11 @@ def _classify_always(
         rst_match = re.search(r"(?:posedge|negedge)\s+(\w*(?:rst|reset)\w*)", sensitivity, re.IGNORECASE)
         if rst_match:
             reset = rst_match.group(1)
-            reset_active = "low" if "negedge" in sensitivity.split(reset)[0].rsplit("posedge", 1)[-1] if reset in sensitivity else "" else "high"
+            if reset in sensitivity:
+                pre_reset = sensitivity.split(reset)[0]
+                reset_active = "low" if "negedge" in pre_reset else "high"
+            else:
+                reset_active = ""
     elif keyword == "always_comb":
         block_type = "combinational"
     elif keyword == "always_latch":

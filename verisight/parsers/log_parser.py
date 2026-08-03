@@ -60,17 +60,20 @@ SVA_FAILURE_PATTERN = re.compile(
 )
 
 # Scoreboard mismatch patterns
+# Handles formats like:
+#   "MISMATCH ... expected result=e1 ... actual result=xx"
+#   "MISMATCH ... expected=0xAB ... actual=0xCD"
 MISMATCH_PATTERN = re.compile(
     r"(?:MISMATCH|mismatch|Mismatch|MISCOMPARE|ERROR.*?mismatch)"
-    r".*?(?:expected|exp)\s*[=:]?\s*(?:0x)?([0-9a-fA-FxXzZ]+)"
-    r".*?(?:actual|act|got|received)\s*[=:]?\s*(?:0x)?([0-9a-fA-FxXzZ]+)",
+    r".*?(?:expected|exp)\s+(?:\w+=)?(?:0x)?([0-9a-fA-FxXzZ]+)"
+    r".*?(?:actual|act|got|received)\s+(?:\w+=)?(?:0x)?([0-9a-fA-FxXzZ]+)",
     re.MULTILINE | re.IGNORECASE
 )
 
 # Alternative mismatch: actual vs expected (reversed order)
 MISMATCH_ALT_PATTERN = re.compile(
-    r"(?:actual|got)\s*[=:]?\s*(?:0x)?([0-9a-fA-FxXzZ]+)"
-    r".*?(?:expected|exp)\s*[=:]?\s*(?:0x)?([0-9a-fA-FxXzZ]+)",
+    r"(?:actual|got)\s+(?:\w+=)?(?:0x)?([0-9a-fA-FxXzZ]+)"
+    r".*?(?:expected|exp)\s+(?:\w+=)?(?:0x)?([0-9a-fA-FxXzZ]+)",
     re.MULTILINE | re.IGNORECASE
 )
 

@@ -60,6 +60,13 @@ class LLMAdapter:
         Returns:
             Raw text response from the LLM.
         """
+        # Fail fast if no API key is configured
+        if not self.api_key:
+            raise RuntimeError(
+                "No LLM API key configured. Set GEMINI_API_KEY or use --api-key. "
+                "Pipeline will use deterministic fallback."
+            )
+
         if self.provider == "gemini":
             return self._generate_gemini(prompt, system_prompt)
         else:
@@ -251,7 +258,9 @@ class BaseAgent(ABC):
         Returns:
             Formatted prompt string.
         """
-        prompt = template.format(**context)
+        # Only run format() when there are actual placeholders to fill;
+        # avoids crashing on literal curly braces in embedded code.
+        prompt = template.format(**context) if context else template
 
         if output_schema:
             schema = output_schema.model_json_schema()

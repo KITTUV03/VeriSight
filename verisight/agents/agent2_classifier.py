@@ -155,6 +155,22 @@ class RootCauseClassifierAgent(BaseAgent):
                             f"Signal '{sig}' in module '{module.name}' has no reset "
                             f"(always block at line {block.line_start})"
                         )
+                elif block.block_type == "sequential" and block.has_reset:
+                    # Block has reset, but check if ALL written signals are reset
+                    import re as _re
+                    reset_match = _re.search(
+                        r"if\s*\(\s*!?\s*\w*(?:rst|reset)\w*\s*\)\s*begin([\s\S]*?)end",
+                        block.raw_code, _re.IGNORECASE
+                    )
+                    if reset_match:
+                        reset_body = reset_match.group(1)
+                        for sig in block.signals_written:
+                            if not _re.search(rf"\b{_re.escape(sig)}\b\s*<=", reset_body):
+                                analysis["reset_issues"].append(
+                                    f"Signal '{sig}' in module '{module.name}' is written "
+                                    f"in sequential block but MISSING from reset clause "
+                                    f"(always block at line {block.line_start})"
+                                )
 
         # Check if mismatches only occur early (X propagation pattern)
         if knowledge.logs.scoreboard_mismatches:
