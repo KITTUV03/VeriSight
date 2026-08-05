@@ -23,7 +23,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class LLMAdapter:
-    """Adapter for LLM API calls. Supports Gemini (default)."""
+    """Adapter for LLM API calls. Supports Gemini and Anthropic Claude."""
 
     def __init__(self):
         config = get_config()
@@ -33,6 +33,9 @@ class LLMAdapter:
         self.temperature = config.llm.temperature
         self.max_output_tokens = config.llm.max_output_tokens
         self._model = None
+        # Set to False after the API rejects 'temperature', so later calls
+        # skip the probe instead of burning a failed request every time.
+        self._supports_temperature = True
 
     def _init_gemini(self):
         """Initialize Gemini model."""
@@ -49,6 +52,20 @@ class LLMAdapter:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Gemini: {e}")
 
+    def _init_anthropic(self):
+        """Initialize Anthropic client."""
+        try:
+            import anthropic
+            self._model = anthropic.Anthropic(api_key=self.api_key)
+            logger.info(f"Anthropic client initialized for model: {self.model_name}")
+        except ImportError:
+            raise RuntimeError(
+                "anthropic not installed. "
+                "Install with: pip install anthropic"
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize Anthropic: {e}")
+
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         """
         Generate a response from the LLM.
@@ -62,13 +79,16 @@ class LLMAdapter:
         """
         # Fail fast if no API key is configured
         if not self.api_key:
+            env_hint = "ANTHROPIC_API_KEY" if self.provider == "anthropic" else "GEMINI_API_KEY"
             raise RuntimeError(
-                "No LLM API key configured. Set GEMINI_API_KEY or use --api-key. "
+                f"No LLM API key configured for provider '{self.provider}'. Set {env_hint} or use --api-key. "
                 "Pipeline will use deterministic fallback."
             )
 
         if self.provider == "gemini":
             return self._generate_gemini(prompt, system_prompt)
+        elif self.provider == "anthropic":
+            return self._generate_anthropic(prompt, system_prompt)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -92,6 +112,63 @@ class LLMAdapter:
         except Exception as e:
             logger.error(f"Gemini API call failed: {e}")
             raise
+
+    def _generate_anthropic(self, prompt: str, system_prompt: str = "") -> str:
+        """Generate using Anthropic Claude API."""
+        if self._model is None:
+            self._init_anthropic()
+
+        try:
+            kwargs = {
+                "model": self.model_name,
+                "max_tokens": self.max_output_tokens,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if system_prompt:
+                kwargs["system"] = system_prompt
+
+            # Newer Claude models (5+) have deprecated the temperature parameter.
+            # Probe once; if rejected, drop it for the rest of this adapter's life.
+            if self._supports_temperature:
+                try:
+                    response = self._model.messages.create(
+                        temperature=self.temperature, **kwargs
+                    )
+                except Exception as temp_err:
+                    if "temperature" not in str(temp_err).lower():
+                        raise
+                    logger.info(
+                        f"Model '{self.model_name}' does not support 'temperature'; "
+                        "dropping it for subsequent calls."
+                    )
+                    self._supports_temperature = False
+                    response = self._model.messages.create(**kwargs)
+            else:
+                response = self._model.messages.create(**kwargs)
+
+            return self._extract_text(response)
+        except Exception as e:
+            logger.error(f"Anthropic API call failed: {e}")
+            raise
+
+    @staticmethod
+    def _extract_text(response) -> str:
+        """
+        Concatenate the text blocks of an Anthropic response.
+
+        Models with thinking enabled return thinking blocks alongside text, so
+        indexing content[0] is not safe — select by block type instead.
+        """
+        text = "".join(
+            block.text for block in response.content
+            if getattr(block, "type", None) == "text"
+        )
+        if not text:
+            raise RuntimeError(
+                f"Anthropic response contained no text block "
+                f"(stop_reason={response.stop_reason})"
+            )
+        return text
 
 
 class BaseAgent(ABC):

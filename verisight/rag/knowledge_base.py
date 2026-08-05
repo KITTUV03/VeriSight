@@ -20,7 +20,8 @@ logger = get_logger("knowledge_base")
 COLLECTIONS = [
     "specifications",
     "rtl",
-    "tb",
+    # ChromaDB rejects collection names shorter than 3 characters.
+    "testbench",
     "logs",
     "errors",
     "fixes",

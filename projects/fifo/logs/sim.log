@@ -1,0 +1,39 @@
+------------------------------------------------------------------------------
+ 
+UVM-1.2
+ 
+------------------------------------------------------------------------------
+ 
+UVM_INFO @ 0: reporter [RNTST] Running test fifo_test...
+ 
+ 
+UVM_INFO fifo_tb.sv(78) @ 55: uvm_test_top.env.driver [DRIVER] Starting sequence...
+UVM_WARNING @ 75: uvm_test_top.env.scoreboard [SCOREBOARD] Full flag mismatch: Expected 1, Got 0
+UVM_ERROR @ 85: uvm_test_top.env.scoreboard [SCOREBOARD] FIFO count mismatch: Expected 15, Got 15
+ 
+UVM_ERROR @ 85: uvm_test_top.env.scoreboard [SCOREBOARD] Full flag mismatch: Expected 1, Got 0
+UVM_WARNING @ 120: uvm_test_top.env.scoreboard [SCOREBOARD] Empty flag mismatch: Expected 0, Got 1
+UVM_ERROR @ 125: uvm_test_top.env.scoreboard [SCOREBOARD] Empty flag mismatch: Expected 0, Got 1
+UVM_WARNING @ 200: uvm_test_top.env.scoreboard [SCOREBOARD] Almost full flag mismatch: Expected 1, Got 0
+UVM_ERROR @ 210: uvm_test_top.env.scoreboard [SCOREBOARD] Almost full flag mismatch: Expected 1, Got 0
+UVM_ERROR @ 350: uvm_test_top.env.scoreboard [SCOREBOARD] Data mismatch at simultaneous read/write
+UVM_ERROR @ 355: tb_top.ASSERT_NO_WRITE_FULL [ASSERT] Write attempted when FIFO full!
+UVM_ERROR @ 420: tb_top.ASSERT_NO_READ_EMPTY [ASSERT] Read attempted when FIFO empty!
+UVM_FATAL @ 500: uvm_test_top.env.scoreboard [SCOREBOARD] 
+UVM_INFO @ 500: reporter [TEST] Simulation completed with ERRORS
+ 
+---
+ 
+UVM Report Summary:
+ 
+** Count: 0
+ 
+** Error: 8
+ 
+** Fatal: 1
+ 
+** Warning: 3
+ 
+** Info: 12
+ 
+------------------------------------------------------------------------------

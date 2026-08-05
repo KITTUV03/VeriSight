@@ -47,14 +47,23 @@ Inputs (Spec, RTL, UVM TB, Sim Log, Coverage)
 # Install dependencies
 pip install -e ".[dev]"
 
-# Run on the included ALU example
+# Run with Gemini (default)
+export GEMINI_API_KEY="your-gemini-key"
 python main.py \
     --spec examples/specs/alu_spec.md \
     --rtl examples/rtl/ \
     --tb examples/tb/ \
     --log examples/logs/sim.log \
-    --output output/ \
-    --no-rag
+    --output output/
+
+# Run with Claude (Anthropic API)
+export ANTHROPIC_API_KEY="your-anthropic-key"
+python main.py \
+    --provider anthropic \
+    --model claude-sonnet-4-20250514 \
+    --spec examples/specs/alu_spec.md \
+    --rtl examples/rtl/ \
+    --log examples/logs/sim.log
 
 # Run tests
 python -m pytest tests/ -v

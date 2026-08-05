@@ -101,14 +101,20 @@ Examples:
 
     # LLM options
     parser.add_argument(
+        "--provider",
+        type=str,
+        choices=["gemini", "anthropic", "claude"],
+        help="LLM provider (default: gemini or auto-detected from environment)",
+    )
+    parser.add_argument(
         "--api-key",
         type=str,
-        help="LLM API key (overrides GEMINI_API_KEY env var)",
+        help="LLM API key (overrides GEMINI_API_KEY or ANTHROPIC_API_KEY env var)",
     )
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (default: gemini-2.0-flash)",
+        help="LLM model name (default: gemini-2.0-flash or claude-sonnet-4-20250514)",
     )
 
     return parser.parse_args()
@@ -155,11 +161,15 @@ def main():
     setup_logging(level=log_level)
 
     # Build configuration
-    llm_config = LLMConfig()
+    kwargs = {}
+    if args.provider:
+        kwargs["provider"] = args.provider
     if args.api_key:
-        llm_config.api_key = args.api_key
+        kwargs["api_key"] = args.api_key
     if args.model:
-        llm_config.model_name = args.model
+        kwargs["model_name"] = args.model
+
+    llm_config = LLMConfig(**kwargs)
 
     config = VeriSightConfig(
         llm=llm_config,
@@ -178,6 +188,8 @@ def main():
     console.print("[bold cyan]║[/]  [bold white]VeriSight[/] — AI-Powered RTL/UVM Debugging Framework     [bold cyan]║[/]")
     console.print("[bold cyan]╚══════════════════════════════════════════════════════════╝[/]\n")
 
+    console.print(f"  [dim]Provider:[/]  {config.llm.provider}")
+    console.print(f"  [dim]Model:[/]     {config.llm.model_name}")
     console.print(f"  [dim]Spec:[/]     {args.spec or 'not provided'}")
     console.print(f"  [dim]RTL:[/]      {args.rtl or 'not provided'}")
     console.print(f"  [dim]TB:[/]       {args.tb or 'not provided'}")
