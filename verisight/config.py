@@ -58,7 +58,7 @@ class LLMConfig:
         # Set default model name if not provided
         if not self.model_name:
             if self.provider == "anthropic":
-                self.model_name = "claude-opus-5"
+                self.model_name = "claude-sonnet-5"
             else:
                 self.model_name = "gemini-2.0-flash"
 

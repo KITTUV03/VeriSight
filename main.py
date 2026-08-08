@@ -156,6 +156,10 @@ def main():
     if not validate_inputs(args):
         sys.exit(1)
 
+    # Normalize output dir (drop any trailing separators so display/paths
+    # don't end up with a doubled slash, e.g. "output//").
+    args.output = args.output.rstrip("/\\") or "."
+
     # Setup logging
     log_level = "DEBUG" if args.verbose else "INFO"
     setup_logging(level=log_level)

@@ -1,99 +1,176 @@
-# Synchronous FIFO Design Specification
+## Synchronous FIFO — Design Specification
 
-## Overview
+Module Name:syn_fifo File:syn_fifo.v Version: 1.1 (corrected) Type: Single-clock (synchronous) FIFO, dual-port RAM based
 
-This document specifies a parameterized synchronous First-In-First-Out (FIFO) buffer designed for reliable data transfer between synchronous blocks within a single clock domain. The FIFO supports configurable data width and depth, provides comprehensive status monitoring, and includes protection mechanisms against overflow and underflow conditions. The design is suitable for use in high-speed datapath buffering, packet processing pipelines, and inter-module communication interfaces.
+## 1. Overview
 
-## Functional Requirements
+syn_fifo is a parameterizable, single-clock-domain FIFO built around a dual-port RAM (ram_dp_ar_aw ). One port is dedicated to writes, the other to reads, using independent write and read pointers and a status counter that tracks current occupancy.
 
-- The FIFO shall accept two configurable parameters at elaboration time:
-  - DATA_WIDTH: Width of each data word in bits (minimum: 1, typical: 8/16/32/64)
-  - ADDR_WIDTH: Address width determining the FIFO depth, where DEPTH = 2^ADDR_WIDTH (minimum ADDR_WIDTH: 2, giving depth 4)
-- The FIFO shall accept a single-bit write enable input signal (wr_en)
-- The FIFO shall accept a data input bus (din) of width DATA_WIDTH
-- The FIFO shall accept a single-bit read enable input signal (rd_en)
-- The FIFO shall produce a data output bus (dout) of width DATA_WIDTH
-- The FIFO shall produce a single-bit full flag (full) indicating no space remains for writing
-- The FIFO shall produce a single-bit empty flag (empty) indicating no data is available for reading
-- The FIFO shall produce a single-bit almost-full flag (almost_full) with a configurable threshold AF_LEVEL
-- The FIFO shall produce a single-bit almost-empty flag (almost_empty) with a configurable threshold AE_LEVEL
-- The FIFO shall produce a single-bit overflow flag (overflow) asserted for one cycle when wr_en is asserted while full
-- The FIFO shall produce a single-bit underflow flag (underflow) asserted for one cycle when rd_en is asserted while empty
-- The FIFO shall produce a count output bus (wr_count) of width ADDR_WIDTH+1 indicating the number of occupied locations
-- The FIFO shall produce a count output bus (rd_count) of width ADDR_WIDTH+1 indicating the number of available words to read
-- The FIFO shall support two operating modes selectable at elaboration time:
-  - FWFT_MODE = 0: Standard mode — data appears on dout one clock cycle after rd_en assertion
-  - FWFT_MODE = 1: First-Word Fall-Through mode — next data word appears on dout combinatorially after previous read, before rd_en assertion
-- The FIFO shall support an optional registered output stage selectable at elaboration time:
-  - REG_OUTPUT = 0: Combinational output from memory array
-  - REG_OUTPUT = 1: Output registered for improved timing closure
-- The FIFO shall implement a circular buffer architecture with one permanently unused location to distinguish between full and empty conditions
-- All pointer arithmetic shall use an extra most significant bit beyond ADDR_WIDTH for full/empty disambiguation
+This version corrects an off-by-one error in the original full flag and adds internal write/read qualification logic so the FIFO cannot silently overflow or underflow even if wr_en /rd_en are asserted when the FIFO is already full/empty.
 
-## Reset Behavior
+## 2. Parameters
 
-- The FIFO shall use an active-low asynchronous reset (rst_n)
-- On reset assertion, the following behavior shall occur:
-  - Write pointer (wr_ptr) shall be reset to 0
-  - Read pointer (rd_ptr) shall be reset to 0
-  - full flag shall be driven to 1'b0
-  - empty flag shall be driven to 1'b1
-  - almost_full flag shall be driven to 1'b0
-  - almost_empty flag shall be driven to 1'b1
-  - overflow flag shall be driven to 1'b0
-  - underflow flag shall be driven to 1'b0
-  - Memory contents may remain unchanged (no explicit clearing required)
-  - In FWFT mode, dout register shall be driven to 0
-- Reset must be held active for a minimum of 3 clock cycles to ensure proper initialization of all internal state
-- After reset de-assertion, the FIFO shall be ready to accept write operations on the subsequent clock cycle
-- The empty flag shall remain asserted until the first successful write operation completes
+| Parameter Default Description |
+| --- |
+| DATA_WIDTH 8 Width of data_in / data_out , in bits |
+| ADDR_WIDTH 8 Width of internal RAM address (pointer width) RAM_DEPTH 1 << ADDR_WIDTH (derived, not Number of storage locations (256 for default |
+| user-set) ADDR_WIDTH ) |
 
-## Timing Requirements
+RAM_DEPTH is always a power of two, since it is derived from ADDR_WIDTH . This allows the write/read pointers to wrap correctly on overflow without explicit modulo logic.
 
-- Clock frequency: The FIFO shall support operation at frequencies up to 400 MHz (2.5 ns period) in typical 28nm CMOS technology, subject to timing closure with actual parameters
-- Setup time: All input signals (wr_en, rd_en, din) must be stable at least 0.5 ns before the rising clock edge
-- Hold time: All input signals must remain stable for at least 0.2 ns after the rising clock edge
-- Clock-to-output delay: Output signals (dout, flags, counts) shall be valid within 1.5 ns after the rising clock edge in REG_OUTPUT=0 mode
-- Write latency: Data written on cycle N shall be available for reading on cycle N+1 (one clock cycle from write enable to data available in memory)
-- Read latency (Standard mode): Data shall appear on dout in the same cycle as rd_en assertion, sourced from memory array
-- Read latency (FWFT mode): Next data word shall appear on dout one cycle after the previous read completes, before subsequent rd_en assertion
-- Flag update latency: full, empty, almost_full, and almost_empty flags shall reflect the FIFO state in the same clock cycle as the operation that caused the state change
-- Overflow/underflow latency: Error flags shall be asserted in the same cycle as the violating operation
-- Count update latency: wr_count and rd_count shall reflect the number of words in the FIFO in the same clock cycle as write/read operations
-- All operations complete in a single clock cycle with no multi-cycle paths
-- Maximum throughput: One write and one read per clock cycle when FIFO is neither full nor empty (simultaneous read/write supported)
 
-## Corner Cases
+## 3. Port List
 
-- **Simultaneous read and write when FIFO is empty**: Write succeeds (data stored), read does not occur (underflow asserted), empty flag remains asserted until write completes, then de-asserts in subsequent cycle
-- **Simultaneous read and write when FIFO is full**: Read succeeds (data retrieved), write does not occur (overflow asserted), full flag remains asserted until read completes, then de-asserts in subsequent cycle
-- **Simultaneous read and write when FIFO is neither full nor empty**: Both operations succeed, FIFO occupancy count (wr_count/rd_count) remains unchanged
-- **Write to FIFO with one remaining empty slot**: Write succeeds, full flag asserts in the same cycle, wr_count equals DEPTH-1 after write
-- **Read from FIFO with one remaining data word**: Read succeeds, empty flag asserts in the same cycle, rd_count equals 0 after read
-- **Back-to-back writes when almost-full**: AF_LEVEL defines the threshold; when wr_count >= AF_LEVEL, almost_full asserts. If AF_LEVEL = DEPTH-2, almost_full asserts when 2 or fewer empty slots remain
-- **Back-to-back reads when almost-empty**: AE_LEVEL defines the threshold; when rd_count <= AE_LEVEL, almost_empty asserts. If AE_LEVEL = 2, almost_empty asserts when 2 or fewer data words remain
-- **Pointer wraparound**: When write pointer or read pointer reaches DEPTH-1 and increments, it shall wrap to 0 correctly with the extra address bit toggling for full/empty distinction
-- **Write when wr_ptr+1 == rd_ptr (all locations full)**: Write is suppressed, overflow flag asserts for one cycle, data is not stored, memory contents preserved
-- **Read when rd_ptr == wr_ptr (all locations empty)**: Read returns undefined data (memory contents at read address), underflow flag asserts for one cycle, read pointer does not advance
-- **DATA_WIDTH = 1 (single-bit FIFO)**: All operations function identically with 1-bit data path width
-- **ADDR_WIDTH = 2 (depth of 4)**: FIFO functions correctly with minimal depth, AF_LEVEL and AE_LEVEL must be adjusted accordingly
-- **AF_LEVEL set to DEPTH (threshold equals capacity)**: almost_full never asserts
-- **AE_LEVEL set to 0**: almost_empty asserts only when FIFO is completely empty
-- **FWFT mode read from empty FIFO**: dout holds the last valid data word read; empty flag indicates data is not valid
-- **Reset assertion during active read/write**: Both operations aborted, pointers reset, flags reset, any in-flight data lost
-- **Parameter validation at elaboration time**: The design shall verify at compile time that DEPTH equals 2^ADDR_WIDTH; mismatch shall result in a compilation error
+| Signal DirectionWidth Description |   |   |   |
+| --- | --- | --- | --- |
+| clk | Input | 1 | System clock. All sequential logic is synchronous to the |
+|   |   |   | rising edge. |
+| rst | Input | 1 | Active-high, asynchronous reset. |
+| wr_cs | Input | 1 | Write chip-select. Must be asserted along with wr_en |
+|   |   |   | for a write to occur. |
+| rd_cs | Input | 1 | Read chip-select. Must be asserted along with rd_en for |
+|   |   |   | a read to occur. |
+| wr_en | Input | 1 | Write enable. |
+| rd_en | Input | 1 | Read enable. |
+| data_in | Input | DATA_WIDTH | Data to be written into the FIFO. |
+| data_out | Output | DATA_WIDTH | Data read from the FIFO. Registered — valid one clock |
+|   |   |   | cycle after a qualified read request (see §6.3). |
+| full | Output 1 |   | Asserted when the FIFO is completely full (status_cnt |
+|   |   |   | == RAM_DEPTH ). |
+| empty | Output 1 |   | Asserted when the FIFO is completely empty |
+|   |   |   | (status_cnt == 0 ). |
 
-## Illegal Conditions
+## 4. Functional Description
 
-- **Operation without reset**: Operating the FIFO without first asserting the reset signal for the minimum required duration (3 clock cycles) is illegal and may result in pointer misalignment, incorrect flag states, and data corruption
-- **Asserting reset for fewer than 3 clock cycles**: May result in incomplete initialization of internal state elements, leaving flags in unknown states
-- **Changing inputs during setup/hold window**: Input signals (wr_en, rd_en, din) shall not transition within the setup-hold window around the active clock edge; violation may cause metastability on captured signals
-- **Writing while FIFO is full with overflow protection ignored**: The hardware suppresses the write and asserts overflow, but the external logic must not rely on the write having succeeded
-- **Reading while FIFO is empty with underflow protection ignored**: The hardware suppresses the read and asserts underflow; dout value is undefined and must not be used by downstream logic
-- **Exceeding ADDR_WIDTH of 16**: Depth beyond 65536 locations (ADDR_WIDTH > 16) is not supported without timing verification; the circular buffer addressing and flag generation must be re-evaluated for such configurations
-- **DATA_WIDTH of 0**: Zero-width data path is undefined and shall not be used
-- **Asynchronous reset de-assertion coincident with clock edge**: Reset de-assertion must not occur simultaneous with the active clock edge; a minimum separation of 1 ns is required to avoid recovery/removal timing violations
-- **Modifying FIFO parameters after synthesis**: All parameter values (DATA_WIDTH, ADDR_WIDTH, FWFT_MODE, REG_OUTPUT, AF_LEVEL, AE_LEVEL) are fixed at elaboration time and cannot be changed dynamically during operation
-- **Using AF_LEVEL greater than or equal to DEPTH**: If AF_LEVEL >= DEPTH, the almost_full flag behavior is undefined; AF_LEVEL must satisfy 0 <= AF_LEVEL < DEPTH
-- **Using AE_LEVEL greater than or equal to DEPTH**: If AE_LEVEL >= DEPTH, the almost_empty flag behavior is undefined; AE_LEVEL must satisfy 0 <= AE_LEVEL < DEPTH
-- **Violating maximum fanout on pointer registers**: In deep FIFO configurations (ADDR_WIDTH > 8), the read and write pointers drive comparators for all status flags; physical synthesis must ensure timing closure, else register duplication may be required
+## 4.1 Write Operation
+
+A write occurs when wr_cs && wr_en are both asserted and the FIFO is not full. On a qualified write:
+
+- data_in is written into the RAM at wr_pointer .
+
+- wr_pointer increments by 1 (wraps automatically at RAM_DEPTH ).
+
+- status_cnt increments by 1 (unless a simultaneous qualified read also occurs — see §4.3).
+
+If wr_cs && wr_en is asserted while full is already asserted, the write is ignored: no pointer increment, no RAM write side-effect change, no status_cnt change. This differs from the original code, which had no such protection.
+
+
+## 4.2 Read Operation
+
+A read occurs when rd_cs && rd_en are both asserted and the FIFO is not empty. On a qualified read:
+
+- The RAM location addressed by rd_pointer is presented as data_ram , which is registered into data_out on the next clock edge.
+
+- rd_pointer increments by 1 (wraps automatically at RAM_DEPTH ).
+
+- status_cnt decrements by 1 (unless a simultaneous qualified write also occurs — see §4.3).
+
+If rd_cs && rd_en is asserted while empty is already asserted, the read is ignored: rd_pointer does not advance and data_out holds its previous value (no stale/garbage RAM read is latched).
+
+## 4.3 Simultaneous Read and Write
+
+If a qualified write and a qualified read occur on the same clock edge, one entry leaves and one entry enters in the same cycle, so status_cnt remains unchanged. Both pointers advance independently.
+
+## 4.4 Reset
+
+On rst (active-high, asynchronous):
+
+- wr_pointer , rd_pointer , and status_cnt are cleared to 0.
+
+- data_out is cleared to 0.
+
+- full deasserts, empty asserts (since status_cnt == 0 ).
+
+## 5. Status Flag Definitions
+
+## 5.1 Correction Rationale
+
+The original code defined:
+
+```
+verilog
+assign full = (status_cnt == (RAM_DEPTH-1));
+```
+
+
+This asserted full one entry early — with status_cnt allowed to legally reach RAM_DEPTH per the counter's own write-guard (status_cnt != RAM_DEPTH ), the FIFO's usable capacity was silently reduced from RAM_DEPTH to RAM_DEPTH - 1 entries, and the discrepancy between the flag and the counter's true range was a latent design inconsistency.
+
+The corrected version aligns the flag with the counter's actual range:
+
+```
+verilog
+assign full = (status_cnt == RAM_DEPTH);
+```
+
+The FIFO now provides its full, advertised RAM_DEPTH -entry capacity.
+
+## 6. Timing Characteristics
+
+## 6.1 Write Timing
+
+- wr_pointer and status_cnt update synchronously, one cycle after a qualified write request.
+
+- Data is written into RAM combinationally on the same cycle the write is issued (RAM write is same-cycle; pointer/counter bookkeeping is registered).
+
+## 6.2 Read Latency
+
+- data_out reflects the RAM contents addressed by rd_pointer one clock cycle after a qualified rd_en assertion (registered read, consistent with synchronous dual-port block RAM behavior).
+
+- Consumers must account for this 1-cycle latency; data_out is not combinationally valid in the same cycle as rd_en .
+
+## 6.3 Back-to-Back Access
+
+Because pointer and status updates are registered, back-to-back writes/reads are supported at one operation per clock cycle, as long as full /empty boundary conditions are respected.
+
+
+## 7. Overflow / Underflow Protection
+
+| Condition Original Behavior |   | Corrected Behavior |
+| --- | --- | --- |
+| wr_en | Not explicitly blocked; relied entirely on | Internally blocked — no |
+| asserted while | external controller discipline | pointer/counter/RAM side-effect |
+| full |   | change |
+| rd_en | rd_pointer would advance past | Internally blocked — |
+| asserted while | wr_pointer , and data_out would latch | rd_pointer holds, data_out |
+| empty | stale/undefined RAM contents with no | retains last valid value |
+|   | error indication |   |
+
+This makes the FIFO self-protecting: even if the integrating design violates the full /empty handshake, the FIFO will not corrupt its internal pointers or silently return garbage data.
+
+Design note: Self-protection adds a small amount of combinational qualification logic (wr_valid , rd_valid ) on the enable paths. If area/timing is extremely constrained and the integrating logic is already verified to strictly honor full /empty , this guard can be omitted — but it is recommended to keep it for robustness during integration and verification.
+
+## 8. Sub-module Dependency
+
+syn_fifo instantiates a synchronous dual-port RAM:
+
+```
+ram_dp_ar_aw #(DATA_WIDTH, ADDR_WIDTH) DP_RAM (...)
+```
+
+
+| Port | Direction Description |
+| --- | --- |
+| address_0 | Input Write-port address (driven by wr_pointer ) |
+| data_0 | Input Write-port data (driven by data_in ) |
+| cs_0 | Input Write-port chip select (wr_cs ) |
+| we_0 | Input Write-port write-enable (wr_en ) |
+| oe_0 | Input Write-port output-enable (tied low — write-only use) |
+| address_1 | Input Read-port address (driven by rd_pointer ) |
+| data_1 | Output Read-port data (feeds data_ram ) |
+| cs_1 | Input Read-port chip select (rd_cs ) |
+| we_1 | Input Read-port write-enable (tied low — read-only use) |
+| oe_1 | Input Read-port output-enable (rd_en ) |
+
+This RAM module is not included in this specification; it is assumed to be a standard synchronous dual-port RAM primitive with independent read/write address/control per port.
+
+## 9. Known Limitations
+
+- Single clock domain only. This design is not suitable for crossing clock domains; use a dual-clock (asynchronous) FIFO with Gray-coded pointers and proper CDC synchronizers for that use case.
+
+- No almost-full / almost-empty / programmable threshold flags. Only binary full /empty are provided. If watermark flags are needed, status_cnt can be compared against a threshold externally or added as additional outputs.
+
+- RAM_DEPTH must be a power of two, as it is derived from ADDR_WIDTH . Non-power- of-two depths would require additional wrap logic and are out of scope for this module.
+
+fi
+
+fi

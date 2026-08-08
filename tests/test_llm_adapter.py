@@ -20,14 +20,18 @@ class TestLLMConfigProvider:
             assert config.model_name == "gemini-2.0-flash"
 
     def test_explicit_anthropic_provider(self):
-        config = LLMConfig(provider="anthropic")
+        with patch.dict(os.environ, {}, clear=True):
+            config = LLMConfig(provider="anthropic")
         assert config.provider == "anthropic"
-        assert config.model_name == "claude-sonnet-4-20250514"
+        assert config.model_name == "claude-sonnet-5"
 
     def test_explicit_claude_provider_alias(self):
-        config = LLMConfig(provider="claude")
-        assert config.provider == "claude"
-        assert config.model_name == "claude-sonnet-4-20250514"
+        # The "claude" alias is normalized to "anthropic" for consistent
+        # downstream provider checks.
+        with patch.dict(os.environ, {}, clear=True):
+            config = LLMConfig(provider="claude")
+        assert config.provider == "anthropic"
+        assert config.model_name == "claude-sonnet-5"
 
     def test_model_name_auto_detects_anthropic(self):
         config = LLMConfig(model_name="claude-3-7-sonnet-20250219")
@@ -42,31 +46,39 @@ class TestLLMConfigProvider:
             config = LLMConfig()
             assert config.provider == "anthropic"
             assert config.api_key == "sk-ant-test12345"
-            assert config.model_name == "claude-sonnet-4-20250514"
+            assert config.model_name == "claude-sonnet-5"
 
 
 class TestLLMAdapterAnthropic:
     """Tests for LLMAdapter with Anthropic provider."""
 
     def test_missing_anthropic_key_raises_error(self):
-        config = VeriSightConfig(llm=LLMConfig(provider="anthropic", api_key=""))
-        set_config(config)
-        adapter = LLMAdapter()
-        with pytest.raises(RuntimeError) as exc_info:
-            adapter.generate("Hello")
+        # Clear the environment so a key loaded from .env (via dotenv at import
+        # time) doesn't leak in and mask the empty-key path under test.
+        with patch.dict(os.environ, {}, clear=True):
+            config = VeriSightConfig(llm=LLMConfig(provider="anthropic", api_key=""))
+            set_config(config)
+            adapter = LLMAdapter()
+            with pytest.raises(RuntimeError) as exc_info:
+                adapter.generate("Hello")
         assert "ANTHROPIC_API_KEY" in str(exc_info.value)
 
     @patch("anthropic.Anthropic")
     def test_anthropic_generate_success(self, mock_anthropic_cls):
-        # Setup mock Anthropic client
+        # Setup mock Anthropic client. Real responses tag each content block
+        # with a type; _extract_text selects the "text" blocks, so the mock
+        # must set it too.
         mock_client = MagicMock()
         mock_anthropic_cls.return_value = mock_client
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = '{"result": "success"}'
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text='{"result": "success"}')]
+        mock_response.content = [text_block]
         mock_client.messages.create.return_value = mock_response
 
         config = VeriSightConfig(
-            llm=LLMConfig(provider="anthropic", api_key="sk-ant-test", model_name="claude-sonnet-4-20250514")
+            llm=LLMConfig(provider="anthropic", api_key="sk-ant-test", model_name="claude-sonnet-5")
         )
         set_config(config)
 
@@ -75,8 +87,8 @@ class TestLLMAdapterAnthropic:
 
         assert res == '{"result": "success"}'
         mock_client.messages.create.assert_called_once_with(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8192,
+            model="claude-sonnet-5",
+            max_tokens=16000,
             temperature=0.1,
             messages=[{"role": "user", "content": "Analyze log"}],
             system="You are a helper",
