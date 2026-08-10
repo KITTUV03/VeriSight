@@ -1,8 +1,12 @@
 """
 VeriSight Pipeline Orchestrator.
 
-Manages the sequential execution of all 4 agents:
-  Agent 1 → Agent 2 → (conditional) Agent 3 → Agent 4
+Manages the sequential execution of all 5 agents:
+  Agent 1 → Agent 2 → (conditional) Agent 3 → Agent 5 → Agent 4
+
+  Agent 5 (Fix Generator) runs after Agent 2 (TB Bug path) or after
+  Agent 3 (RTL Bug path). It degrades gracefully when confidence is
+  below threshold, RTL/TB source is unavailable, or the LLM fails.
 
 Handles early termination (TB Bug at Agent 2), intermediate artifact
 persistence, error handling, and graceful degradation.
@@ -164,7 +168,7 @@ class VeriSightPipeline:
         if self.classification.classification == "TB Bug":
             logger.info("")
             logger.info("┌─ TB Bug detected — skipping RTL analysis (Agent 3)")
-            logger.info("└─ Pipeline short-circuiting to Report Generator (Agent 4)")
+            logger.info("└─ Proceeding to Fix Generator (Agent 5) then Report Generator (Agent 4)")
             logger.info("")
         elif self.classification.classification in ("RTL Bug", "Unknown"):
             try:
@@ -178,6 +182,38 @@ class VeriSightPipeline:
             logger.info(f"Classification: {self.classification.classification} — skipping Agent 3")
 
         # ═══════════════════════════════════════════════════════════
+        # AGENT 5: Automated Fix Generator
+        # ═══════════════════════════════════════════════════════════
+        if self.config.fix.enabled and self.classification.classification in ("TB Bug", "RTL Bug"):
+            try:
+                self.fix_result = self.agent5.execute(
+                    self.knowledge,
+                    self.classification,
+                    self.rtl_analysis,
+                )
+
+                if self.config.pipeline.save_intermediates:
+                    save_json(self.fix_result, output_dir / "fix.json")
+
+            except Exception as e:
+                logger.warning(f"Agent 5 (Fix Generator) failed: {e} — continuing without fix")
+                self.fix_result = FixResult(
+                    fix_available=False,
+                    issue_type="none",
+                    fix_type="no_fix",
+                    decline_reason=f"Fix generation failed unexpectedly: {e}",
+                    limitations=["Unexpected exception during fix generation; see pipeline logs."],
+                )
+        else:
+            if not self.config.fix.enabled:
+                logger.info("Fix generation disabled (VERISIGHT_FIX_ENABLED=false)")
+            else:
+                logger.info(
+                    f"Classification '{self.classification.classification}' does not "
+                    "require fix generation — skipping Agent 5"
+                )
+
+        # ═══════════════════════════════════════════════════════════
         # AGENT 4: Report Generation
         # ═══════════════════════════════════════════════════════════
         try:
@@ -185,6 +221,7 @@ class VeriSightPipeline:
                 self.knowledge,
                 self.classification,
                 self.rtl_analysis,
+                self.fix_result,
             )
         except Exception as e:
             logger.error(f"Agent 4 failed: {e}")

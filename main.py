@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from verisight.config import VeriSightConfig, LLMConfig, ChromaConfig, PipelineConfig, XTracerConfig
+from verisight.config import VeriSightConfig, LLMConfig, ChromaConfig, PipelineConfig, XTracerConfig, FixConfig
 from verisight.orchestrator import VeriSightPipeline
 from verisight.utils.logger import setup_logging, console
 
@@ -97,6 +97,20 @@ Examples:
         "--no-intermediates",
         action="store_true",
         help="Don't save intermediate JSON artifacts",
+    )
+    parser.add_argument(
+        "--no-fix",
+        action="store_true",
+        help="Disable automated fix generation (Agent 5)",
+    )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=None,
+        help=(
+            "Minimum evidence-weighted confidence (0.0–1.0) required before Agent 5 "
+            "emits a fix. Default: 0.70. Fixes below this threshold are declined."
+        ),
     )
 
     # X-Propagation Analysis (x-tracer) — all optional
@@ -259,6 +273,14 @@ def main():
             verbose=args.verbose,
         ),
         xtracer=xtracer_config,
+        fix=FixConfig(
+            enabled=not args.no_fix,
+            min_confidence=(
+                args.min_confidence
+                if args.min_confidence is not None
+                else 0.70
+            ),
+        ),
         log_level=log_level,
     )
 

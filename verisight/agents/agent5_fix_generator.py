@@ -582,8 +582,9 @@ class FixGeneratorAgent(BaseAgent):
             known_modules.add(module.name)
             for port in module.ports:
                 known_signals.add(port.name)
-            for sig in module.internal_signals:
-                known_signals.add(sig)
+            for block in module.always_blocks:
+                known_signals.update(block.signals_written)
+                known_signals.update(block.signals_read)
 
         # Only fail on structural check if we have something to check against
         if not known_signals and not known_modules:
