@@ -147,6 +147,16 @@ class ReportGeneratorAgent(BaseAgent):
             ))
 
         if rtl_analysis:
+            for trace in rtl_analysis.xtrace.real_traces:
+                fixes.append(RecommendedFix(
+                    action=(
+                        f"x-tracer confirmed '{trace.query_signal}' is X due to "
+                        f"{trace.root_cause_type or 'an unresolved cause'} "
+                        f"at {trace.query_time_ps}ps"
+                    ),
+                    priority="critical",
+                ))
+
             for x_origin in rtl_analysis.xtrace.x_origins:
                 fixes.append(RecommendedFix(
                     action=f"Add reset for signal '{x_origin.origin_signal}' in module",
@@ -194,6 +204,16 @@ class ReportGeneratorAgent(BaseAgent):
 
         # Build evidence chain
         evidence = list(classification.evidence)
+        if rtl_analysis and rtl_analysis.xtrace.real_traces:
+            for trace in rtl_analysis.xtrace.real_traces:
+                evidence.append(EvidenceItem(
+                    source="x-tracer",
+                    reference=f"{trace.query_signal}@{trace.query_time_ps}ps",
+                    description=(
+                        f"x-tracer confirmed root cause: {trace.root_cause_type or 'unknown'}"
+                        + (f" — {trace.summary}" if trace.summary else "")
+                    ),
+                ))
         if rtl_analysis and rtl_analysis.xtrace.x_origins:
             for x in rtl_analysis.xtrace.x_origins:
                 evidence.append(EvidenceItem(
@@ -354,7 +374,7 @@ class ReportGeneratorAgent(BaseAgent):
                 f"",
             ])
 
-            if rtl_analysis.xtrace.x_origins:
+            if rtl_analysis.xtrace.x_origins or rtl_analysis.xtrace.tool_status != "disabled":
                 lines.extend([
                     f"### X Propagation",
                     f"",
@@ -364,7 +384,26 @@ class ReportGeneratorAgent(BaseAgent):
                         f"- **{x.origin_signal}** in `{x.origin_module}` "
                         f"(line {x.line_number}) — Cause: {x.origin_cause}"
                     )
-                lines.append("")
+                if rtl_analysis.xtrace.x_origins:
+                    lines.append("")
+
+                if rtl_analysis.xtrace.real_traces:
+                    lines.extend([
+                        f"#### Confirmed by x-tracer",
+                        f"",
+                    ])
+                    for trace in rtl_analysis.xtrace.real_traces:
+                        lines.append(
+                            f"- **{trace.query_signal}** @ {trace.query_time_ps}ps — "
+                            f"{trace.root_cause_type or 'unknown cause'}"
+                            + (f": {trace.summary}" if trace.summary else "")
+                        )
+                    lines.append("")
+                elif rtl_analysis.xtrace.tool_status not in ("disabled", "ok"):
+                    lines.extend([
+                        f"_Real x-tracer analysis not run: {rtl_analysis.xtrace.tool_message}_",
+                        f"",
+                    ])
 
             if rtl_analysis.functional.issues:
                 lines.extend([
@@ -429,6 +468,7 @@ class ReportGeneratorAgent(BaseAgent):
     def _generate_html_report(self, context: dict) -> str:
         """Generate styled HTML report."""
         report = context["report"]
+        rtl_analysis = context.get("rtl_analysis")
 
         # Inline HTML with CSS (no external template needed)
         severity_colors = {
@@ -474,6 +514,22 @@ class ReportGeneratorAgent(BaseAgent):
                     <span class="badge badge-{fix.priority}">{fix.priority}</span>
                     {fix.action}
                     {'<pre><code>' + fix.code_suggestion + '</code></pre>' if fix.code_suggestion else ''}
+                </div>"""
+
+        # Build x-tracer confirmed traces
+        xtracer_items = ""
+        if rtl_analysis:
+            for trace in rtl_analysis.xtrace.real_traces:
+                xtracer_items += f"""
+                <div class="evidence-item">
+                    <span class="evidence-source">[x-tracer]</span>
+                    <strong>{trace.query_signal}@{trace.query_time_ps}ps</strong> — {trace.root_cause_type or 'unknown cause'}
+                    {'<br>' + trace.summary if trace.summary else ''}
+                </div>"""
+            if not rtl_analysis.xtrace.real_traces and rtl_analysis.xtrace.tool_status not in ("disabled", "ok"):
+                xtracer_items = f"""
+                <div class="evidence-item">
+                    <em>Real x-tracer analysis not run: {rtl_analysis.xtrace.tool_message}</em>
                 </div>"""
 
         # Build reasoning chain
@@ -610,6 +666,7 @@ class ReportGeneratorAgent(BaseAgent):
     </table>
 
     {'<h2>Evidence Chain</h2>' + evidence_items if evidence_items else ''}
+    {'<h2>X-Tracer</h2>' + xtracer_items if xtracer_items else ''}
     {'<h2>Reasoning</h2>' + reasoning_items if reasoning_items else ''}
     {'<h2>Recommended Fixes</h2>' + fix_items if fix_items else ''}
 
@@ -622,6 +679,7 @@ class ReportGeneratorAgent(BaseAgent):
     def _generate_summary(self, context: dict) -> str:
         """Generate plain-text executive summary."""
         report = context["report"]
+        rtl_analysis = context.get("rtl_analysis")
         lines = [
             "=" * 60,
             "VERISIGHT DEBUGGING SUMMARY",
@@ -649,6 +707,15 @@ class ReportGeneratorAgent(BaseAgent):
             lines.append("RECOMMENDED FIXES:")
             for i, fix in enumerate(report.recommended_fixes, 1):
                 lines.append(f"  {i}. [{fix.priority}] {fix.action}")
+            lines.append("")
+
+        if rtl_analysis and rtl_analysis.xtrace.real_traces:
+            lines.append("X-TRACER CONFIRMED:")
+            for trace in rtl_analysis.xtrace.real_traces:
+                lines.append(
+                    f"  - {trace.query_signal}@{trace.query_time_ps}ps: "
+                    f"{trace.root_cause_type or 'unknown cause'}"
+                )
             lines.append("")
 
         lines.extend([

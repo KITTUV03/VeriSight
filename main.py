@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from verisight.config import VeriSightConfig, LLMConfig, ChromaConfig, PipelineConfig
+from verisight.config import VeriSightConfig, LLMConfig, ChromaConfig, PipelineConfig, XTracerConfig
 from verisight.orchestrator import VeriSightPipeline
 from verisight.utils.logger import setup_logging, console
 
@@ -99,6 +99,54 @@ Examples:
         help="Don't save intermediate JSON artifacts",
     )
 
+    # X-Propagation Analysis (x-tracer) — all optional
+    xtrace_group = parser.add_argument_group("X-Propagation Analysis (x-tracer)")
+    xtrace_group.add_argument(
+        "--xtrace",
+        action="store_true",
+        help="Enable real X-propagation root-cause tracing via x-tracer "
+             "(requires yosys or --netlist, and a --vcd waveform)",
+    )
+    xtrace_group.add_argument(
+        "--netlist",
+        action="append",
+        help="Path to a pre-synthesized gate-level netlist (.v). Repeatable. "
+             "If omitted, VeriSight synthesizes one from --rtl using yosys",
+    )
+    xtrace_group.add_argument(
+        "--top",
+        type=str,
+        help="Top module name for synthesis/x-tracer hierarchy (auto-detected if omitted)",
+    )
+    xtrace_group.add_argument(
+        "--vcd",
+        type=str,
+        help="Path to simulation waveform (VCD) for x-tracer analysis",
+    )
+    xtrace_group.add_argument(
+        "--xtrace-signal",
+        type=str,
+        help="Explicit signal path to trace (e.g. tb.dut.y[0]), overrides "
+             "auto-derivation from the sim log. Must be given with --xtrace-time",
+    )
+    xtrace_group.add_argument(
+        "--xtrace-time",
+        type=int,
+        help="Explicit query time in picoseconds, overrides auto-derivation. "
+             "Must be given with --xtrace-signal",
+    )
+    xtrace_group.add_argument(
+        "--xtracer-path",
+        type=str,
+        help="Path to x_tracer.py (else VERISIGHT_XTRACER_PATH env var or auto-detected)",
+    )
+    xtrace_group.add_argument(
+        "--xtrace-max-depth",
+        type=int,
+        default=100,
+        help="Max trace depth for x-tracer (default: 100)",
+    )
+
     # LLM options
     parser.add_argument(
         "--provider",
@@ -140,6 +188,21 @@ def validate_inputs(args) -> bool:
         console.print(f"[red]Error:[/red] Log file not found: {args.log}")
         valid = False
 
+    for netlist in (args.netlist or []):
+        if not Path(netlist).exists():
+            console.print(f"[red]Error:[/red] Netlist file not found: {netlist}")
+            valid = False
+
+    if args.vcd and not Path(args.vcd).exists():
+        console.print(f"[red]Error:[/red] VCD file not found: {args.vcd}")
+        valid = False
+
+    if bool(args.xtrace_signal) != bool(args.xtrace_time is not None):
+        console.print(
+            "[red]Error:[/red] --xtrace-signal and --xtrace-time must be given together"
+        )
+        valid = False
+
     if not any([args.spec, args.rtl, args.tb, args.log]):
         console.print("[red]Error:[/red] At least one input must be provided")
         console.print("  Use --spec, --rtl, --tb, or --log")
@@ -175,6 +238,17 @@ def main():
 
     llm_config = LLMConfig(**kwargs)
 
+    xtracer_config = XTracerConfig(
+        enabled=bool(args.xtrace or args.vcd or args.netlist),
+        netlist_paths=args.netlist or [],
+        top_module=args.top or "",
+        vcd_path=args.vcd or "",
+        signal=args.xtrace_signal or "",
+        time_ps=args.xtrace_time,
+        xtracer_path=args.xtracer_path or "",
+        max_depth=args.xtrace_max_depth,
+    )
+
     config = VeriSightConfig(
         llm=llm_config,
         chroma=ChromaConfig(),
@@ -184,6 +258,7 @@ def main():
             output_dir=args.output,
             verbose=args.verbose,
         ),
+        xtracer=xtracer_config,
         log_level=log_level,
     )
 
@@ -201,6 +276,7 @@ def main():
     console.print(f"  [dim]Coverage:[/] {args.coverage or 'not provided'}")
     console.print(f"  [dim]Output:[/]   {args.output}")
     console.print(f"  [dim]RAG:[/]      {'enabled' if not args.no_rag else 'disabled'}")
+    console.print(f"  [dim]X-Tracer:[/] {'enabled' if xtracer_config.enabled else 'disabled'}")
     console.print()
 
     # Execute pipeline

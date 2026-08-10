@@ -12,7 +12,7 @@
 //                 ██║     ██║  ██║   ██║   ███████╗███████╗
 //                 ╚═╝     ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝
 
- `include "sync_fifo.sv"
+ `include "syn_fifo.sv"
 //`include "assertion.sv"
 `include "uvm_macros.svh"
 `include "fifo_package.sv"

@@ -17,11 +17,13 @@ from verisight.agents.agent1_knowledge import KnowledgeExtractionAgent
 from verisight.agents.agent2_classifier import RootCauseClassifierAgent
 from verisight.agents.agent3_rtl_analyzer import RTLRootCauseAnalyzer
 from verisight.agents.agent4_reporter import ReportGeneratorAgent
+from verisight.agents.agent5_fix_generator import FixGeneratorAgent
 from verisight.rag.knowledge_base import KnowledgeBase
 from verisight.schemas.knowledge_schema import UnifiedKnowledge
 from verisight.schemas.classification import Classification
 from verisight.schemas.rtl_analysis import RTLAnalysis
 from verisight.schemas.report_schema import ErrorReport
+from verisight.schemas.fix_schema import FixResult
 from verisight.utils.file_utils import save_json
 from verisight.utils.logger import get_logger, setup_logging
 
@@ -65,16 +67,21 @@ class VeriSightPipeline:
         # Initialize agents
         self.agent1 = KnowledgeExtractionAgent(knowledge_base=self.kb)
         self.agent2 = RootCauseClassifierAgent()
-        self.agent3 = RTLRootCauseAnalyzer()
+        self.agent3 = RTLRootCauseAnalyzer(output_dir=self.config.pipeline.output_dir)
         self.agent4 = ReportGeneratorAgent(
             output_dir=self.config.pipeline.output_dir,
             knowledge_base=self.kb,
+        )
+        self.agent5 = FixGeneratorAgent(
+            output_dir=self.config.pipeline.output_dir,
+            fix_subdir=self.config.fix.fix_output_subdir,
         )
 
         # Pipeline state
         self.knowledge: Optional[UnifiedKnowledge] = None
         self.classification: Optional[Classification] = None
         self.rtl_analysis: Optional[RTLAnalysis] = None
+        self.fix_result: Optional[FixResult] = None
         self.report: Optional[ErrorReport] = None
 
     def run(

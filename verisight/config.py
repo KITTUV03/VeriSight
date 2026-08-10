@@ -9,7 +9,7 @@ and .env files.
 import os
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -95,11 +95,67 @@ class PipelineConfig:
 
 
 @dataclass
+class XTracerConfig:
+    """
+    Configuration for real X-propagation root-cause tracing via x-tracer
+    (https://github.com/kuchlous/x-tracer), synthesizing a netlist with
+    yosys when the user doesn't supply one. Entirely optional — when
+    disabled, Agent 3 falls back to its static heuristic X analysis.
+    """
+    enabled: bool = False
+    netlist_paths: List[str] = field(default_factory=list)
+    top_module: str = ""
+    vcd_path: str = ""
+    signal: str = ""
+    time_ps: Optional[int] = None
+    xtracer_path: str = ""
+    max_depth: int = 100
+
+    def __post_init__(self):
+        if not self.xtracer_path:
+            env_path = os.getenv("VERISIGHT_XTRACER_PATH")
+            if env_path:
+                self.xtracer_path = env_path
+            else:
+                candidate = Path(__file__).parent.parent / "third_party" / "x-tracer" / "x_tracer.py"
+                if candidate.exists():
+                    self.xtracer_path = str(candidate)
+
+
+@dataclass
+class FixConfig:
+    """
+    Configuration for Agent 5 — Automated Fix Generator.
+
+    enabled=False makes Agent 5 a no-op, preserving the existing pipeline
+    behaviour exactly. min_confidence is the evidence-weighted threshold
+    below which the agent declines to emit a fix.
+    """
+    enabled: bool = True
+    min_confidence: float = 0.70
+    fix_output_subdir: str = "fix"   # relative to pipeline output_dir
+
+    def __post_init__(self):
+        env_enabled = os.getenv("VERISIGHT_FIX_ENABLED")
+        if env_enabled is not None:
+            self.enabled = env_enabled.lower() not in ("0", "false", "no")
+
+        env_conf = os.getenv("VERISIGHT_FIX_MIN_CONFIDENCE")
+        if env_conf is not None:
+            try:
+                self.min_confidence = float(env_conf)
+            except ValueError:
+                pass
+
+
+@dataclass
 class VeriSightConfig:
     """Top-level configuration for the VeriSight framework."""
     llm: LLMConfig = field(default_factory=LLMConfig)
     chroma: ChromaConfig = field(default_factory=ChromaConfig)
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
+    xtracer: XTracerConfig = field(default_factory=XTracerConfig)
+    fix: FixConfig = field(default_factory=FixConfig)
     log_level: str = ""
 
     def __post_init__(self):

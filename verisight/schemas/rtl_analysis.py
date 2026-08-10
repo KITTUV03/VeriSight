@@ -37,6 +37,27 @@ class XPropagationPath(BaseModel):
     file: str = Field(default="", description="Source file")
 
 
+class XTracerTraceResult(BaseModel):
+    """
+    A single real x-tracer trace result: the backward cause tree for one
+    (signal, time) query, run against an actual gate-level netlist + VCD
+    (as opposed to the static heuristic analysis above).
+    """
+    query_signal: str = Field(description="Signal path queried (e.g. 'tb.dut.result[3]')")
+    query_time_ps: int = Field(description="Query time in picoseconds")
+    root_cause_type: str = Field(
+        default="",
+        description="x-tracer root cause classification: primary_input/uninit_ff/"
+                    "x_injection/sequential_capture/clock_x/async_control_x/"
+                    "multi_driver/x_propagation/unknown_cell"
+    )
+    summary: str = Field(default="", description="Human-readable summary of the trace")
+    cause_tree: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Raw x-tracer JSON cause tree"
+    )
+
+
 class XTraceResult(BaseModel):
     """X-Tracer analysis results (xtrace.json)."""
     x_origins: List[XPropagationPath] = Field(
@@ -61,6 +82,19 @@ class XTraceResult(BaseModel):
     )
     severity: str = Field(default="none", description="Overall severity: none/low/medium/high/critical")
     summary: str = Field(default="", description="Human-readable summary")
+    real_traces: List[XTracerTraceResult] = Field(
+        default_factory=list,
+        description="Real x-tracer traces (netlist + VCD backed), when enabled"
+    )
+    tool_status: str = Field(
+        default="disabled",
+        description="Real x-tracer tool status: disabled/skipped_no_vcd/"
+                    "skipped_not_installed/skipped_no_query/error/ok"
+    )
+    tool_message: str = Field(
+        default="",
+        description="Human-readable explanation of tool_status"
+    )
 
 
 # ─── Module 2: Functional Analyzer ─────────────────────────────────

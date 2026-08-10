@@ -12,13 +12,15 @@ Performs exhaustive RTL diagnosis across 7 sub-modules:
 """
 
 import re
+from pathlib import Path
 from typing import Optional, List
 
 from verisight.agents.base_agent import BaseAgent
+from verisight.config import get_config
 from verisight.schemas.knowledge_schema import UnifiedKnowledge
 from verisight.schemas.classification import Classification
 from verisight.schemas.rtl_analysis import (
-    RTLAnalysis, XTraceResult, XPropagationPath,
+    RTLAnalysis, XTraceResult, XPropagationPath, XTracerTraceResult,
     FunctionalResult, FunctionalIssue,
     CDCResult, CDCIssue,
     LintResult, LintIssue,
@@ -26,6 +28,8 @@ from verisight.schemas.rtl_analysis import (
     ProtocolResult, ProtocolIssue,
     MiscResult, MiscIssue,
 )
+from verisight.tools import yosys_runner, xtracer_runner
+from verisight.tools.xtracer_runner import XTracerNotFoundError
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent3_rtl_analyzer")
@@ -58,8 +62,9 @@ class RTLRootCauseAnalyzer(BaseAgent):
     Agent 3: RTL Root Cause Analyzer with 7 sub-modules.
     """
 
-    def __init__(self):
+    def __init__(self, output_dir: str = "output"):
         super().__init__("rtl_root_cause_analyzer")
+        self.output_dir = Path(output_dir)
 
     def execute(
         self,
@@ -85,6 +90,7 @@ class RTLRootCauseAnalyzer(BaseAgent):
         # Module 1: X-Tracer
         self.logger.info("Module 1: X-Tracer Analysis")
         analysis.xtrace = self._analyze_x_propagation(knowledge)
+        analysis.xtrace = self._augment_with_real_xtracer(analysis.xtrace, knowledge)
 
         # Module 2: Functional Analyzer
         self.logger.info("Module 2: Functional Analysis")
@@ -212,6 +218,119 @@ class RTLRootCauseAnalyzer(BaseAgent):
                     if port.direction == "output" and port.name == lhs:
                         affected.append(port.name)
         return affected
+
+    def _augment_with_real_xtracer(
+        self, result: XTraceResult, knowledge: UnifiedKnowledge
+    ) -> XTraceResult:
+        """
+        Run real x-tracer analysis (netlist + VCD backed) on top of the
+        static heuristic above, when the user has opted in via config.
+
+        Every external-tool step is wrapped so a missing/failing tool
+        degrades to a clear tool_status/tool_message instead of crashing
+        the pipeline — the heuristic result above always still stands.
+        """
+        config = get_config().xtracer
+
+        if not config.enabled:
+            result.tool_status = "disabled"
+            return result
+
+        top_module = config.top_module or knowledge.rtl.top_module
+
+        # Step 1: resolve netlist (user-supplied, or synthesize with yosys).
+        if config.netlist_paths:
+            netlists = [Path(p) for p in config.netlist_paths]
+        else:
+            try:
+                netlist_path = yosys_runner.synthesize_netlist(
+                    knowledge.rtl.file_list,
+                    top_module,
+                    self.output_dir / "xtracer" / "netlist.v",
+                )
+                netlists = [netlist_path]
+            except RuntimeError as e:
+                self.logger.warning(f"x-tracer: yosys synthesis failed — {e}")
+                result.tool_status = "error"
+                result.tool_message = f"yosys synthesis failed: {e}"
+                return result
+
+        # Step 2: require a VCD waveform.
+        if not config.vcd_path:
+            result.tool_status = "skipped_no_vcd"
+            result.tool_message = (
+                "Real x-tracer analysis requires a VCD waveform. Pass --vcd "
+                "to enable it; falling back to static heuristic X analysis."
+            )
+            return result
+        vcd_path = Path(config.vcd_path)
+
+        # Step 3: locate x-tracer itself.
+        try:
+            xtracer_path = xtracer_runner.find_xtracer(config.xtracer_path)
+        except XTracerNotFoundError as e:
+            self.logger.warning(f"x-tracer: not found — {e}")
+            result.tool_status = "skipped_not_installed"
+            result.tool_message = str(e)
+            return result
+
+        # Step 4: build queries (explicit override, or auto-derived from
+        # sim-log scoreboard mismatches).
+        if config.signal and config.time_ps is not None:
+            queries = [xtracer_runner.XTraceQuery(
+                field_name=config.signal,
+                signal_candidates=[config.signal],
+                time_ps=config.time_ps,
+            )]
+        else:
+            queries = xtracer_runner.derive_queries(knowledge, top_module)
+
+        if not queries:
+            result.tool_status = "skipped_no_query"
+            result.tool_message = (
+                "Could not derive an X-valued signal/time to trace from the "
+                "sim log. Pass --xtrace-signal and --xtrace-time explicitly."
+            )
+            return result
+
+        # Step 5: run x-tracer per query, tolerating individual failures.
+        for query in queries:
+            try:
+                trace_json = xtracer_runner.run_xtracer_with_candidates(
+                    xtracer_path, netlists, vcd_path,
+                    query.signal_candidates, query.time_ps, config.max_depth,
+                )
+                result.real_traces.append(XTracerTraceResult(
+                    query_signal=trace_json.get("signal", query.signal_candidates[0]),
+                    query_time_ps=query.time_ps,
+                    root_cause_type=trace_json.get("root_cause_type", ""),
+                    summary=trace_json.get("summary", ""),
+                    cause_tree=trace_json,
+                ))
+            except RuntimeError as e:
+                self.logger.warning(
+                    f"x-tracer: query for '{query.field_name}' failed on all "
+                    f"candidate paths — {e}"
+                )
+
+        # Step 6: real evidence outranks the heuristic guess.
+        if result.real_traces:
+            result.tool_status = "ok"
+            lead = result.real_traces[0]
+            result.summary = (
+                f"x-tracer confirmed: {lead.query_signal} is {lead.root_cause_type or 'X'} "
+                f"at {lead.query_time_ps}ps. {lead.summary}"
+            ).strip()
+            if result.severity == "none":
+                result.severity = "high"
+        else:
+            result.tool_status = "error"
+            result.tool_message = (
+                "x-tracer ran but no query resolved against the given netlist/VCD; "
+                "see logs for per-signal errors."
+            )
+
+        return result
 
     # ─── Module 2: Functional Analyzer ─────────────────────────────
 

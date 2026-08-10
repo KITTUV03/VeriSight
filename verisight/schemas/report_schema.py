@@ -8,6 +8,8 @@ with classification, evidence chain, and recommended fixes.
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+from verisight.schemas.fix_schema import FixResult  # noqa: F401 — re-exported
+
 from verisight.schemas.classification import EvidenceItem, ClassificationReasoning
 
 
@@ -113,4 +115,13 @@ class ErrorReport(BaseModel):
     )
     timestamp: str = Field(
         default="", description="Report generation timestamp"
+    )
+
+    # ─── Automated Fix (Agent 5) ─────────────────────────────────
+    fix: Optional[FixResult] = Field(
+        default=None,
+        description=(
+            "Automated fix proposal from Agent 5. None if fix generation "
+            "was disabled, declined, or failed."
+        )
     )
