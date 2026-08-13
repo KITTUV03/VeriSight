@@ -5,12 +5,18 @@ A production-grade autonomous multi-agent system for root-cause analysis of ASIC
 ## Architecture
 
 ```
-Inputs (Spec, RTL, UVM TB, Sim Log, Coverage)
+Inputs (Spec, RTL, UVM TB, Sim Log, Coverage, VCD)
+                    │
+                    ▼   (optional) --simulate: iverilog/verilator
+         ┌──────────────────┐        produces sim.log + sim.vcd
+         │  sim_runner      │  ─────────────────────────────────►
+         └──────────────────┘
                     │
                     ▼
          ┌──────────────────┐
          │   Agent 1        │  Knowledge Extraction Engine
-         │   Parse & Index  │  → knowledge.json
+         │   Parse & Index  │  (spec/rtl/tb/log/coverage + VCD via
+         │                  │   vcd_parser) → knowledge.json
          └────────┬─────────┘
                   │
                   ▼
@@ -78,8 +84,12 @@ python -m pytest tests/ -v
 | UVM Testbench | `.sv` | Recommended |
 | Simulation Log | `.log` | Required |
 | Coverage Report | `.rpt`, `.txt` | Optional |
-| Waveform/VCD | `.vcd` | Optional (enables real x-tracer analysis) |
-| Gate-level Netlist | `.v` | Optional (else synthesized from RTL via yosys) |
+| Waveform/VCD | `.vcd` | Optional (parsed into waveform evidence for Agent 2/3; also enables real x-tracer analysis when combined with `--xtrace`) |
+| Gate-level Netlist | `.v` | Optional (else synthesized from RTL via yosys, only with `--xtrace`) |
+
+Simulation log and VCD don't have to be pre-existing files — pass `--simulate`
+and VeriSight runs the simulation itself (see
+[Running Simulations Internally](#running-simulations-internally-simulate)).
 
 ## Outputs
 
@@ -94,7 +104,9 @@ python -m pytest tests/ -v
 | `rtl.json` | Parsed RTL knowledge |
 | `tb.json` | Parsed testbench knowledge |
 | `log.json` | Parsed simulation log |
+| `vcd_summary.json` | Post-processed VCD waveform data (when a VCD is available) |
 | `analysis/*.json` | RTL analysis sub-module results |
+| `sim/sim.log`, `sim/sim.vcd` | Simulator output, only with `--simulate` |
 
 ## Configuration
 
@@ -114,6 +126,7 @@ cp .env.example .env
 | `VERISIGHT_CHROMA_PATH` | ChromaDB persistence path | `./verisight_knowledge_db` |
 | `VERISIGHT_LOG_LEVEL` | Logging level | `INFO` |
 | `VERISIGHT_XTRACER_PATH` | Path to x-tracer's `x_tracer.py` | auto-detected |
+| `VERISIGHT_UVM_HOME` | Path to a UVM library for `--simulate` | none |
 
 ## CLI Options
 
@@ -137,6 +150,14 @@ Options:
   --api-key KEY      LLM API key override
   --model NAME       LLM model name override
 
+Simulation (all optional — see "Running Simulations Internally" below):
+  --simulate            Run the simulation internally instead of requiring
+                         a pre-existing --log/--vcd. Requires --rtl and --tb
+  --simulator NAME       iverilog (default) or verilator
+  --sim-top NAME          Top-level module to simulate (auto-detected if omitted)
+  --uvm-home PATH         Path to a UVM library (else VERISIGHT_UVM_HOME env var)
+  --sim-timeout SECONDS   Simulation timeout (default: 300)
+
 X-Propagation Analysis (x-tracer, all optional):
   --xtrace                Enable real X-propagation tracing via x-tracer
   --netlist PATH           Pre-synthesized gate-level netlist (repeatable);
@@ -157,6 +178,81 @@ The included example demonstrates VeriSight detecting a missing reset bug in an 
 - **Symptom**: Scoreboard mismatches with `xx` values early in simulation
 - **Root Cause**: X propagation from uninitialized register
 - **Classification**: RTL Bug (confidence: 85-99%)
+
+## Running Simulations Internally (--simulate)
+
+By default, VeriSight is a post-mortem analyzer: it expects a `--log` (and
+optionally a `--vcd`) that some other flow already produced. Passing
+`--simulate` makes VeriSight run the simulation itself, from `--rtl` and
+`--tb`, producing a fresh `sim/sim.log` and `sim/sim.vcd` before the usual
+Agent 1→5 pipeline runs against them.
+
+**Simulator choice:** the default backend is **Icarus Verilog**
+(`iverilog`/`vvp`) — a small, single-package install with a trivial
+two-step compile+run workflow, adequate UVM-lite support for class-based
+testbenches, and effortless VCD generation (VeriSight auto-injects a
+`$dumpfile`/`$dumpvars` wrapper module, so your testbench doesn't need to
+declare its own dump statements). **Verilator** is available via
+`--simulator verilator` as an experimental alternative for users who need
+raw simulation throughput on large designs and have already validated
+their testbench builds under it — its SystemVerilog class/UVM support is
+less complete than Icarus's, so it isn't the default.
+
+**Setup (one-time, for real UVM testbenches):**
+
+```bash
+sudo apt install iverilog   # or: brew install icarus-verilog
+
+# Icarus doesn't ship a UVM library — point VeriSight at one, e.g. a
+# community UVM-for-Icarus port, or your simulator vendor's UVM sources
+export VERISIGHT_UVM_HOME=/path/to/uvm/src
+```
+
+**Usage:**
+
+```bash
+python main.py --simulate --rtl projects/fifo/rtl --tb projects/fifo/tb \
+    --spec projects/fifo/specs/fifo_spec.md --output output/
+```
+
+`--simulate` and `--xtrace` are independent, composable flags:
+
+- `--simulate` alone: the generated VCD is parsed into `vcd_summary.json`
+  and used as debugging evidence for Agent 2/3 (see below), but no netlist
+  is synthesized and the real x-tracer binary is never invoked.
+- `--simulate --xtrace`: the generated VCD additionally feeds the real
+  x-tracer flow (yosys netlist synthesis + x-tracer subprocess), exactly as
+  if you had passed `--vcd sim/sim.vcd --xtrace` yourself.
+
+If simulation fails to even compile or run (missing simulator, missing UVM
+library, compile errors), VeriSight aborts with the simulator's own error
+message rather than attempting to analyze a nonexistent log. If the
+simulation *runs* but the testbench reports failures (`UVM_ERROR`,
+`UVM_FATAL`, scoreboard mismatches), that's the normal case — the resulting
+log is exactly what the rest of the pipeline analyzes.
+
+## VCD Waveform Parsing
+
+Whenever a VCD is available — either supplied via `--vcd` or produced by
+`--simulate` — Agent 1 parses it into a compact `VCDData` summary
+(`vcd_summary.json`) using **pywellen** (fast, Rust-backed, handles large
+industrial VCDs with low memory) when installed, falling back to
+**vcdvcd** (pure Python, always pip-installable) otherwise. Install either
+with `pip install -e ".[vcd]"`. If neither is installed, VeriSight
+continues without waveform evidence and reports why in
+`vcd_summary.json`'s `tool_status`/`tool_message` — the same
+graceful-degradation convention used for yosys and x-tracer.
+
+This parsed waveform is then used two ways, both independent of the real
+x-tracer binary:
+
+- **Agent 2** cross-checks log-derived scoreboard mismatches against the
+  VCD — if a signal genuinely carries an X/Z value near a mismatch's
+  timestamp, that's included as evidence in both the deterministic
+  pre-analysis and the LLM classification prompt.
+- **Agent 3**'s X-Tracer module adds a `vcd_evidence` list to
+  `analysis/xtrace.json` with the same corroboration, available even when
+  the real x-tracer tool isn't installed or `--xtrace` wasn't passed.
 
 ## X-Propagation Analysis (x-tracer)
 

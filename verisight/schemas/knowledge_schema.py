@@ -12,6 +12,7 @@ from verisight.schemas.spec_schema import SpecKnowledge
 from verisight.schemas.rtl_schema import RTLKnowledge
 from verisight.schemas.tb_schema import TBKnowledge
 from verisight.schemas.log_schema import LogKnowledge
+from verisight.schemas.vcd_schema import VCDData
 
 
 class CoverageData(BaseModel):
@@ -78,6 +79,10 @@ class UnifiedKnowledge(BaseModel):
     coverage: Optional[CoverageData] = Field(
         default=None,
         description="Optional coverage data"
+    )
+    vcd: Optional[VCDData] = Field(
+        default=None,
+        description="Post-processed VCD waveform data (user-supplied or --simulate-generated)"
     )
     rag_context: Optional[RAGContext] = Field(
         default=None,

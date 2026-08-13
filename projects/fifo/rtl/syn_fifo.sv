@@ -1,5 +1,3 @@
-`include "ram.sv"
-
 //-----------------------------------------------------
 // Design Name : syn_fifo
 // File Name   : syn_fifo.v

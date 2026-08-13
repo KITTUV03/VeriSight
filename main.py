@@ -11,11 +11,14 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from verisight.config import VeriSightConfig, LLMConfig, ChromaConfig, PipelineConfig, XTracerConfig, FixConfig
 from verisight.orchestrator import VeriSightPipeline
+from verisight.tools import sim_runner
+from verisight.tools.sim_runner import SimulatorNotFoundError, SimulationError
 from verisight.utils.logger import setup_logging, console
 
 
@@ -113,6 +116,39 @@ Examples:
         ),
     )
 
+    # Simulation (--simulate) — all optional
+    sim_group = parser.add_argument_group("Simulation")
+    sim_group.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Run the simulation internally (via iverilog or verilator) instead of "
+             "requiring a pre-existing --log/--vcd. Requires --rtl and --tb",
+    )
+    sim_group.add_argument(
+        "--simulator",
+        type=str,
+        choices=["iverilog", "verilator"],
+        default="iverilog",
+        help="Simulator backend for --simulate (default: iverilog — best UVM-lite "
+             "compatibility, size, and ease of use; verilator is experimental)",
+    )
+    sim_group.add_argument(
+        "--sim-top",
+        type=str,
+        help="Top-level module to simulate (auto-detected if omitted)",
+    )
+    sim_group.add_argument(
+        "--uvm-home",
+        type=str,
+        help="Path to a UVM library for --simulate (else VERISIGHT_UVM_HOME env var)",
+    )
+    sim_group.add_argument(
+        "--sim-timeout",
+        type=int,
+        default=300,
+        help="Simulation timeout in seconds (default: 300)",
+    )
+
     # X-Propagation Analysis (x-tracer) — all optional
     xtrace_group = parser.add_argument_group("X-Propagation Analysis (x-tracer)")
     xtrace_group.add_argument(
@@ -198,7 +234,7 @@ def validate_inputs(args) -> bool:
         console.print(f"[red]Error:[/red] TB path not found: {args.tb}")
         valid = False
 
-    if args.log and not Path(args.log).exists():
+    if args.log and not args.simulate and not Path(args.log).exists():
         console.print(f"[red]Error:[/red] Log file not found: {args.log}")
         valid = False
 
@@ -217,7 +253,16 @@ def validate_inputs(args) -> bool:
         )
         valid = False
 
-    if not any([args.spec, args.rtl, args.tb, args.log]):
+    if args.simulate:
+        if not (args.rtl and args.tb):
+            console.print("[red]Error:[/red] --simulate requires both --rtl and --tb")
+            valid = False
+        if args.log:
+            console.print(
+                "[yellow]Warning:[/yellow] --log is ignored with --simulate — "
+                "the freshly generated simulation log will be used instead"
+            )
+    elif not any([args.spec, args.rtl, args.tb, args.log]):
         console.print("[red]Error:[/red] At least one input must be provided")
         console.print("  Use --spec, --rtl, --tb, or --log")
         valid = False
@@ -240,6 +285,45 @@ def main():
     # Setup logging
     log_level = "DEBUG" if args.verbose else "INFO"
     setup_logging(level=log_level)
+
+    # ─── Optional: run the simulation ourselves (--simulate) ──────────
+    # Always produces a fresh log + VCD, which we parse into
+    # knowledge.vcd for Agent 2/3 debugging evidence regardless of
+    # whether --xtrace was also passed. We only feed the VCD into the
+    # x-tracer path (which triggers yosys netlist synthesis) when the
+    # user explicitly opted into that via --xtrace/--netlist — --simulate
+    # and --xtrace are independent, composable flags.
+    vcd_for_knowledge = args.vcd
+    if args.simulate:
+        console.print(f"[dim]Simulator:[/]  {args.simulator}")
+        console.print("[dim]Running simulation...[/]\n")
+        try:
+            sim_result = sim_runner.run_simulation(
+                rtl_path=args.rtl,
+                tb_path=args.tb,
+                simulator=args.simulator,
+                top_module=args.sim_top or args.top or "",
+                uvm_home=args.uvm_home or os.getenv("VERISIGHT_UVM_HOME", ""),
+                timeout_s=args.sim_timeout,
+                output_dir=Path(args.output) / "sim",
+            )
+        except (SimulatorNotFoundError, SimulationError) as e:
+            console.print(f"[bold red]Simulation failed:[/] {e}")
+            sys.exit(1)
+
+        args.log = str(sim_result.log_path)
+        vcd_for_knowledge = args.vcd or str(sim_result.vcd_path)
+        if args.xtrace or args.netlist:
+            args.vcd = args.vcd or str(sim_result.vcd_path)
+        if not args.top and not args.sim_top:
+            args.top = sim_result.top_module
+
+        console.print(
+            f"[dim]Simulation complete[/] (top={sim_result.top_module}, "
+            f"exit={sim_result.returncode})\n"
+            f"  log: {sim_result.log_path}\n"
+            f"  vcd: {sim_result.vcd_path}\n"
+        )
 
     # Build configuration
     kwargs = {}
@@ -296,8 +380,10 @@ def main():
     console.print(f"  [dim]TB:[/]       {args.tb or 'not provided'}")
     console.print(f"  [dim]Log:[/]      {args.log or 'not provided'}")
     console.print(f"  [dim]Coverage:[/] {args.coverage or 'not provided'}")
+    console.print(f"  [dim]VCD:[/]      {vcd_for_knowledge or 'not provided'}")
     console.print(f"  [dim]Output:[/]   {args.output}")
     console.print(f"  [dim]RAG:[/]      {'enabled' if not args.no_rag else 'disabled'}")
+    console.print(f"  [dim]Simulate:[/] {'enabled (' + args.simulator + ')' if args.simulate else 'disabled'}")
     console.print(f"  [dim]X-Tracer:[/] {'enabled' if xtracer_config.enabled else 'disabled'}")
     console.print()
 
@@ -310,6 +396,7 @@ def main():
             tb_path=args.tb,
             log_path=args.log,
             coverage_path=args.coverage,
+            vcd_path=vcd_for_knowledge,
         )
 
         # Print final summary

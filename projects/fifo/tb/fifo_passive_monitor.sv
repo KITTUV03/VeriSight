@@ -30,16 +30,16 @@ task fifo_passive::run_phase(uvm_phase phase);
   fifo_trans packet;
 
   wait(inf.RST == 0);
-  @(inf.mon_cb);
+  @(posedge inf.CLK); #1;
 
   forever begin
-    @(inf.mon_cb);
+    @(posedge inf.CLK); #1;
 
     packet = fifo_trans::type_id::create("packet", this);
 
-    packet.DATA_OUT = inf.mon_cb.DATA_OUT;
-    packet.FULL     = inf.mon_cb.FULL;
-    packet.EMPTY    = inf.mon_cb.EMPTY;
+    packet.DATA_OUT = inf.DATA_OUT;
+    packet.FULL     = inf.FULL;
+    packet.EMPTY    = inf.EMPTY;
 
     pass_port.write(packet);
   end

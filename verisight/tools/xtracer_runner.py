@@ -100,7 +100,7 @@ def find_xtracer(explicit_path: str = "") -> Path:
     raise XTracerNotFoundError(XTRACER_INSTALL_HINT)
 
 
-def _ns_string_to_ps(timestamp: str) -> Optional[int]:
+def timestamp_to_ps(timestamp: str) -> Optional[int]:
     """Convert a timestamp string like '20 ns' or '150ps' to picoseconds."""
     match = re.search(r"(\d+(?:\.\d+)?)\s*(ps|ns|us|ms)?", timestamp, re.IGNORECASE)
     if not match:
@@ -155,7 +155,7 @@ def derive_queries(knowledge: UnifiedKnowledge, top_module: str) -> List[XTraceQ
         if mismatch.field in seen_fields:
             continue
 
-        time_ps = _ns_string_to_ps(mismatch.timestamp)
+        time_ps = timestamp_to_ps(mismatch.timestamp)
         if time_ps is None:
             continue
 

@@ -91,6 +91,7 @@ class RTLRootCauseAnalyzer(BaseAgent):
         self.logger.info("Module 1: X-Tracer Analysis")
         analysis.xtrace = self._analyze_x_propagation(knowledge)
         analysis.xtrace = self._augment_with_real_xtracer(analysis.xtrace, knowledge)
+        analysis.xtrace = self._augment_with_vcd_evidence(analysis.xtrace, knowledge)
 
         # Module 2: Functional Analyzer
         self.logger.info("Module 2: Functional Analysis")
@@ -328,6 +329,42 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.tool_message = (
                 "x-tracer ran but no query resolved against the given netlist/VCD; "
                 "see logs for per-signal errors."
+            )
+
+        return result
+
+    def _augment_with_vcd_evidence(
+        self, result: XTraceResult, knowledge: UnifiedKnowledge
+    ) -> XTraceResult:
+        """
+        Add lightweight VCD-derived evidence for the same derived queries
+        real x-tracer would use, but sourced from Agent 1's post-processed
+        knowledge.vcd — so this evidence is available even when the real
+        x-tracer binary isn't installed or --xtrace wasn't passed at all,
+        as long as a VCD (user-supplied or --simulate-generated) exists.
+        """
+        if not knowledge.vcd or knowledge.vcd.tool_status != "ok":
+            return result
+
+        top_module = get_config().xtracer.top_module or knowledge.rtl.top_module
+        queries = xtracer_runner.derive_queries(knowledge, top_module)
+
+        for query in queries:
+            for candidate in query.signal_candidates:
+                for path in knowledge.vcd.find_matching_signals(candidate):
+                    value = knowledge.vcd.signals[path].value_at(query.time_ps)
+                    if value and ("x" in value.lower() or "z" in value.lower()):
+                        result.vcd_evidence.append(
+                            f"VCD: signal '{path}' = {value} at {query.time_ps}ps "
+                            f"(derived from mismatch on field '{query.field_name}')"
+                        )
+
+        if result.vcd_evidence and result.severity == "none":
+            result.severity = "medium"
+            prefix = f"{result.summary} " if result.summary else ""
+            result.summary = (
+                f"{prefix}VCD waveform independently confirms X/Z on "
+                f"{len(result.vcd_evidence)} signal(s)."
             )
 
         return result

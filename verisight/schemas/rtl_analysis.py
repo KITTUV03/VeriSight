@@ -86,6 +86,11 @@ class XTraceResult(BaseModel):
         default_factory=list,
         description="Real x-tracer traces (netlist + VCD backed), when enabled"
     )
+    vcd_evidence: List[str] = Field(
+        default_factory=list,
+        description="Lightweight VCD-derived evidence (signal=X/Z near a query time), "
+                    "available even when the real x-tracer binary isn't installed"
+    )
     tool_status: str = Field(
         default="disabled",
         description="Real x-tracer tool status: disabled/skipped_no_vcd/"

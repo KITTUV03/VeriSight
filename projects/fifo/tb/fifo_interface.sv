@@ -1,3 +1,12 @@
+// NOTE: the original version of this interface used `clocking`/`modport
+// clocking` blocks (drv_cb/mon_cb) to get input-skew-#1/output-skew-#0
+// sampling relative to `posedge CLK`. Icarus Verilog (the default
+// --simulate backend) doesn't support modport clocking declarations, so
+// this was rewritten to plain signals. Driver/monitor reproduce the same
+// timing directly: the driver still drives with `<=` at the clock edge
+// (equivalent to output #0), and the monitor samples `#1` after the edge
+// (equivalent to input #1) to avoid the same driver/DUT race the
+// clocking block existed to prevent.
 interface intf(input CLK,input RST);
   logic WR_CS;
   logic WR_EN;
@@ -7,21 +16,4 @@ interface intf(input CLK,input RST);
   logic [`DATA_WIDTH-1:0] DATA_OUT;
   logic EMPTY;
   logic FULL;
-  
-  clocking drv_cb @(posedge CLK);
-    default input #1 output #0;
-    output WR_CS,WR_EN,RD_CS,RD_EN,DATA_IN;
-    input DATA_OUT,EMPTY,FULL;
-  endclocking 
-   
-  clocking mon_cb @(posedge CLK);
-    default input #1 output #0;
-    input WR_CS,WR_EN,RD_CS,RD_EN,DATA_IN;
-    input DATA_OUT,EMPTY,FULL;
-  endclocking
-  
-  modport drv_mp(clocking drv_cb,input CLK,input RST);
-  modport mon_mp(clocking mon_cb,input CLK,input RST);
-  
-  
 endinterface

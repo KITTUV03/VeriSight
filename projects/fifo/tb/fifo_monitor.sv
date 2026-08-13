@@ -37,9 +37,9 @@ task fifo_monitor::run_phase(uvm_phase phase);
   prev = 0;
 
   forever begin
-    @(inf.mon_cb);
+    @(posedge inf.CLK);
+    #1; // input skew, matches the original clocking block's `default input #1`
 
-   
     if (prev) begin
       packet = fifo_trans::type_id::create("packet");
       packet.WR_CS    = temp_wr_cs;
@@ -47,18 +47,18 @@ task fifo_monitor::run_phase(uvm_phase phase);
       packet.RD_CS    = temp_rd_cs;
       packet.RD_EN    = temp_rd_en;
       packet.DATA_IN  = temp_din;
-      packet.DATA_OUT = inf.mon_cb.DATA_OUT;
-      packet.FULL     = inf.mon_cb.FULL;
-      packet.EMPTY    = inf.mon_cb.EMPTY;
+      packet.DATA_OUT = inf.DATA_OUT;
+      packet.FULL     = inf.FULL;
+      packet.EMPTY    = inf.EMPTY;
 
       ap_port.write(packet);
     end
 
-    temp_wr_cs   = inf.mon_cb.WR_CS;
-    temp_wr_en   = inf.mon_cb.WR_EN;
-    temp_rd_cs   = inf.mon_cb.RD_CS;
-    temp_rd_en   = inf.mon_cb.RD_EN;
-    temp_din = inf.mon_cb.DATA_IN;
+    temp_wr_cs   = inf.WR_CS;
+    temp_wr_en   = inf.WR_EN;
+    temp_rd_cs   = inf.RD_CS;
+    temp_rd_en   = inf.RD_EN;
+    temp_din = inf.DATA_IN;
     prev = 1;
   end
 endtask

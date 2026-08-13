@@ -17,6 +17,7 @@ from typing import Optional
 from verisight.agents.base_agent import BaseAgent
 from verisight.schemas.knowledge_schema import UnifiedKnowledge
 from verisight.schemas.classification import Classification, EvidenceItem, ClassificationReasoning
+from verisight.tools.xtracer_runner import timestamp_to_ps
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent2_classifier")
@@ -145,6 +146,25 @@ class RootCauseClassifierAgent(BaseAgent):
                     f"at {mismatch.timestamp}"
                 )
 
+        # Corroborate log-derived X mismatches against the real VCD waveform,
+        # when one was supplied or produced by --simulate. This gives Agent 2
+        # waveform-backed evidence without requiring the real x-tracer tool.
+        analysis["vcd_evidence"] = []
+        if knowledge.vcd and knowledge.vcd.tool_status == "ok":
+            fields, times_ps = [], []
+            for mismatch in knowledge.logs.scoreboard_mismatches:
+                if not mismatch.field:
+                    continue
+                time_ps = timestamp_to_ps(mismatch.timestamp)
+                if time_ps is None:
+                    continue
+                fields.append(mismatch.field)
+                times_ps.append(time_ps)
+            analysis["vcd_evidence"] = knowledge.vcd.evidence_near_mismatches(fields, times_ps)
+            if analysis["vcd_evidence"]:
+                analysis["x_detected"] = True
+                analysis["evidence"].extend(analysis["vcd_evidence"])
+
         # Check RTL for missing resets
         for module in knowledge.rtl.modules:
             for block in module.always_blocks:
@@ -259,6 +279,19 @@ class RootCauseClassifierAgent(BaseAgent):
             sb_summary += f"\nScoreboard: {sb.name} (file: {sb.file})\n"
             sb_summary += f"  Prediction logic:\n{sb.prediction_logic[:500]}\n"
 
+        # VCD waveform evidence (independent of real x-tracer availability)
+        vcd_summary = ""
+        if knowledge.vcd and knowledge.vcd.tool_status == "ok":
+            vcd_evidence = pre_analysis.get("vcd_evidence", [])
+            vcd_summary = (
+                f"Parsed {len(knowledge.vcd.signals)} signals via "
+                f"{knowledge.vcd.parser_backend} from {knowledge.vcd.source_file}.\n"
+                + ("\n".join(f"- {e}" for e in vcd_evidence) if vcd_evidence
+                   else "No X/Z values found near reported mismatch times.")
+            )
+        elif knowledge.vcd:
+            vcd_summary = f"VCD waveform unavailable: {knowledge.vcd.tool_message}"
+
         # Pre-analysis findings
         pre_findings = "\n".join(pre_analysis.get("evidence", [])) or "No deterministic findings"
 
@@ -291,6 +324,9 @@ SIMULATION TIME: {knowledge.logs.summary.simulation_time}
 
 ═══ SCOREBOARD LOGIC ═══
 {sb_summary or "No scoreboard found"}
+
+═══ VCD WAVEFORM EVIDENCE ═══
+{vcd_summary or "No VCD waveform provided"}
 
 ═══ DETERMINISTIC PRE-ANALYSIS ═══
 {pre_findings}

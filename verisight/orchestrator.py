@@ -95,6 +95,7 @@ class VeriSightPipeline:
         tb_path: Optional[str] = None,
         log_path: Optional[str] = None,
         coverage_path: Optional[str] = None,
+        vcd_path: Optional[str] = None,
     ) -> ErrorReport:
         """
         Execute the full debugging pipeline.
@@ -105,6 +106,9 @@ class VeriSightPipeline:
             tb_path: Path to UVM testbench file(s) or directory.
             log_path: Path to simulation log file.
             coverage_path: Optional path to coverage report.
+            vcd_path: Optional path to a simulation waveform (VCD), parsed
+                into knowledge.vcd for Agent 2/3 to use as debugging evidence,
+                independent of whether real x-tracer analysis is enabled.
 
         Returns:
             ErrorReport — the final debugging report.
@@ -130,6 +134,7 @@ class VeriSightPipeline:
                 tb_path=tb_path,
                 log_path=log_path,
                 coverage_path=coverage_path,
+                vcd_path=vcd_path,
             )
 
             if self.config.pipeline.save_intermediates:
@@ -137,6 +142,8 @@ class VeriSightPipeline:
                 save_json(self.knowledge.rtl, output_dir / "rtl.json")
                 save_json(self.knowledge.tb, output_dir / "tb.json")
                 save_json(self.knowledge.logs, output_dir / "log.json")
+                if self.knowledge.vcd:
+                    save_json(self.knowledge.vcd, output_dir / "vcd_summary.json")
                 save_json(self.knowledge, output_dir / "knowledge.json")
 
         except Exception as e:

@@ -23,11 +23,11 @@ endclass
   endfunction
       
  task fifo_driver::clear_all;
-   inf.drv_cb.WR_CS <= 0;
-   inf.drv_cb.WR_EN <= 0;
-   inf.drv_cb.RD_CS <= 0;
-   inf.drv_cb.RD_EN <= 0;
-   inf.drv_cb.DATA_IN <= 'b0;
+   inf.WR_CS <= 0;
+   inf.WR_EN <= 0;
+   inf.RD_CS <= 0;
+   inf.RD_EN <= 0;
+   inf.DATA_IN <= 'b0;
  endtask
     
  task fifo_driver::run_phase(uvm_phase phase);
@@ -43,13 +43,13 @@ endclass
  endtask
     
  task fifo_driver::send_to_dut(fifo_trans packet);
-   inf.drv_cb.WR_CS <= packet.WR_CS;
-   inf.drv_cb.WR_EN <= packet.WR_EN;
-   inf.drv_cb.RD_CS <= packet.RD_CS;
-   inf.drv_cb.RD_EN <= packet.RD_EN;
-   inf.drv_cb.DATA_IN <= packet.DATA_IN;
+   inf.WR_CS <= packet.WR_CS;
+   inf.WR_EN <= packet.WR_EN;
+   inf.RD_CS <= packet.RD_CS;
+   inf.RD_EN <= packet.RD_EN;
+   inf.DATA_IN <= packet.DATA_IN;
 //    end
-  @(inf.drv_cb);
+  @(posedge inf.CLK);
   clear_all;
 //    begin
 //      wait(inf.RST==1);
