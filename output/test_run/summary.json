@@ -1,0 +1,95 @@
+{
+  "classification": "RTL Bug",
+  "confidence": 92,
+  "component": "ALU (sequential block, line 37)",
+  "reason": "The ALU RTL's sequential always block (line 37) that drives 'result', 'carry', and 'zero' does not include 'result' in its reset clause. Per REQ-010, on reset assertion 'all outputs shall be driven to 0'. Because 'result' is omitted from the reset branch, it remains at its uninitialized (X) value after reset deassertion until a case branch in the block eventually assigns it. This manifests as 'xx' actual result values at 20/40/60/80 ns while carry and zero (which ARE reset) show 0 as expected, exactly matching the deterministic pre-analysis finding. The mismatches disappear after 80 ns once 'result' has been assigned at least once, consistent with an uninitialized-signal (X-propagation) bug rather than a functional/logic error a scoreboard mismatch of this nature. The scoreboard's expected values (e1, 5f, 0f, 00) are arithmetically correct for the given operands/opcodes, confirming the golden model is fine and the fault lies in RTL.",
+  "category": "X Propagation / Reset Bug",
+  "spec_reference": "REQ-010 (On reset assertion, all outputs shall be driven to 0), REQ-007 (All outputs shall be registered)",
+  "log_reference": "UVM_ERROR @20ns, @40ns, @60ns, @80ns — actual result=xx while carry/zero match expected 0 values",
+  "rtl_reference": "/home/uday/VeriSight/examples/rtl/alu.sv:37 (sequential always block missing 'result' in reset clause)",
+  "tb_reference": "/home/uday/VeriSight/examples/tb/alu_scoreboard.sv (prediction logic computes correct expected_result for op=0,1,2 confirming golden model correctness)",
+  "recommended_fix": "Add 'result <= 8'h00;' to the reset branch of the sequential always block at line 37 in alu.sv, ensuring all registered outputs (result, carry, zero) are synchronously/asynchronously reset per REQ-010.",
+  "evidence": [
+    {
+      "source": "log",
+      "reference": "UVM_ERROR @20 ns",
+      "description": "Actual result is 'xx' (X) despite carry and zero matching expected values, indicating result register specifically is uninitialized",
+      "snippet": "expected result=e1 carry=0 zero=0 | actual result=xx carry=0 zero=0"
+    },
+    {
+      "source": "rtl",
+      "reference": "alu.sv:37",
+      "description": "Sequential always block writes ['carry','result','zero'] and HAS RESET, but deterministic analysis shows 'result' is missing from the reset clause",
+      "snippet": "sequential block @ line 37: writes ['carry', 'result', 'zero'], HAS RESET (result excluded from reset assignment)"
+    },
+    {
+      "source": "spec",
+      "reference": "REQ-010",
+      "description": "Spec mandates all outputs (result, carry, zero) driven to 0 on reset assertion; RTL violates this for 'result'",
+      "snippet": "On reset assertion, all outputs shall be driven to 0"
+    },
+    {
+      "source": "tb",
+      "reference": "alu_scoreboard.sv case statement",
+      "description": "Scoreboard prediction logic correctly computes expected_result for add/sub/and operations, ruling out TB miscalculation",
+      "snippet": "4'b0000: expected_out = {1'b0, txn.operand_a} + {1'b0, txn.operand_b};"
+    },
+    {
+      "source": "log",
+      "reference": "Deterministic Pre-Analysis",
+      "description": "Tool-detected reset issue explicitly flags 'result' missing from reset clause and X-values confined to early simulation window",
+      "snippet": "Signal 'result' in module 'alu' is written in sequential block but MISSING from reset clause (always block at line 37)"
+    }
+  ],
+  "reasoning_chain": [
+    {
+      "step": 1,
+      "observation": "Scoreboard reports 4 mismatches, all with actual result='xx' while carry and zero fields match expected values exactly.",
+      "inference": "Only the 'result' signal is corrupted (X), not the entire output bus, pointing to a signal-specific issue rather than a broad computation error.",
+      "source": "log: UVM_ERROR entries @20/40/60/80 ns"
+    },
+    {
+      "step": 2,
+      "observation": "RTL analysis shows the sequential block at line 37 drives result, carry, and zero, and HAS a reset branch, but 'result' is missing from that reset clause.",
+      "inference": "After reset deassertion, 'result' retains its power-on X value until it is first assigned by a case branch in the block, explaining early-cycle X values.",
+      "source": "rtl: alu.sv:37 static analysis"
+    },
+    {
+      "step": 3,
+      "observation": "Mismatches stop after 80 ns; simulation runs cleanly until 240 ns.",
+      "inference": "Once 'result' receives its first valid assignment inside the sequential block, it stabilizes and subsequent transactions match, consistent with a one-time uninitialized-register issue rather than a persistent logic bug.",
+      "source": "log: 'Mismatches occur only in early simulation (last mismatch at 80.0 ns)'"
+    },
+    {
+      "step": 4,
+      "observation": "Scoreboard's combinational expected value computation for op_sel 0,1,2 correctly implements add/sub/and operations matching spec REQ-008.",
+      "inference": "The golden reference model is correct, ruling out Case 3 (Scoreboard prediction incorrect) as root cause.",
+      "source": "tb: alu_scoreboard.sv case statement"
+    },
+    {
+      "step": 5,
+      "observation": "Spec REQ-010 explicitly requires all outputs including result to be driven to 0 upon reset assertion.",
+      "inference": "The RTL's omission of 'result' from the reset clause is a direct violation of REQ-010, which is Case 6/Case 7 (RTL violates spec / RTL outputs X due to incomplete reset).",
+      "source": "spec: REQ-010"
+    },
+    {
+      "step": 6,
+      "observation": "No evidence of driver or monitor timing errors; only 'result' shows X, not both operands or op_sel corruption.",
+      "inference": "This rules out driver stimulus issues (Case 1) and monitor sampling issues (Case 2).",
+      "source": "log: absence of driver/monitor-specific errors"
+    }
+  ],
+  "missing_artifacts": [],
+  "alternative_hypotheses": [
+    {
+      "classification": "TB Bug",
+      "confidence": 10,
+      "reason": "If the scoreboard incorrectly modeled reset timing or sampled result one cycle early before RTL update, it could also show mismatches; however scoreboard's arithmetic logic is verified correct and reset-timing issue is localized to RTL reset clause per static analysis."
+    },
+    {
+      "classification": "Unknown",
+      "confidence": 5,
+      "reason": "Without VCD waveform, cannot 100% confirm timing of reset deassertion vs first result assignment, but static RTL analysis and log pattern strongly support RTL Bug classification."
+    }
+  ]
+}

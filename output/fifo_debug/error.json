@@ -1,0 +1,42 @@
+{
+  "classification": "Unknown",
+  "module": "syn_fifo",
+  "confidence": 30,
+  "root_cause": "Insufficient evidence for deterministic classification. LLM reasoning unavailable.",
+  "category": "Lint",
+  "affected_signals": [],
+  "simulation_timestamp": "55 ns",
+  "spec_reference": "",
+  "log_reference": "",
+  "rtl_file": "",
+  "rtl_line": 0,
+  "tb_file": "",
+  "evidence": [],
+  "reasoning": [],
+  "recommended_fixes": [],
+  "prevention_measures": [
+    {
+      "category": "lint_rule",
+      "description": "Enable lint rule for uninitialized sequential registers",
+      "implementation": "Add reset checking lint rule to CI pipeline"
+    },
+    {
+      "category": "assertion",
+      "description": "Add SVA assertions for X detection on all outputs",
+      "implementation": "assert property (@(posedge clk) !$isunknown(result));"
+    },
+    {
+      "category": "review_checklist",
+      "description": "Add reset verification to code review checklist",
+      "implementation": "Verify all sequential registers have reset values"
+    }
+  ],
+  "severity": "medium",
+  "tags": [
+    "unknown",
+    "unclassified"
+  ],
+  "session_id": "72fe246c",
+  "timestamp": "2026-08-19T15:41:46.976036",
+  "fix": null
+}

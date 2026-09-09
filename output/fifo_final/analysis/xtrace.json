@@ -1,0 +1,13 @@
+{
+  "x_origins": [],
+  "uninitialized_registers": [],
+  "uninitialized_memories": [],
+  "tristate_signals": [],
+  "multi_driven_signals": [],
+  "severity": "none",
+  "summary": "No X propagation issues detected",
+  "real_traces": [],
+  "vcd_evidence": [],
+  "tool_status": "skipped_no_vcd",
+  "tool_message": "Real x-tracer analysis requires a VCD waveform. Pass --vcd to enable it; falling back to static heuristic X analysis."
+}

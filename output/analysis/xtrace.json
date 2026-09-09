@@ -1,0 +1,23 @@
+{
+  "x_origins": [
+    {
+      "origin_signal": "fifo_count",
+      "origin_module": "sync_fifo",
+      "origin_cause": "uninitialized",
+      "propagation_chain": [
+        "fifo_count"
+      ],
+      "affected_outputs": [],
+      "line_number": 63,
+      "file": "projects/fifo/rtl/sync_fifo.sv"
+    }
+  ],
+  "uninitialized_registers": [
+    "sync_fifo.fifo_count"
+  ],
+  "uninitialized_memories": [],
+  "tristate_signals": [],
+  "multi_driven_signals": [],
+  "severity": "high",
+  "summary": "Found 1 X propagation source(s): fifo_count. Uninitialized registers: sync_fifo.fifo_count"
+}

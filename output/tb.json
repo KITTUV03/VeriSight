@@ -1,0 +1,16 @@
+{
+  "transactions": [],
+  "sequences": [],
+  "drivers": [],
+  "monitors": [],
+  "scoreboards": [],
+  "coverage": [],
+  "tlm_connections": [],
+  "factory_overrides": [],
+  "config_db_entries": [],
+  "components": [],
+  "assertions": [],
+  "interfaces": [],
+  "file_list": [],
+  "packages": []
+}

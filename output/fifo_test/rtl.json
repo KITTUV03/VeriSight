@@ -1,0 +1,427 @@
+{
+  "modules": [
+    {
+      "name": "syn_fifo",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "ports": [
+        {
+          "name": "clk",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "rst",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "wr_cs",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "rd_cs",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "rd_en",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "wr_en",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "full",
+          "direction": "output",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "empty",
+          "direction": "output",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        }
+      ],
+      "parameters": [
+        {
+          "name": "DATA_WIDTH",
+          "value": "8",
+          "param_type": "parameter",
+          "data_type": ""
+        },
+        {
+          "name": "ADDR_WIDTH",
+          "value": "8",
+          "param_type": "parameter",
+          "data_type": ""
+        },
+        {
+          "name": "RAM_DEPTH",
+          "value": "(1 << ADDR_WIDTH",
+          "param_type": "parameter",
+          "data_type": ""
+        }
+      ],
+      "always_blocks": [
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk or posedge rst",
+          "clock_signal": "clk",
+          "reset_signal": "rst",
+          "reset_active": "high",
+          "signals_written": [
+            "wr_pointer"
+          ],
+          "signals_read": [
+            "WRITE_POINTER",
+            "rst",
+            "wr_valid"
+          ],
+          "has_reset": true,
+          "line_start": 52,
+          "line_end": 59,
+          "raw_code": "begin : WRITE_POINTER\n  if (rst) begin\n    wr_pointer <= 0;\n  end else if (wr_valid) begin\n    wr_pointer <= wr_pointer + 1;\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk or posedge rst",
+          "clock_signal": "clk",
+          "reset_signal": "rst",
+          "reset_active": "high",
+          "signals_written": [
+            "rd_pointer"
+          ],
+          "signals_read": [
+            "READ_POINTER",
+            "rd_valid",
+            "rst"
+          ],
+          "has_reset": true,
+          "line_start": 61,
+          "line_end": 68,
+          "raw_code": "begin : READ_POINTER\n  if (rst) begin\n    rd_pointer <= 0;\n  end else if (rd_valid) begin\n    rd_pointer <= rd_pointer + 1;\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk or posedge rst",
+          "clock_signal": "clk",
+          "reset_signal": "rst",
+          "reset_active": "high",
+          "signals_written": [
+            "data_out"
+          ],
+          "signals_read": [
+            "READ_DATA",
+            "data_ram",
+            "rd_valid",
+            "rst"
+          ],
+          "has_reset": true,
+          "line_start": 70,
+          "line_end": 77,
+          "raw_code": "begin : READ_DATA\n  if (rst) begin\n    data_out <= 0;\n  end else if (rd_valid) begin\n    data_out <= data_ram;\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk or posedge rst",
+          "clock_signal": "clk",
+          "reset_signal": "rst",
+          "reset_active": "high",
+          "signals_written": [
+            "status_cnt"
+          ],
+          "signals_read": [
+            "STATUS_COUNTER",
+            "rd_valid",
+            "rst",
+            "wr_valid"
+          ],
+          "has_reset": true,
+          "line_start": 79,
+          "line_end": 91,
+          "raw_code": "begin : STATUS_COUNTER\n  if (rst) begin\n    status_cnt <= 0;\n  \n  end else if (rd_valid && !wr_valid) begin\n    status_cnt <= status_cnt - 1;\n  \n  end else if (wr_valid && !rd_valid) begin\n    status_cnt <= status_cnt + 1;\n  \n  end\nend",
+          "issues": []
+        }
+      ],
+      "fsms": [],
+      "clock_domains": [
+        {
+          "clock_signal": "clk",
+          "signals": [
+            "data_out",
+            "rd_pointer",
+            "status_cnt",
+            "wr_pointer"
+          ],
+          "reset_signal": "rst"
+        }
+      ],
+      "assignments": [
+        "full  = (status_cnt == RAM_DEPTH)",
+        "empty = (status_cnt == 0)"
+      ],
+      "instantiations": [
+        {
+          "module": "WRITE_POINTER",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "READ_POINTER",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "READ_DATA",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "STATUS_COUNTER",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "ram_dp_ar_aw",
+          "instance": "DP_RAM",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        }
+      ],
+      "assertions": [],
+      "raw_source": "--------------------------------------------------\n// Design Name : syn_fifo\n// File Name   : syn_fifo.v\n// Function    : Synchronous (single clock) FIFO\n//-----------------------------------------------------\nmodule syn_fifo (\nclk      , // Clock input\nrst      , // Active high reset\nwr_cs    , // Write chip select\nrd_cs    , // Read chip select\ndata_in  , // Data input\nrd_en    , // Read enable\nwr_en    , // Write Enable\ndata_out , // Data Output\nempty    , // FIFO empty\nfull       // FIFO full\n);\n\n// FIFO constants\nparameter DATA_WIDTH = 8;\nparameter ADDR_WIDTH = 8;\nparameter RAM_DEPTH  = (1 << ADDR_WIDTH);\n\n// Port Declarations\ninput                     clk      ;\ninput                     rst      ;\ninput                     wr_cs    ;\ninput                     rd_cs    ;\ninput                     rd_en    ;\ninput                     wr_en    ;\ninput  [DATA_WIDTH-1:0]   data_in  ;\noutput                    full     ;\noutput                    empty    ;\noutput [DATA_WIDTH-1:0]   data_out ;\n\n//-----------Internal variables-------------------\nreg  [ADDR_WIDTH-1:0] wr_pointer;\nreg  [ADDR_WIDTH-1:0] rd_pointer;\nreg  [ADDR_WIDTH  :0] status_cnt;\nreg  [DATA_WIDTH-1:0] data_out ;\nwire [DATA_WIDTH-1:0] data_ram ;\n\n  assign full  = (status_cnt == RAM_DEPTH);\n  assign empty = (status_cnt == 0);\n\n//-----------Internal write/read qualifiers-------\n// Only allow a pointer/counter update when the operation\n// is actually legal (not full on write, not empty on read).\n// This prevents wr_pointer/rd_pointer from silently lapping\n// each other if wr_en/rd_en are asserted out of protocol.\nwire wr_valid = wr_cs && wr_en && !full;\nwire rd_valid = rd_cs && rd_en && !empty;\n\n//-----------Code Start---------------------------\nalways @ (posedge clk or posedge rst)\nbegin : WRITE_POINTER\n  if (rst) begin\n    wr_pointer <= 0;\n  end else if (wr_valid) begin\n    wr_pointer <= wr_pointer + 1;\n  end\nend\n\nalways @ (posedge clk or posedge rst)\nbegin : READ_POINTER\n  if (rst) begin\n    rd_pointer <= 0;\n  end else if (rd_valid) begin\n    rd_pointer <= rd_pointer + 1;\n  end\nend\n\nalw",
+      "line_count": 73
+    },
+    {
+      "name": "ram_dp_ar_aw",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "ports": [
+        {
+          "name": "clk",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "cs_0",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "we_0",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "oe_0",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "cs_1",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "we_1",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "oe_1",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        }
+      ],
+      "parameters": [
+        {
+          "name": "DATA_WIDTH",
+          "value": "8",
+          "param_type": "parameter",
+          "data_type": ""
+        },
+        {
+          "name": "ADDR_WIDTH",
+          "value": "8",
+          "param_type": "parameter",
+          "data_type": ""
+        },
+        {
+          "name": "RAM_DEPTH",
+          "value": "(1 << ADDR_WIDTH",
+          "param_type": "parameter",
+          "data_type": ""
+        }
+      ],
+      "always_blocks": [
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk",
+          "clock_signal": "clk",
+          "reset_signal": "",
+          "reset_active": "",
+          "signals_written": [],
+          "signals_read": [
+            "PORT0_WRITE",
+            "address_0",
+            "cs_0",
+            "data_0",
+            "mem",
+            "we_0"
+          ],
+          "has_reset": false,
+          "line_start": 122,
+          "line_end": 127,
+          "raw_code": "begin : PORT0_WRITE\n  if (cs_0 && we_0) begin\n    mem[address_0] <= data_0;\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "combinational",
+          "sensitivity_list": "*",
+          "clock_signal": "",
+          "reset_signal": "",
+          "reset_active": "",
+          "signals_written": [
+            "data_0_out"
+          ],
+          "signals_read": [
+            "DATA_WIDTH",
+            "PORT0_READ",
+            "address_0",
+            "bz",
+            "cs_0",
+            "mem",
+            "oe_0"
+          ],
+          "has_reset": false,
+          "line_start": 132,
+          "line_end": 139,
+          "raw_code": "begin : PORT0_READ\n  if (cs_0 && oe_0) begin\n    data_0_out = mem[address_0];\n  end else begin\n    data_0_out = {DATA_WIDTH{1'bz}};\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk",
+          "clock_signal": "clk",
+          "reset_signal": "",
+          "reset_active": "",
+          "signals_written": [],
+          "signals_read": [
+            "PORT1_WRITE",
+            "address_1",
+            "cs_1",
+            "data_1",
+            "mem",
+            "we_1"
+          ],
+          "has_reset": false,
+          "line_start": 147,
+          "line_end": 152,
+          "raw_code": "begin : PORT1_WRITE\n  if (cs_1 && we_1) begin\n    mem[address_1] <= data_1;\n  end\nend",
+          "issues": []
+        },
+        {
+          "block_type": "combinational",
+          "sensitivity_list": "*",
+          "clock_signal": "",
+          "reset_signal": "",
+          "reset_active": "",
+          "signals_written": [
+            "data_1_out"
+          ],
+          "signals_read": [
+            "DATA_WIDTH",
+            "PORT1_READ",
+            "address_1",
+            "bz",
+            "cs_1",
+            "mem",
+            "oe_1"
+          ],
+          "has_reset": false,
+          "line_start": 157,
+          "line_end": 164,
+          "raw_code": "begin : PORT1_READ\n  if (cs_1 && oe_1) begin\n    data_1_out = mem[address_1];\n  end else begin\n    data_1_out = {DATA_WIDTH{1'bz}};\n  end\nend",
+          "issues": []
+        }
+      ],
+      "fsms": [],
+      "clock_domains": [
+        {
+          "clock_signal": "clk",
+          "signals": [],
+          "reset_signal": ""
+        }
+      ],
+      "assignments": [
+        "data_0 = (cs_0 && oe_0 && !we_0) ? data_0_out : {DATA_WIDTH{1'bz}}",
+        "data_1 = (cs_1 && oe_1 && !we_1) ? data_1_out : {DATA_WIDTH{1'bz}}"
+      ],
+      "instantiations": [
+        {
+          "module": "PORT0_WRITE",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "PORT0_READ",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "PORT1_WRITE",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        },
+        {
+          "module": "PORT1_READ",
+          "instance": "if",
+          "file": "projects/fifo/rtl/syn_fifo.sv"
+        }
+      ],
+      "assertions": [],
+      "raw_source": " data_out <= 0;\n  end else if (rd_valid) begin\n    data_out <= data_ram;\n  end\nend\n\nalways @ (posedge clk or posedge rst)\nbegin : STATUS_COUNTER\n  if (rst) begin\n    status_cnt <= 0;\n  // Read but no write.\n  end else if (rd_valid && !wr_valid) begin\n    status_cnt <= status_cnt - 1;\n  // Write but no read.\n  end else if (wr_valid && !rd_valid) begin\n    status_cnt <= status_cnt + 1;\n  // Simultaneous valid read + valid write -> count unchanged\n  end\nend\n\nram_dp_ar_aw #(DATA_WIDTH,ADDR_WIDTH) DP_RAM (\n  .clk     (clk),\n.address_0 (wr_pointer) , // address_0 input\n.data_0    (data_in)    , // data_0 bi-directional\n.cs_0      (wr_cs)      , // chip select\n.we_0      (wr_en)      , // write enable\n.oe_0      (1'b0)       , // output enable\n  \n  \n.address_1 (rd_pointer) , // address_1 input\n.data_1    (data_ram)   , // data_1 bi-directional\n.cs_1      (rd_cs)      , // chip select\n.we_1      (1'b0)       , // Read enable\n.oe_1      (rd_en)        // output enable\n);\nendmodule\n\n//Ram_Module\n//-----------------------------------------------------\n// Design Name : ram_dp_ar_aw\n// File Name   : ram_dp_ar_aw.v\n// Function    : Dual-Port RAM, Asynchronous Read,\n//               Asynchronous Write (no clock port).\n//               Port 0 -> used as the WRITE port by syn_fifo\n//                         (oe_0 tied low -> never drives data_0)\n//               Port 1 -> used as the READ  port by syn_fifo\n//                         (we_1 tied low -> never writes)\n//\n//               Wri",
+      "line_count": 49
+    }
+  ],
+  "top_module": "syn_fifo",
+  "file_list": [
+    "projects/fifo/rtl/syn_fifo.sv"
+  ],
+  "total_lines": 276,
+  "global_issues": []
+}

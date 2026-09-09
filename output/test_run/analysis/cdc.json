@@ -1,0 +1,8 @@
+{
+  "clock_domains": [],
+  "crossings": [],
+  "async_resets": [
+    "rst_n"
+  ],
+  "summary": "Found 0 CDC issue(s), 1 async reset(s)"
+}

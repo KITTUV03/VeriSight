@@ -1,0 +1,18 @@
+{
+  "classification": "Unknown",
+  "confidence": 30,
+  "component": "",
+  "reason": "Insufficient evidence for deterministic classification. LLM reasoning unavailable.",
+  "category": "",
+  "spec_reference": "",
+  "log_reference": "",
+  "rtl_reference": "",
+  "tb_reference": "",
+  "recommended_fix": "",
+  "evidence": [],
+  "reasoning_chain": [],
+  "missing_artifacts": [
+    "LLM API access for deep reasoning"
+  ],
+  "alternative_hypotheses": []
+}

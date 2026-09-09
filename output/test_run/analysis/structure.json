@@ -1,0 +1,186 @@
+{
+  "issues": [
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0011' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0011",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0000' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0000",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0111' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0111",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0110' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0110",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0010' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0010",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State '2' has no outgoing transitions",
+      "module": "alu",
+      "element": "2",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0001' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0001",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0100' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0100",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "dead_state",
+      "description": "State 'b0101' has no outgoing transitions",
+      "module": "alu",
+      "element": "b0101",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0011' may be unreachable",
+      "module": "alu",
+      "element": "b0011",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0000' may be unreachable",
+      "module": "alu",
+      "element": "b0000",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0111' may be unreachable",
+      "module": "alu",
+      "element": "b0111",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0110' may be unreachable",
+      "module": "alu",
+      "element": "b0110",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0010' may be unreachable",
+      "module": "alu",
+      "element": "b0010",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State '2' may be unreachable",
+      "module": "alu",
+      "element": "2",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0001' may be unreachable",
+      "module": "alu",
+      "element": "b0001",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0100' may be unreachable",
+      "module": "alu",
+      "element": "b0100",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    },
+    {
+      "issue_type": "unreachable_logic",
+      "description": "State 'b0101' may be unreachable",
+      "module": "alu",
+      "element": "b0101",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "line_number": 0,
+      "severity": "medium"
+    }
+  ],
+  "fsm_analysis": [
+    {
+      "name": "alu_op_sel",
+      "total_states": 10,
+      "reachable_states": 0,
+      "dead_states": [
+        "b0011",
+        "b0000",
+        "b0111",
+        "b0110",
+        "b0010",
+        "2",
+        "b0001",
+        "b0100",
+        "b0101"
+      ],
+      "has_default": true
+    }
+  ],
+  "summary": "Found 18 structural issue(s)"
+}

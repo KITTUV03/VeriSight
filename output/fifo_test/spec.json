@@ -1,0 +1,198 @@
+{
+  "title": "",
+  "version": "",
+  "raw_sections": {
+    "Synchronous FIFO — Design Specification": "Module Name:syn_fifo File:syn_fifo.v Version: 1.1 (corrected) Type: Single-clock (synchronous) FIFO, dual-port RAM based",
+    "1. Overview": "syn_fifo is a parameterizable, single-clock-domain FIFO built around a dual-port RAM (ram_dp_ar_aw ). One port is dedicated to writes, the other to reads, using independent write and read pointers and a status counter that tracks current occupancy.\n\nThis version corrects an off-by-one error in the original full flag and adds internal write/read qualification logic so the FIFO cannot silently overflow or underflow even if wr_en /rd_en are asserted when the FIFO is already full/empty.",
+    "2. Parameters": "| Parameter Default Description |\n| --- |\n| DATA_WIDTH 8 Width of data_in / data_out , in bits |\n| ADDR_WIDTH 8 Width of internal RAM address (pointer width) RAM_DEPTH 1 << ADDR_WIDTH (derived, not Number of storage locations (256 for default |\n| user-set) ADDR_WIDTH ) |\n\nRAM_DEPTH is always a power of two, since it is derived from ADDR_WIDTH . This allows the write/read pointers to wrap correctly on overflow without explicit modulo logic.",
+    "3. Port List": "| Signal DirectionWidth Description |   |   |   |\n| --- | --- | --- | --- |\n| clk | Input | 1 | System clock. All sequential logic is synchronous to the |\n|   |   |   | rising edge. |\n| rst | Input | 1 | Active-high, asynchronous reset. |\n| wr_cs | Input | 1 | Write chip-select. Must be asserted along with wr_en |\n|   |   |   | for a write to occur. |\n| rd_cs | Input | 1 | Read chip-select. Must be asserted along with rd_en for |\n|   |   |   | a read to occur. |\n| wr_en | Input | 1 | Write enable. |\n| rd_en | Input | 1 | Read enable. |\n| data_in | Input | DATA_WIDTH | Data to be written into the FIFO. |\n| data_out | Output | DATA_WIDTH | Data read from the FIFO. Registered — valid one clock |\n|   |   |   | cycle after a qualified read request (see §6.3). |\n| full | Output 1 |   | Asserted when the FIFO is completely full (status_cnt |\n|   |   |   | == RAM_DEPTH ). |\n| empty | Output 1 |   | Asserted when the FIFO is completely empty |\n|   |   |   | (status_cnt == 0 ). |",
+    "4. Functional Description": "",
+    "4.1 Write Operation": "A write occurs when wr_cs && wr_en are both asserted and the FIFO is not full. On a qualified write:\n\n- data_in is written into the RAM at wr_pointer .\n\n- wr_pointer increments by 1 (wraps automatically at RAM_DEPTH ).\n\n- status_cnt increments by 1 (unless a simultaneous qualified read also occurs — see §4.3).\n\nIf wr_cs && wr_en is asserted while full is already asserted, the write is ignored: no pointer increment, no RAM write side-effect change, no status_cnt change. This differs from the original code, which had no such protection.",
+    "4.2 Read Operation": "A read occurs when rd_cs && rd_en are both asserted and the FIFO is not empty. On a qualified read:\n\n- The RAM location addressed by rd_pointer is presented as data_ram , which is registered into data_out on the next clock edge.\n\n- rd_pointer increments by 1 (wraps automatically at RAM_DEPTH ).\n\n- status_cnt decrements by 1 (unless a simultaneous qualified write also occurs — see §4.3).\n\nIf rd_cs && rd_en is asserted while empty is already asserted, the read is ignored: rd_pointer does not advance and data_out holds its previous value (no stale/garbage RAM read is latched).",
+    "4.3 Simultaneous Read and Write": "If a qualified write and a qualified read occur on the same clock edge, one entry leaves and one entry enters in the same cycle, so status_cnt remains unchanged. Both pointers advance independently.",
+    "4.4 Reset": "On rst (active-high, asynchronous):\n\n- wr_pointer , rd_pointer , and status_cnt are cleared to 0.\n\n- data_out is cleared to 0.\n\n- full deasserts, empty asserts (since status_cnt == 0 ).",
+    "5. Status Flag Definitions": "",
+    "5.1 Correction Rationale": "The original code defined:\n\n```\nverilog\nassign full = (status_cnt == (RAM_DEPTH-1));\n```\n\n\nThis asserted full one entry early — with status_cnt allowed to legally reach RAM_DEPTH per the counter's own write-guard (status_cnt != RAM_DEPTH ), the FIFO's usable capacity was silently reduced from RAM_DEPTH to RAM_DEPTH - 1 entries, and the discrepancy between the flag and the counter's true range was a latent design inconsistency.\n\nThe corrected version aligns the flag with the counter's actual range:\n\n```\nverilog\nassign full = (status_cnt == RAM_DEPTH);\n```\n\nThe FIFO now provides its full, advertised RAM_DEPTH -entry capacity.",
+    "6. Timing Characteristics": "",
+    "6.1 Write Timing": "- wr_pointer and status_cnt update synchronously, one cycle after a qualified write request.\n\n- Data is written into RAM combinationally on the same cycle the write is issued (RAM write is same-cycle; pointer/counter bookkeeping is registered).",
+    "6.2 Read Latency": "- data_out reflects the RAM contents addressed by rd_pointer one clock cycle after a qualified rd_en assertion (registered read, consistent with synchronous dual-port block RAM behavior).\n\n- Consumers must account for this 1-cycle latency; data_out is not combinationally valid in the same cycle as rd_en .",
+    "6.3 Back-to-Back Access": "Because pointer and status updates are registered, back-to-back writes/reads are supported at one operation per clock cycle, as long as full /empty boundary conditions are respected.",
+    "7. Overflow / Underflow Protection": "| Condition Original Behavior |   | Corrected Behavior |\n| --- | --- | --- |\n| wr_en | Not explicitly blocked; relied entirely on | Internally blocked — no |\n| asserted while | external controller discipline | pointer/counter/RAM side-effect |\n| full |   | change |\n| rd_en | rd_pointer would advance past | Internally blocked — |\n| asserted while | wr_pointer , and data_out would latch | rd_pointer holds, data_out |\n| empty | stale/undefined RAM contents with no | retains last valid value |\n|   | error indication |   |\n\nThis makes the FIFO self-protecting: even if the integrating design violates the full /empty handshake, the FIFO will not corrupt its internal pointers or silently return garbage data.\n\nDesign note: Self-protection adds a small amount of combinational qualification logic (wr_valid , rd_valid ) on the enable paths. If area/timing is extremely constrained and the integrating logic is already verified to strictly honor full /empty , this guard can be omitted — but it is recommended to keep it for robustness during integration and verification.",
+    "8. Sub-module Dependency": "syn_fifo instantiates a synchronous dual-port RAM:\n\n```\nram_dp_ar_aw #(DATA_WIDTH, ADDR_WIDTH) DP_RAM (...)\n```\n\n\n| Port | Direction Description |\n| --- | --- |\n| address_0 | Input Write-port address (driven by wr_pointer ) |\n| data_0 | Input Write-port data (driven by data_in ) |\n| cs_0 | Input Write-port chip select (wr_cs ) |\n| we_0 | Input Write-port write-enable (wr_en ) |\n| oe_0 | Input Write-port output-enable (tied low — write-only use) |\n| address_1 | Input Read-port address (driven by rd_pointer ) |\n| data_1 | Output Read-port data (feeds data_ram ) |\n| cs_1 | Input Read-port chip select (rd_cs ) |\n| we_1 | Input Read-port write-enable (tied low — read-only use) |\n| oe_1 | Input Read-port output-enable (rd_en ) |\n\nThis RAM module is not included in this specification; it is assumed to be a standard synchronous dual-port RAM primitive with independent read/write address/control per port.",
+    "9. Known Limitations": "- Single clock domain only. This design is not suitable for crossing clock domains; use a dual-clock (asynchronous) FIFO with Gray-coded pointers and proper CDC synchronizers for that use case.\n\n- No almost-full / almost-empty / programmable threshold flags. Only binary full /empty are provided. If watermark flags are needed, status_cnt can be compared against a threshold externally or added as additional outputs.\n\n- RAM_DEPTH must be a power of two, as it is derived from ADDR_WIDTH . Non-power- of-two depths would require additional wrap logic and are out of scope for this module.\n\nfi\n\nfi"
+  },
+  "functional_requirements": [
+    {
+      "id": "REQ-001",
+      "description": "Module Name:syn_fifo File:syn_fifo.v Version: 1.1 (corrected) Type: Single-clock (synchronous) FIFO, dual-port RAM based",
+      "section": "Synchronous FIFO — Design Specification",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-002",
+      "description": "syn_fifo is a parameterizable, single-clock-domain FIFO built around a dual-port RAM (ram_dp_ar_aw ). One port is dedicated to writes, the other to reads, using independent write and read pointers and a status counter that tracks current occupancy.\n\nThis version corrects an off-by-one error in the original full flag and adds internal write/read qualification logic so the FIFO cannot silently overflow or underflow even if wr_en /rd_en are asserted when the FIFO is already full/empty.",
+      "section": "1. Overview",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-003",
+      "description": "data_in is written into the RAM at wr_pointer .",
+      "section": "4.1 Write Operation",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-004",
+      "description": "wr_pointer increments by 1 (wraps automatically at RAM_DEPTH ).",
+      "section": "4.1 Write Operation",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-005",
+      "description": "status_cnt increments by 1 (unless a simultaneous qualified read also occurs — see §4.3).",
+      "section": "4.1 Write Operation",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-006",
+      "description": "The RAM location addressed by rd_pointer is presented as data_ram , which is registered into data_out on the next clock edge.",
+      "section": "4.2 Read Operation",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-007",
+      "description": "rd_pointer increments by 1 (wraps automatically at RAM_DEPTH ).",
+      "section": "4.2 Read Operation",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-008",
+      "description": "status_cnt decrements by 1 (unless a simultaneous qualified write also occurs — see §4.3).",
+      "section": "4.2 Read Operation",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-009",
+      "description": "wr_pointer , rd_pointer , and status_cnt are cleared to 0.",
+      "section": "4.4 Reset",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-010",
+      "description": "data_out is cleared to 0.",
+      "section": "4.4 Reset",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-011",
+      "description": "full deasserts, empty asserts (since status_cnt == 0 ).",
+      "section": "4.4 Reset",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-012",
+      "description": "wr_pointer and status_cnt update synchronously, one cycle after a qualified write request.",
+      "section": "6.1 Write Timing",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-013",
+      "description": "Data is written into RAM combinationally on the same cycle the write is issued (RAM write is same-cycle; pointer/counter bookkeeping is registered).",
+      "section": "6.1 Write Timing",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-014",
+      "description": "data_out reflects the RAM contents addressed by rd_pointer one clock cycle after a qualified rd_en assertion (registered read, consistent with synchronous dual-port block RAM behavior).",
+      "section": "6.2 Read Latency",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-015",
+      "description": "Consumers must account for this 1-cycle latency; data_out is not combinationally valid in the same cycle as rd_en .",
+      "section": "6.2 Read Latency",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-016",
+      "description": "Single clock domain only. This design is not suitable for crossing clock domains; use a dual-clock (asynchronous) FIFO with Gray-coded pointers and proper CDC synchronizers for that use case.",
+      "section": "9. Known Limitations",
+      "priority": "normal",
+      "category": "timing"
+    },
+    {
+      "id": "REQ-017",
+      "description": "No almost-full / almost-empty / programmable threshold flags. Only binary full /empty are provided. If watermark flags are needed, status_cnt can be compared against a threshold externally or added as additional outputs.",
+      "section": "9. Known Limitations",
+      "priority": "normal",
+      "category": "functional"
+    },
+    {
+      "id": "REQ-018",
+      "description": "RAM_DEPTH must be a power of two, as it is derived from ADDR_WIDTH . Non-power- of-two depths would require additional wrap logic and are out of scope for this module.",
+      "section": "9. Known Limitations",
+      "priority": "normal",
+      "category": "functional"
+    }
+  ],
+  "timing_requirements": [
+    {
+      "signal": "",
+      "constraint": "wr_pointer and status_cnt update synchronously, one cycle after a qualified write request.",
+      "value": "",
+      "unit": "ns",
+      "section": "6.1 Write Timing"
+    },
+    {
+      "signal": "",
+      "constraint": "Data is written into RAM combinationally on the same cycle the write is issued (RAM write is same-cycle; pointer/counter bookkeeping is registered).",
+      "value": "",
+      "unit": "ns",
+      "section": "6.1 Write Timing"
+    },
+    {
+      "signal": "",
+      "constraint": "data_out reflects the RAM contents addressed by rd_pointer one clock cycle after a qualified rd_en assertion (registered read, consistent with synchronous dual-port block RAM behavior).",
+      "value": "",
+      "unit": "ns",
+      "section": "6.2 Read Latency"
+    },
+    {
+      "signal": "",
+      "constraint": "Consumers must account for this 1-cycle latency; data_out is not combinationally valid in the same cycle as rd_en .",
+      "value": "",
+      "unit": "ns",
+      "section": "6.2 Read Latency"
+    }
+  ],
+  "reset_behavior": [
+    {
+      "reset_signal": "rst",
+      "active_level": "high",
+      "type": "asynchronous",
+      "affected_signals": [],
+      "reset_values": {},
+      "section": "4.4 Reset"
+    }
+  ],
+  "protocol_rules": [],
+  "address_map": {},
+  "register_descriptions": [],
+  "state_machines": [],
+  "corner_cases": [],
+  "illegal_conditions": []
+}

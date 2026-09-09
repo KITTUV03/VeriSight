@@ -1,0 +1,18 @@
+{
+  "issues": [
+    {
+      "issue_type": "unused_variable",
+      "description": "Input port 'wire' appears unused",
+      "signal": "wire",
+      "module": "sync_fifo",
+      "file": "projects/fifo/rtl/sync_fifo.sv",
+      "line_number": 0,
+      "code_snippet": "",
+      "severity": "low"
+    }
+  ],
+  "issue_counts": {
+    "unused_variable": 1
+  },
+  "summary": "Found 1 lint issue(s)"
+}

@@ -1,0 +1,48 @@
+{
+  "issues": [
+    {
+      "issue_type": "unused_variable",
+      "description": "Input port 'wr_cs' appears unused",
+      "signal": "wr_cs",
+      "module": "syn_fifo",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "line_number": 0,
+      "code_snippet": "",
+      "severity": "low"
+    },
+    {
+      "issue_type": "unused_variable",
+      "description": "Input port 'rd_cs' appears unused",
+      "signal": "rd_cs",
+      "module": "syn_fifo",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "line_number": 0,
+      "code_snippet": "",
+      "severity": "low"
+    },
+    {
+      "issue_type": "unused_variable",
+      "description": "Input port 'rd_en' appears unused",
+      "signal": "rd_en",
+      "module": "syn_fifo",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "line_number": 0,
+      "code_snippet": "",
+      "severity": "low"
+    },
+    {
+      "issue_type": "unused_variable",
+      "description": "Input port 'wr_en' appears unused",
+      "signal": "wr_en",
+      "module": "syn_fifo",
+      "file": "projects/fifo/rtl/syn_fifo.sv",
+      "line_number": 0,
+      "code_snippet": "",
+      "severity": "low"
+    }
+  ],
+  "issue_counts": {
+    "unused_variable": 4
+  },
+  "summary": "Found 4 lint issue(s)"
+}

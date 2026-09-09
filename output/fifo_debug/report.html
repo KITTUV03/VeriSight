@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriSight Debugging Report — 72fe246c</title>
+    <style>
+        :root {
+            --bg: #0d1117; --card-bg: #161b22; --border: #30363d;
+            --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
+            --error: #f85149; --warn: #d29922; --success: #3fb950;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6;
+            padding: 2rem; max-width: 1200px; margin: 0 auto;
+        }
+        h1 { color: var(--accent); margin-bottom: 0.5rem; font-size: 1.8rem; }
+        h2 {
+            color: var(--accent); margin: 2rem 0 1rem; padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 { color: var(--text); margin: 1.5rem 0 0.5rem; }
+        .meta { color: var(--text-muted); margin-bottom: 2rem; }
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem; margin: 1rem 0 2rem;
+        }
+        .summary-card {
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 1rem;
+        }
+        .summary-card .label { color: var(--text-muted); font-size: 0.85rem; }
+        .summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.3rem; }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 0.8rem; font-weight: 600;
+        }
+        .badge-critical { background: #f8514922; color: #f85149; }
+        .badge-high { background: #fd7e1422; color: #fd7e14; }
+        .badge-medium { background: #d2992222; color: #d29922; }
+        .badge-low { background: #3fb95022; color: #3fb950; }
+        .badge-error { background: #f8514922; color: #f85149; }
+        table {
+            width: 100%; border-collapse: collapse; margin: 1rem 0;
+            background: var(--card-bg);
+        }
+        th, td {
+            padding: 0.6rem 1rem; text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th { color: var(--text-muted); font-weight: 600; }
+        .evidence-item, .fix-item, .reasoning-step {
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 0.8rem 1rem; margin: 0.5rem 0;
+        }
+        .evidence-source {
+            color: var(--accent); font-weight: 600; margin-right: 0.5rem;
+        }
+        pre {
+            background: #0d1117; border: 1px solid var(--border);
+            padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;
+            overflow-x: auto;
+        }
+        code { color: #79c0ff; font-family: 'JetBrains Mono', monospace; }
+        .root-cause {
+            background: var(--card-bg); border-left: 4px solid #6c757d;
+            padding: 1rem 1.5rem; border-radius: 0 6px 6px 0; margin: 1rem 0;
+        }
+        footer {
+            margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+            color: var(--text-muted); font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 VeriSight Debugging Report</h1>
+    <div class="meta">
+        Session: 72fe246c &bull;
+        Generated: 2026-08-19T15:41:46.976036 &bull;
+        Simulation: FAIL ()
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="label">Classification</div>
+            <div class="value" style="color: #6c757d">Unknown</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Confidence</div>
+            <div class="value">30%</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Module</div>
+            <div class="value">syn_fifo</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Category</div>
+            <div class="value">Lint</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Severity</div>
+            <div class="value"><span class="badge badge-medium">medium</span></div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Errors</div>
+            <div class="value" style="color: var(--error)">7</div>
+        </div>
+    </div>
+
+    <div class="root-cause">
+        <h3>Root Cause</h3>
+        <p>Insufficient evidence for deterministic classification. LLM reasoning unavailable.</p>
+        
+    </div>
+
+    <h2>Error Timeline</h2>
+    <table>
+        <thead><tr><th>Time</th><th>Severity</th><th>Message</th></tr></thead>
+        <tbody>
+                <tr>
+                    <td>55 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>EMPTY FLAG FAIL | Expected=0 Actual=1 COUNT=1</td>
+                </tr>
+                <tr>
+                    <td>65 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>EMPTY FLAG FAIL | Expected=0 Actual=1 COUNT=2</td>
+                </tr>
+                <tr>
+                    <td>75 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>READ FAIL | EXP=0xa9 ACT=0x0 COUNT=2->1 QUEUE_SIZE=1</td>
+                </tr>
+                <tr>
+                    <td>75 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>EMPTY FLAG FAIL | Expected=0 Actual=1 COUNT=1</td>
+                </tr>
+                <tr>
+                    <td>85 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>READ FAIL | EXP=0xf5 ACT=0x0 COUNT=1->0 QUEUE_SIZE=0</td>
+                </tr>
+                <tr>
+                    <td>135 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>SIMULTANEOUS WR/RD FAIL | EXP=0xcf ACT=0xf5 COUNT=1 QUEUE_SIZE=1</td>
+                </tr>
+                <tr>
+                    <td>2765 ns</td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>READ FAIL | EXP=0x18 ACT=0xf5 COUNT=256->255 QUEUE_SIZE=255</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td>7</td>
+                </tr></tbody>
+    </table>
+
+    
+    
+    
+    
+
+    
+
+    <footer>Report generated by VeriSight v1.0.0</footer>
+</body>
+</html>

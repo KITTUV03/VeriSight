@@ -1,0 +1,324 @@
+{
+  "transactions": [
+    {
+      "name": "fifo_trans",
+      "file": "projects/fifo/tb/fifo_trans.sv",
+      "fields": [
+        {
+          "name": "WR_CS",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": true
+        },
+        {
+          "name": "WR_EN",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": true
+        },
+        {
+          "name": "RD_CS",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": true
+        },
+        {
+          "name": "RD_EN",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": true
+        },
+        {
+          "name": "operations",
+          "field_type": "operation",
+          "constraint": "",
+          "is_rand": true
+        },
+        {
+          "name": "EMPTY",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": false
+        },
+        {
+          "name": "FULL",
+          "field_type": "bit",
+          "constraint": "",
+          "is_rand": false
+        },
+        {
+          "name": "fifo_operations",
+          "field_type": "constraint",
+          "constraint": "",
+          "is_rand": false
+        }
+      ],
+      "constraints": [],
+      "parent_class": "uvm_sequence_item"
+    }
+  ],
+  "sequences": [
+    {
+      "name": "fifo_base_seq",
+      "file": "projects/fifo/tb/fifo_direct_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "uvm_sequence#(fifo_trans)",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_memory_empty_seq",
+      "file": "projects/fifo/tb/fifo_empty_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "uvm_sequence#(fifo_trans)",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_memory_full_seq",
+      "file": "projects/fifo/tb/fifo_full_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "uvm_sequence#(fifo_trans)",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_general_seq",
+      "file": "projects/fifo/tb/fifo_general_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_random_seq",
+      "file": "projects/fifo/tb/fifo_random_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_read_seq",
+      "file": "projects/fifo/tb/fifo_read_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_reset_seq",
+      "file": "projects/fifo/tb/fifo_reset_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_sim_rw_seq",
+      "file": "projects/fifo/tb/fifo_sim_rw.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_virtual_seq",
+      "file": "projects/fifo/tb/fifo_virtual_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "uvm_sequence#(fifo_trans)",
+      "has_pre_body": false,
+      "has_post_body": false
+    },
+    {
+      "name": "fifo_write_seq",
+      "file": "projects/fifo/tb/fifo_write_seq.sv",
+      "body_summary": "",
+      "transaction_type": "",
+      "parent_class": "fifo_base_seq",
+      "has_pre_body": false,
+      "has_post_body": false
+    }
+  ],
+  "drivers": [
+    {
+      "name": "fifo_driver",
+      "file": "projects/fifo/tb/fifo_driver.sv",
+      "transaction_type": "fifo_trans",
+      "interface_signals": [],
+      "drive_logic_summary": "",
+      "raw_run_phase": ""
+    }
+  ],
+  "monitors": [
+    {
+      "name": "fifo_monitor",
+      "file": "projects/fifo/tb/fifo_monitor.sv",
+      "transaction_type": "",
+      "interface_signals": [],
+      "sampling_logic_summary": "",
+      "analysis_port": "ap_port",
+      "raw_run_phase": ""
+    },
+    {
+      "name": "fifo_passive",
+      "file": "projects/fifo/tb/fifo_passive_monitor.sv",
+      "transaction_type": "",
+      "interface_signals": [],
+      "sampling_logic_summary": "",
+      "analysis_port": "pass_port",
+      "raw_run_phase": ""
+    }
+  ],
+  "scoreboards": [
+    {
+      "name": "fifo_scoreboard",
+      "file": "projects/fifo/tb/fifo_scoreboard.sv",
+      "prediction_logic": "",
+      "comparison_logic": "",
+      "analysis_exports": [
+        "ap_imp",
+        "pass_imp"
+      ],
+      "raw_code": "\n\n  `uvm_component_utils(fifo_scoreboard)\n  `COMP_CNSTR(fifo_scoreboard)\n\n  virtual intf inf;\n\n  uvm_analysis_imp_active  #(fifo_trans, fifo_scoreboard) ap_imp;\n  uvm_analysis_imp_passive #(fifo_trans, fifo_scoreboard) pass_imp;\n\n  fifo_trans active_q[$];\n  fifo_trans passive_q[$];\n\n  bit [`DATA_WIDTH-1:0] exp_DATA_OUT[$];\n  bit                   exp_EMPTY;\n  bit                   exp_FULL;\n  bit [`ADDR_WIDTH:0]   status_count;\n  bit [`DATA_WIDTH-1:0] exp_data;\n\n  function void build_phase(uvm_phase phase);\n    super.build_phase(phase);\n    if (!uvm_config_db #(virtual intf)::get(this, \"\", \"vif\", inf))\n      `uvm_fatal(get_type_name(), \"Interface Not Received\")\n\n    ap_imp   = new(\"ap_imp\", this);\n    pass_imp = new(\"pass_imp\", this);\n  endfunction\n\n\n  function void write_active(fifo_trans packet);\n    fifo_trans cloned;\n    if (!$cast(cloned, packet.clone()))\n      `uvm_fatal(get_type_name(), \"Failed to clone active transaction\")\n\n    active_q.push_back(cloned);\n    `uvm_info(get_type_name(),\n      $sformatf(\"Active Monitor Packet Received | QUEUE_SIZE=%0d\", active_q.size()),\n      UVM_HIGH)\n  endfunction\n\n\n  function void write_passive(fifo_trans packet1);\n    fifo_trans cloned;\n    if (!$cast(cloned, packet1.clone()))\n      `uvm_fatal(get_type_name(), \"Failed to clone passive transaction\")\n\n    passive_q.push_back(cloned);\n    `uvm_info(get_type_name(),\n      $sformatf(\"Passive Monitor Packet Received | QUEUE_SIZE=%0d\", passive_q.size()),\n      UVM_HIGH)\n  endfunction\n\n\n  task run_phase(uvm_phase phase);\n    fifo_trans packet, packet1;\n    forever begin\n      wait (active_q.size() > 0 && passive_q.size() > 0);\n      packet  = active_q.pop_front();\n      packet1 = passive_q.pop_front();\n      compare(packet, packet1);\n    end\n  endtask\n\n\n  function void compare(fifo_trans packet, fifo_trans packet1);\n\n    `uvm_info(get_type_name(),\n      $sformatf(\"\\n==================== FIFO TRANSACTION ====================\\n\\\nWR_CS=%0b WR_EN=%0b RD_CS=%0b RD_EN=%0b\\n\\\nDATA_IN =0x%0h DATA_OUT=0x%0h\\n\\\nFULL=%0b EMPTY=%0b\\n\\\nSTATUS_COUNT=%0d QUEUE_SIZE=%0d\\n\\\n============================================================\",\n      packet.WR_CS,\n      packet.WR_EN,\n      packet.RD_CS,\n      packet.RD_EN,\n      packet.DATA_IN,\n      packet1.DATA_OUT,\n      packet1.FULL,\n      packet1.EMPTY,\n      status_count,\n      exp_DATA_OUT.size()),\n      UVM_HIGH);\n\n    exp_FULL  = (status_count == `DEPTH);\n    exp_EMPTY = (status_count == 0);\n\n    if (inf.RST == 0) begin\n\n      if ((packet.WR_CS && packet.WR_EN && !exp_FULL) &&\n          (packet.RD_CS && packet.RD_EN && !exp_EMPTY)) begin\n\n        exp_DATA_OUT.push_back(packet.DATA_IN);\n        exp_data = exp_DATA_OUT.pop_front();\n\n        if (exp_data == packet1.DATA_OUT)\n          `uvm_info(get_type_name(),\n            $sformatf(\"SIMULTANEOUS WR/RD PASS | EXP=0x%0h ACT=0x%0h COUNT=%0d QUEUE_SIZE=%0d\",\n                      exp_data, packet1.DATA_OUT, status_count, exp_DATA_OUT.size()),\n            UVM_LOW)\n        else\n      "
+    },
+    {
+      "name": "subscriber",
+      "file": "projects/fifo/tb/fifo_subscriber.sv",
+      "prediction_logic": "packet = t;\n    cvg.sample();",
+      "comparison_logic": "packet = t;\n    cvg.sample();",
+      "analysis_exports": [],
+      "raw_code": "\n\n  `uvm_component_utils(subscriber)\n   fifo_trans packet;\n\n  covergroup cvg;\n\n    coverpoint packet.WR_EN;\n    coverpoint packet.RD_EN;\n    coverpoint packet.WR_CS;\n    coverpoint packet.RD_CS;\n\n\n  endgroup\n  \n  function new(string name=\"subscriber\",uvm_component parent);\n    super.new(name,parent);\n    cvg = new();\n  endfunction\n\n\n  \n  function void write(fifo_trans t);\n    packet = t;\n    cvg.sample();\n  endfunction\n  \n  \n  function void report_phase(uvm_phase phase);\n    $display(\"%0f\",cvg.get_coverage());\n  endfunction\n  \n\n"
+    }
+  ],
+  "coverage": [
+    {
+      "name": "cvg",
+      "file": "projects/fifo/tb/fifo_subscriber.sv",
+      "covergroups": [
+        "cvg"
+      ],
+      "coverpoints": [],
+      "crosses": []
+    }
+  ],
+  "tlm_connections": [],
+  "factory_overrides": [],
+  "config_db_entries": [
+    {
+      "operation": "get",
+      "field_name": "vif",
+      "value_type": "virtual intf",
+      "scope": "",
+      "component": "fifo_scoreboard"
+    }
+  ],
+  "components": [
+    {
+      "name": "fifo_agent",
+      "component_type": "agent",
+      "file": "projects/fifo/tb/fifo_agent.sv",
+      "parent_class": "uvm_agent",
+      "children": [],
+      "phase_methods": [
+        "build_phase",
+        "connect_phase"
+      ]
+    },
+    {
+      "name": "fifo_env",
+      "component_type": "env",
+      "file": "projects/fifo/tb/fifo_env.sv",
+      "parent_class": "uvm_env",
+      "children": [],
+      "phase_methods": [
+        "build_phase",
+        "connect_phase"
+      ]
+    },
+    {
+      "name": "fifo_passive_agent",
+      "component_type": "agent",
+      "file": "projects/fifo/tb/fifo_passive_agent.sv",
+      "parent_class": "uvm_agent",
+      "children": [],
+      "phase_methods": [
+        "build_phase"
+      ]
+    },
+    {
+      "name": "fifo_sequencer",
+      "component_type": "sequencer",
+      "file": "projects/fifo/tb/fifo_sequencer.sv",
+      "parent_class": "uvm_sequencer#(fifo_trans)",
+      "children": [],
+      "phase_methods": []
+    },
+    {
+      "name": "base_test",
+      "component_type": "test",
+      "file": "projects/fifo/tb/fifo_test.sv",
+      "parent_class": "uvm_test",
+      "children": [],
+      "phase_methods": [
+        "build_phase"
+      ]
+    }
+  ],
+  "assertions": [],
+  "interfaces": [
+    {
+      "name": "intf",
+      "file": "projects/fifo/tb/fifo_interface.sv",
+      "signals": [
+        "WR_CS",
+        "WR_EN",
+        "RD_CS",
+        "RD_EN",
+        "EMPTY",
+        "FULL"
+      ],
+      "clocking_blocks": [],
+      "modports": []
+    }
+  ],
+  "file_list": [
+    "projects/fifo/tb/fifo_agent.sv",
+    "projects/fifo/tb/fifo_defines.svh",
+    "projects/fifo/tb/fifo_direct_seq.sv",
+    "projects/fifo/tb/fifo_driver.sv",
+    "projects/fifo/tb/fifo_empty_seq.sv",
+    "projects/fifo/tb/fifo_env.sv",
+    "projects/fifo/tb/fifo_full_seq.sv",
+    "projects/fifo/tb/fifo_general_seq.sv",
+    "projects/fifo/tb/fifo_interface.sv",
+    "projects/fifo/tb/fifo_monitor.sv",
+    "projects/fifo/tb/fifo_package.sv",
+    "projects/fifo/tb/fifo_passive_agent.sv",
+    "projects/fifo/tb/fifo_passive_monitor.sv",
+    "projects/fifo/tb/fifo_random_seq.sv",
+    "projects/fifo/tb/fifo_read_seq.sv",
+    "projects/fifo/tb/fifo_reset_seq.sv",
+    "projects/fifo/tb/fifo_scoreboard.sv",
+    "projects/fifo/tb/fifo_sequencer.sv",
+    "projects/fifo/tb/fifo_sim_rw.sv",
+    "projects/fifo/tb/fifo_subscriber.sv",
+    "projects/fifo/tb/fifo_tb.sv",
+    "projects/fifo/tb/fifo_test.sv",
+    "projects/fifo/tb/fifo_trans.sv",
+    "projects/fifo/tb/fifo_virtual_seq.sv",
+    "projects/fifo/tb/fifo_write_seq.sv"
+  ],
+  "packages": [
+    "fifo_pkg"
+  ]
+}

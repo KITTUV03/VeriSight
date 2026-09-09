@@ -1,0 +1,196 @@
+{
+  "modules": [
+    {
+      "name": "alu",
+      "file": "/home/uday/VeriSight/examples/rtl/alu.sv",
+      "ports": [
+        {
+          "name": "clk",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "rst_n",
+          "direction": "input",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "operand_a",
+          "direction": "input",
+          "width": "[7:0]",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "operand_b",
+          "direction": "input",
+          "width": "[7:0]",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "op_sel",
+          "direction": "input",
+          "width": "[3:0]",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "result",
+          "direction": "output",
+          "width": "[7:0]",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "carry",
+          "direction": "output",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        },
+        {
+          "name": "zero",
+          "direction": "output",
+          "width": "1",
+          "signal_type": "logic",
+          "description": ""
+        }
+      ],
+      "parameters": [],
+      "always_blocks": [
+        {
+          "block_type": "combinational",
+          "sensitivity_list": "",
+          "clock_signal": "",
+          "reset_signal": "",
+          "reset_active": "",
+          "signals_written": [
+            "alu_out",
+            "zero_next"
+          ],
+          "signals_read": [
+            "b0",
+            "b0000",
+            "b0001",
+            "b0010",
+            "b0011",
+            "b0100",
+            "b0101",
+            "b0110",
+            "b0111",
+            "h00",
+            "op_sel",
+            "operand_a",
+            "operand_b"
+          ],
+          "has_reset": false,
+          "line_start": 17,
+          "line_end": 31,
+          "raw_code": "begin\n        alu_out = 9'b0;\n        case (op_sel)\n            4'b0000: alu_out = {1'b0, operand_a} + {1'b0, operand_b}; \n            4'b0001: alu_out = {1'b0, operand_a} - {1'b0, operand_b}; \n            4'b0010: alu_out = {1'b0, operand_a & operand_b};          \n            4'b0011: alu_out = {1'b0, operand_a | operand_b};          \n            4'b0100: alu_out = {1'b0, operand_a ^ operand_b};          \n            4'b0101: alu_out = {1'b0, ~operand_a};                     \n            4'b0110: alu_out = {1'b0, operand_a} << operand_b[2:0];    \n            4'b0111: alu_out = {1'b0, operand_a >> operand_b[2:0]};    \n            default: alu_out = 9'b0;\n        endcase\n        zero_next = (alu_out[7:0] == 8'h00);\n    end",
+          "issues": []
+        },
+        {
+          "block_type": "sequential",
+          "sensitivity_list": "posedge clk or negedge rst_n",
+          "clock_signal": "clk",
+          "reset_signal": "rst_n",
+          "reset_active": "low",
+          "signals_written": [
+            "carry",
+            "result",
+            "zero"
+          ],
+          "signals_read": [
+            "alu_out",
+            "b0",
+            "rst_n",
+            "zero_next"
+          ],
+          "has_reset": true,
+          "line_start": 37,
+          "line_end": 47,
+          "raw_code": "begin\n        if (!rst_n) begin\n            \n            carry <= 1'b0;\n            zero  <= 1'b0;\n        end else begin\n            result <= alu_out[7:0];\n            carry  <= alu_out[8];\n            zero   <= zero_next;\n        end\n    end",
+          "issues": []
+        }
+      ],
+      "fsms": [
+        {
+          "name": "alu_op_sel",
+          "state_variable": "op_sel",
+          "next_state_variable": "",
+          "states": [
+            {
+              "name": "b0000",
+              "encoding": ""
+            },
+            {
+              "name": "b0001",
+              "encoding": ""
+            },
+            {
+              "name": "b0010",
+              "encoding": ""
+            },
+            {
+              "name": "b0011",
+              "encoding": ""
+            },
+            {
+              "name": "b0100",
+              "encoding": ""
+            },
+            {
+              "name": "b0101",
+              "encoding": ""
+            },
+            {
+              "name": "b0110",
+              "encoding": ""
+            },
+            {
+              "name": "2",
+              "encoding": ""
+            },
+            {
+              "name": "b0111",
+              "encoding": ""
+            },
+            {
+              "name": "2",
+              "encoding": ""
+            }
+          ],
+          "transitions": [],
+          "has_default": true,
+          "reset_state": ""
+        }
+      ],
+      "clock_domains": [
+        {
+          "clock_signal": "clk",
+          "signals": [
+            "carry",
+            "zero"
+          ],
+          "reset_signal": "rst_n"
+        }
+      ],
+      "assignments": [],
+      "instantiations": [],
+      "assertions": [],
+      "raw_source": "===========================================================================\n// ALU RTL Design\n// INTENTIONAL BUG: result register is NEVER reset — causes X propagation\n// =============================================================================\n\nmodule alu (\n    input  logic        clk,\n    input  logic        rst_n,\n    input  logic [7:0]  operand_a,\n    input  logic [7:0]  operand_b,\n    input  logic [3:0]  op_sel,\n    output logic [7:0]  result,\n    output logic        carry,\n    output logic        zero\n);\n\n    // Internal combinational result\n    logic [8:0] alu_out;  // 9-bit to capture carry\n    logic       zero_next;\n\n    // Combinational ALU logic\n    always_comb begin\n        alu_out = 9'b0;\n        case (op_sel)\n            4'b0000: alu_out = {1'b0, operand_a} + {1'b0, operand_b}; // ADD\n            4'b0001: alu_out = {1'b0, operand_a} - {1'b0, operand_b}; // SUB\n            4'b0010: alu_out = {1'b0, operand_a & operand_b};          // AND\n            4'b0011: alu_out = {1'b0, operand_a | operand_b};          // OR\n            4'b0100: alu_out = {1'b0, operand_a ^ operand_b};          // XOR\n            4'b0101: alu_out = {1'b0, ~operand_a};                     // NOT\n            4'b0110: alu_out = {1'b0, operand_a} << operand_b[2:0];    // SHL\n            4'b0111: alu_out = {1'b0, operand_a >> operand_b[2:0]};    // SHR\n            default: alu_out = 9'b0;\n        end",
+      "line_count": 34
+    }
+  ],
+  "top_module": "alu",
+  "file_list": [
+    "/home/uday/VeriSight/examples/rtl/alu.sv"
+  ],
+  "total_lines": 55,
+  "global_issues": []
+}

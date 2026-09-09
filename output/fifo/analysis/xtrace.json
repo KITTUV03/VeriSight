@@ -1,0 +1,12 @@
+{
+  "x_origins": [],
+  "uninitialized_registers": [],
+  "uninitialized_memories": [],
+  "tristate_signals": [],
+  "multi_driven_signals": [],
+  "severity": "none",
+  "summary": "No X propagation issues detected",
+  "real_traces": [],
+  "tool_status": "disabled",
+  "tool_message": ""
+}
