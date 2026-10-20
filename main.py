@@ -55,7 +55,7 @@ Examples:
         "command",
         nargs="?",
         default=None,
-        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), or 'sim' (closed-loop simulation runner)",
+        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
     )
     parser.add_argument(
         "--interactive", "-i",
@@ -66,6 +66,18 @@ Examples:
         "--no-browser",
         action="store_true",
         help="Do not open HTML report in browser automatically",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host address for live web cockpit server (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port number for live web cockpit server (default: 8000)",
     )
 
     # Input files
@@ -303,6 +315,9 @@ def validate_inputs(args) -> bool:
         console.print("  Use --spec, --rtl, --tb, or --log")
         valid = False
 
+    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
+        return True
+
     if getattr(args, "command", None) == "plan":
         if not args.spec:
             console.print("[red]Error:[/red] 'verisight plan' requires --spec <path_to_spec.md>")
@@ -320,6 +335,12 @@ def main():
         return
 
     args = parse_args()
+
+    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
+        from verisight.server.app import start_server
+        console.print(f"[bold cyan]⚡ Launching VeriSight Live Web Cockpit at http://{args.host}:{args.port}[/bold cyan]")
+        start_server(host=args.host, port=args.port, open_browser=not args.no_browser)
+        return
 
     if getattr(args, "command", None) in ("start", "wizard") or getattr(args, "interactive", False):
         from verisight.wizard import run_wizard

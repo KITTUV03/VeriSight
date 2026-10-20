@@ -755,19 +755,26 @@ def run_wizard():
     console.print("  [1] [bold green]🛠️  VeriSight Debug[/bold green]  — Root-Cause Analysis & Fix for Sim Failures")
     console.print("  [2] [bold green]📋 VeriSight Plan[/bold green]   — Generate Test Plan, Coverage Model & SVA Suite")
     console.print("  [3] [bold green]🚀 Closed-Loop Sim[/bold green]  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit")
-    console.print("  [4] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
-    console.print("  [5] [bold red]🚪 Exit[/bold red]")
+    console.print("  [4] [bold cyan]🌐 Live Web Cockpit[/bold cyan] — Launch Interactive Browser Studio (Sim/Waveforms/RCA)")
+    console.print("  [5] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
+    console.print("  [6] [bold red]🚪 Exit[/bold red]")
     console.print()
 
     workflow = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5"],
+        choices=["1", "2", "3", "4", "5", "6"],
         default="1",
     )
 
-    if workflow == "5":
+    if workflow == "6":
         console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
         sys.exit(0)
+
+    if workflow == "4":
+        from verisight.server.app import start_server
+        console.print("\n[bold cyan]⚡ Launching VeriSight Live Web Cockpit at http://127.0.0.1:8000[/bold cyan]")
+        start_server(host="127.0.0.1", port=8000, open_browser=True)
+        return
 
     console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
     provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
@@ -790,7 +797,7 @@ def run_wizard():
             airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
         )
 
-    elif workflow == "4":
+    elif workflow == "5":
         console.print("\n[bold cyan]Select Pre-packaged Demo:[/bold cyan]")
         console.print("  [1] ALU Debug Demo   (Detect Missing Reset Bug)")
         console.print("  [2] FIFO Debug Demo  (Synchronous FIFO UVM Debug)")
