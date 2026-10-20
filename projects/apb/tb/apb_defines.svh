@@ -1,0 +1,16 @@
+`ifndef APB_DEFINES_SVH
+`define APB_DEFINES_SVH
+
+`define CLK_PERIOD      10
+`define ADDR_WIDTH      32
+`define DATA_WIDTH      32
+
+// Register Offsets
+`define REG_CTRL_ADDR   32'h0000_0000
+`define REG_STATUS_ADDR 32'h0000_0004
+`define REG_DATA0_ADDR  32'h0000_0008
+`define REG_DATA1_ADDR  32'h0000_000C
+`define REG_TIMER_ADDR  32'h0000_0010
+`define REG_INVALID_ADDR 32'h0000_0020
+
+`endif // APB_DEFINES_SVH

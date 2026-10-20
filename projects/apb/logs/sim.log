@@ -1,0 +1,83 @@
+# //  Questa Sim
+# //  Version 2024.1 linux Oct 10 2024
+# //  Copyright 1991-2024 Mentor Graphics Corporation
+# Loading sv_std.std
+# Loading mtiUvm.uvm_pkg
+# Loading work.apb_pkg
+# Loading work.apb_tb
+# Loading work.apb_slave
+# ----------------------------------------------------------------
+# UVM-1.2
+# (C) 2007-2014 Mentor Graphics Corporation
+# (C) 2007-2014 Cadence Design Systems, Inc.
+# (C) 2006-2014 Synopsys, Inc.
+# ----------------------------------------------------------------
+# UVM_INFO @ 0 ns: reporter [RNTST] Running test apb_regression_test...
+# UVM_INFO apb_test.sv(22) @ 0 ns: uvm_test_top [APB_TEST] ==================================================
+# UVM_INFO apb_test.sv(23) @ 0 ns: uvm_test_top [APB_TEST]    Starting APB Comprehensive Verification Test   
+# UVM_INFO apb_test.sv(24) @ 0 ns: uvm_test_top [APB_TEST] ==================================================
+# UVM_INFO apb_tb.sv(28) @ 35000 ns: uvm_test_top [APB_TB] Power-on Reset Deasserted (PRESETn=1)
+# UVM_INFO apb_sequences.sv(15) @ 55000 ns: uvm_test_top.env.agent.sequencer [APB_SEQ] === Scenario 1: Checking Register Reset Defaults ===
+# UVM_INFO apb_driver.sv(64) @ 110000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000000 DATA=0x00000000 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 110000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x00000000 DATA=0x00000000 Expected=0x00000000 Actual=0x00000000
+# UVM_INFO apb_driver.sv(64) @ 170000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000004 DATA=0x00000002 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 170000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x00000004 DATA=0x00000002 Expected=0x00000002 Actual=0x00000002
+# UVM_INFO apb_driver.sv(64) @ 230000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000008 DATA=0x00000000 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 230000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x00000008 DATA=0x00000000 Expected=0x00000000 Actual=0x00000000
+# UVM_INFO apb_driver.sv(64) @ 290000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x0000000c DATA=0x00000000 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 290000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x0000000c DATA=0x00000000 Expected=0x00000000 Actual=0x00000000
+# UVM_INFO apb_sequences.sv(35) @ 310000 ns: uvm_test_top.env.agent.sequencer [APB_SEQ] === Scenario 2: Control and DATA1 Access Verification ===
+# UVM_INFO apb_driver.sv(58) @ 350000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x00000000 DATA=0x00000005 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(72) @ 350000 ns: uvm_test_top.env.scoreboard [APB_SCB] WRITE RECORDED | ADDR=0x00000000 DATA=0x00000005
+# UVM_INFO apb_driver.sv(64) @ 410000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000000 DATA=0x00000005 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 410000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x00000000 DATA=0x00000005 Expected=0x00000005 Actual=0x00000005
+# UVM_INFO apb_driver.sv(58) @ 470000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x0000000c DATA=0xcafebabe PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(72) @ 470000 ns: uvm_test_top.env.scoreboard [APB_SCB] WRITE RECORDED | ADDR=0x0000000c DATA=0xcafebabe
+# UVM_INFO apb_driver.sv(64) @ 530000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x0000000c DATA=0xcafebabe PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 530000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x0000000c DATA=0xcafebabe Expected=0xcafebabe Actual=0xcafebabe
+# UVM_INFO apb_sequences.sv(52) @ 550000 ns: uvm_test_top.env.agent.sequencer [APB_SEQ] === Scenario 3: DATA0 32-bit Data Integrity Test ===
+# UVM_INFO apb_driver.sv(58) @ 590000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x00000008 DATA=0xdeadbeef PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(72) @ 590000 ns: uvm_test_top.env.scoreboard [APB_SCB] WRITE RECORDED | ADDR=0x00000008 DATA=0xdeadbeef
+# UVM_INFO apb_driver.sv(64) @ 650000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000008 DATA=0x0000beef PSLVERR=0
+# UVM_ERROR apb_scoreboard.sv(102) @ 650000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA MISMATCH | ADDR=0x00000008 Expected=0xdeadbeef Actual=0x0000beef
+# UVM_INFO apb_driver.sv(58) @ 710000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x00000008 DATA=0xa5a55a5a PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(72) @ 710000 ns: uvm_test_top.env.scoreboard [APB_SCB] WRITE RECORDED | ADDR=0x00000008 DATA=0xa5a55a5a
+# UVM_INFO apb_driver.sv(64) @ 770000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000008 DATA=0x00005a5a PSLVERR=0
+# UVM_ERROR apb_scoreboard.sv(102) @ 770000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA MISMATCH | ADDR=0x00000008 Expected=0xa5a55a5a Actual=0x00005a5a
+# UVM_INFO apb_sequences.sv(75) @ 790000 ns: uvm_test_top.env.agent.sequencer [APB_SEQ] === Scenario 4: Read-Only STATUS Register Write Protection Test ===
+# UVM_INFO apb_driver.sv(58) @ 830000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x00000004 DATA=0xffffffff PSLVERR=0
+# UVM_ERROR apb_scoreboard.sv(55) @ 830000 ns: uvm_test_top.env.scoreboard [APB_SCB] PROTOCOL MISMATCH | Write to Read-Only STATUS register (0x04) did not assert PSLVERR! Expected PSLVERR=1 Actual PSLVERR=0
+# Error: apb_interface.sv(42): Assertion SVA_PSLVERR_ON_RO_WRITE_FAILED FAILED @ 830000 ns: Write to Read-Only register (0x04) must assert PSLVERR
+# UVM_INFO apb_driver.sv(64) @ 890000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000004 DATA=0x00000002 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(98) @ 890000 ns: uvm_test_top.env.scoreboard [APB_SCB] READ DATA PASS | ADDR=0x00000004 DATA=0x00000002 Expected=0x00000002 Actual=0x00000002
+# UVM_INFO apb_sequences.sv(90) @ 910000 ns: uvm_test_top.env.agent.sequencer [APB_SEQ] === Scenario 5: Unmapped Address Access Validation ===
+# UVM_INFO apb_driver.sv(58) @ 950000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed WRITE transfer: ADDR=0x00000020 DATA=0x12345678 PSLVERR=0
+# UVM_ERROR apb_scoreboard.sv(65) @ 950000 ns: uvm_test_top.env.scoreboard [APB_SCB] UNMAPPED ADDR MISMATCH | Write to unmapped address (0x00000020) did not assert PSLVERR! Expected PSLVERR=1 Actual=0
+# UVM_INFO apb_driver.sv(64) @ 1010000 ns: uvm_test_top.env.agent.driver [APB_DRV] Completed READ transfer: ADDR=0x00000020 DATA=0xdead0000 PSLVERR=0
+# UVM_INFO apb_scoreboard.sv(110) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] --------------------------------------------------------
+# UVM_INFO apb_scoreboard.sv(111) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB]              APB SCOREBOARD VERIFICATION SUMMARY        
+# UVM_INFO apb_scoreboard.sv(112) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] --------------------------------------------------------
+# UVM_INFO apb_scoreboard.sv(113) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] Total Matches Verified       : 7
+# UVM_INFO apb_scoreboard.sv(114) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] Total Mismatches Detected    : 2
+# UVM_INFO apb_scoreboard.sv(115) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] Protocol Error Checks Failed : 2
+# UVM_INFO apb_scoreboard.sv(116) @ 1050000 ns: uvm_test_top.env.scoreboard [APB_SCB] --------------------------------------------------------
+# 
+# --- UVM Report Summary ---
+# 
+# ** Report counts by severity
+# UVM_INFO :   28
+# UVM_WARNING :    0
+# UVM_ERROR :    4
+# UVM_FATAL :    0
+# ** Report counts by id
+# [APB_DRV]    16
+# [APB_SCB]    15
+# [APB_SEQ]     5
+# [APB_TB]      1
+# [APB_TEST]    3
+# [RNTST]       1
+# [SVA_ERR]     1
+# ** Note: $finish    : apb_tb.sv(65)
+#    Time: 1050000 ns  Iteration: 1  Instance: /apb_tb
+# End time: 1050000 on Oct 20, 2026, Elapsed time: 0:00:01
+projects/apb/tb/apb_sim_harness.sv:259: $finish called at 1050000 (1ps)

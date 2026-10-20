@@ -35,6 +35,57 @@ from verisight.rag.knowledge_base import KnowledgeBase
 console = Console()
 
 
+def _open_html_in_browser(html_path: Path) -> bool:
+    """
+    Open an HTML file in the default web browser, supporting WSL2/Windows, Linux, and macOS.
+    """
+    import shutil
+    import subprocess
+
+    resolved = html_path.resolve()
+
+    # 1. Detect if running inside Windows Subsystem for Linux (WSL)
+    is_wsl = False
+    if os.path.exists("/proc/version"):
+        try:
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
+                    is_wsl = True
+        except Exception:
+            pass
+
+    if is_wsl:
+        # A. Try wslview if available
+        if shutil.which("wslview"):
+            try:
+                res = subprocess.run(["wslview", str(resolved)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if res.returncode == 0:
+                    return True
+            except Exception:
+                pass
+
+        # B. Convert to Windows path and launch via powershell Start-Process
+        if shutil.which("wslpath") and shutil.which("powershell.exe"):
+            try:
+                out = subprocess.run(["wslpath", "-w", str(resolved)], capture_output=True, text=True, check=True)
+                win_path = out.stdout.strip()
+                res = subprocess.run(
+                    ["powershell.exe", "-Command", f"Start-Process '{win_path}'"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if res.returncode == 0:
+                    return True
+            except Exception:
+                pass
+
+    # 2. Native fallback (Linux xdg-open / macOS open / standard Python webbrowser)
+    try:
+        return webbrowser.open(f"file://{resolved}")
+    except Exception:
+        return False
+
+
 def _print_welcome_banner():
     """Print the interactive wizard welcome banner."""
     title = (
@@ -330,10 +381,9 @@ def run_plan_flow(provider: str, api_key: Optional[str], model_name: Optional[st
         if html_file.exists():
             open_html = Confirm.ask("[bold]Open the interactive HTML Verification Plan in your browser?[/bold]", default=True)
             if open_html:
-                try:
-                    webbrowser.open(f"file://{html_file.resolve()}")
-                    console.print(f"[green]✓ Opened: file://{html_file.resolve()}[/green]")
-                except Exception as e:
+                if _open_html_in_browser(html_file):
+                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
+                else:
                     console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
 
     except Exception as e:
@@ -407,10 +457,9 @@ def run_debug_flow(provider: str, api_key: Optional[str], model_name: Optional[s
         if html_file.exists():
             open_html = Confirm.ask("[bold]Open the HTML report in your browser?[/bold]", default=True)
             if open_html:
-                try:
-                    webbrowser.open(f"file://{html_file.resolve()}")
-                    console.print(f"[green]✓ Opened: file://{html_file.resolve()}[/green]")
-                except Exception as e:
+                if _open_html_in_browser(html_file):
+                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
+                else:
                     console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
 
     except Exception as e:
