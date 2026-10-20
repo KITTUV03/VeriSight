@@ -50,6 +50,19 @@ Examples:
         """,
     )
 
+    # Optional command or interactive flag
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default=None,
+        help="Optional command: 'start' (guided wizard) or 'plan' (verification plan architect)",
+    )
+    parser.add_argument(
+        "--interactive", "-i",
+        action="store_true",
+        help="Launch the interactive guided setup wizard",
+    )
+
     # Input files
     parser.add_argument(
         "--spec",
@@ -263,20 +276,73 @@ def validate_inputs(args) -> bool:
                 "the freshly generated simulation log will be used instead"
             )
     elif not any([args.spec, args.rtl, args.tb, args.log]):
-        console.print("[red]Error:[/red] At least one input must be provided")
+        if getattr(args, "command", None) in ("start", "wizard") or getattr(args, "interactive", False):
+            return True
+        console.print("[red]Error:[/red] At least one input must be provided (or run 'python main.py start' for interactive mode)")
         console.print("  Use --spec, --rtl, --tb, or --log")
         valid = False
+
+    if getattr(args, "command", None) == "plan":
+        if not args.spec:
+            console.print("[red]Error:[/red] 'verisight plan' requires --spec <path_to_spec.md>")
+            valid = False
 
     return valid
 
 
 def main():
     """Main entry point for VeriSight CLI."""
+    # If invoked with no arguments at all, or with 'start' / '--interactive':
+    if len(sys.argv) == 1:
+        from verisight.wizard import run_wizard
+        run_wizard()
+        return
+
     args = parse_args()
+
+    if getattr(args, "command", None) in ("start", "wizard") or getattr(args, "interactive", False):
+        from verisight.wizard import run_wizard
+        run_wizard()
+        return
 
     # Validate inputs
     if not validate_inputs(args):
         sys.exit(1)
+
+    # ─── Direct 'plan' command ──────────────────────────────────────────
+    if getattr(args, "command", None) == "plan":
+        from verisight.plan.planner_orchestrator import VeriSightPlanner
+        from verisight.rag.knowledge_base import KnowledgeBase
+        from verisight.config import set_config
+
+        kwargs = {}
+        if args.provider:
+            kwargs["provider"] = args.provider
+        if args.api_key:
+            kwargs["api_key"] = args.api_key
+        if args.model:
+            kwargs["model_name"] = args.model
+
+        llm_config = LLMConfig(**kwargs)
+        plan_output = args.output if args.output != "output" else "output/verification_plan"
+        cfg = VeriSightConfig(
+            llm=llm_config,
+            chroma=ChromaConfig(),
+            pipeline=PipelineConfig(output_dir=plan_output),
+        )
+        set_config(cfg)
+
+        kb = None
+        if not args.no_rag:
+            try:
+                kb = KnowledgeBase()
+                kb.initialize_collections()
+            except Exception:
+                kb = None
+
+        planner = VeriSightPlanner(output_dir=plan_output, knowledge_base=kb)
+        planner.run(spec_path=args.spec, rtl_path=args.rtl)
+        return
 
     # Normalize output dir (drop any trailing separators so display/paths
     # don't end up with a doubled slash, e.g. "output//").

@@ -21,8 +21,26 @@ T = TypeVar("T", bound=BaseModel)
 RTL_EXTENSIONS = {".sv", ".v", ".svh", ".vh"}
 TB_EXTENSIONS = {".sv", ".svh", ".v", ".vh"}
 LOG_EXTENSIONS = {".log", ".txt", ".rpt"}
-SPEC_EXTENSIONS = {".md", ".txt", ".rst"}
+SPEC_EXTENSIONS = {".md", ".txt", ".rst", ".pdf"}
 COVERAGE_EXTENSIONS = {".rpt", ".txt", ".ucdb", ".xml"}
+
+
+def extract_pdf_text(filepath: Union[str, Path]) -> str:
+    """Extract plain text from a PDF file using pypdf."""
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(str(filepath))
+        text_parts = []
+        for i, page in enumerate(reader.pages):
+            page_text = page.extract_text() or ""
+            if page_text.strip():
+                text_parts.append(f"--- Page {i+1} ---\n{page_text}")
+        text = "\n\n".join(text_parts)
+        logger.info(f"Extracted {len(text_parts)} pages from PDF: {filepath}")
+        return text
+    except Exception as e:
+        logger.error(f"Error reading PDF {filepath}: {e}")
+        return ""
 
 
 def discover_files(
@@ -57,14 +75,13 @@ def discover_files(
         f for f in directory.glob(pattern)
         if f.is_file() and f.suffix.lower() in extensions
     )
-
     logger.info(f"Discovered {len(files)} files in {directory}")
     return files
 
 
 def read_file(filepath: Union[str, Path]) -> str:
     """
-    Read a text file and return its contents.
+    Read a text or PDF file and return its text contents.
 
     Args:
         filepath: Path to the file.
@@ -76,6 +93,9 @@ def read_file(filepath: Union[str, Path]) -> str:
     if not filepath.exists():
         logger.error(f"File not found: {filepath}")
         return ""
+
+    if filepath.suffix.lower() == ".pdf":
+        return extract_pdf_text(filepath)
 
     try:
         return filepath.read_text(encoding="utf-8", errors="replace")

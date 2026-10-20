@@ -49,6 +49,15 @@ Inputs (Spec, RTL, UVM TB, Sim Log, Coverage, VCD)
 
 ## Quick Start
 
+### Option A: Interactive Setup Wizard (Recommended for Demo & Easy Use)
+```bash
+# Launch the interactive guided wizard:
+python main.py start
+# or simply:
+./start.sh
+```
+
+### Option B: Direct CLI Execution
 ```bash
 # Install dependencies
 pip install -e ".[dev]"
@@ -70,6 +79,12 @@ python main.py \
     --spec examples/specs/alu_spec.md \
     --rtl examples/rtl/ \
     --log examples/logs/sim.log
+
+# Run VeriSight Plan (Generate Test Plan, SystemVerilog Coverage & SVA Suite)
+python main.py plan \
+    --spec examples/specs/alu_spec.md \
+    --rtl examples/rtl/ \
+    --output output/verification_plan
 
 # Run tests
 python -m pytest tests/ -v
