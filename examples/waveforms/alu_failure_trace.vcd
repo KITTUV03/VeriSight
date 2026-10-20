@@ -1,0 +1,128 @@
+$date
+   Tue Oct 20 10:55:00 2026
+$end
+$version
+   VeriSight EDA Simulation Engine v2.4 (Questa/VCS compatible)
+$end
+$timescale
+   1ns
+$end
+$scope module top_tb $end
+$var wire 1 ! clk $end
+$var wire 1 " rst_n $end
+$var wire 4 # op [3:0] $end
+$var wire 8 $ operand_a [7:0] $end
+$var wire 8 % operand_b [7:0] $end
+$var wire 8 & result [7:0] $end
+$var wire 1 ' carry $end
+$var wire 1 ( zero $end
+$var wire 1 ) error $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0!
+0"
+b0000 #
+b00000000 $
+b00000000 %
+b00000000 &
+0'
+1(
+0)
+$end
+#5
+1!
+#10
+0!
+1"
+#15
+1!
+#20
+0!
+b0000 #
+b00001010 $
+b00010100 %
+#25
+1!
+b00011110 &
+0(
+#30
+0!
+b0001 #
+b00110010 $
+b00001010 %
+#35
+1!
+b00101000 &
+#40
+0!
+b0010 #
+b11110000 $
+b10101010 %
+#45
+1!
+b10100000 &
+#50
+0!
+b0011 #
+b11110000 $
+b00001111 %
+#55
+1!
+b11111111 &
+#60
+0!
+b0000 #
+b11111111 $
+b00000001 %
+#65
+1!
+b00000000 &
+1'
+1(
+1)
+#70
+0!
+b0110 #
+b00001111 $
+b00000010 %
+#75
+1!
+b00111100 &
+0'
+0(
+0)
+#80
+0!
+b0111 #
+b11110000 $
+b00000010 %
+#85
+1!
+b00111100 &
+#90
+0!
+b1111 #
+b01010101 $
+b01010101 %
+#95
+1!
+bxxxxxxxx &
+1)
+#100
+0!
+0"
+#105
+1!
+b00000000 &
+0'
+1(
+0)
+#110
+0!
+1"
+#115
+1!
+#120
+0!

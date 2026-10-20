@@ -27,6 +27,7 @@ from verisight.schemas.report_schema import (
 )
 from verisight.schemas.fix_schema import FixResult
 from verisight.rag.knowledge_base import KnowledgeBase
+from verisight.reporter.waveform_studio import generate_waveform_studio_tab
 from verisight.utils.file_utils import save_json, save_text
 from verisight.utils.logger import get_logger
 
@@ -626,6 +627,32 @@ class ReportGeneratorAgent(BaseAgent):
         sec_provider = (cfg.llm.provider or "gemini").upper()
         sec_model = cfg.llm.model_name or "gemini-2.0-flash"
 
+        # Determine failure timestamp for waveform studio
+        failure_ts = 65.0
+        failure_label = "Assertion / Scoreboard Error"
+        for err in context.get("errors", []):
+            raw_ts = getattr(err, "timestamp", None)
+            if raw_ts is not None:
+                try:
+                    failure_ts = float(raw_ts)
+                    failure_label = getattr(err, "message", "Simulation Anomaly")
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        vcd_path = context.get("vcd_path")
+        if not vcd_path and "knowledge" in context:
+            kn = context["knowledge"]
+            if hasattr(kn, "vcd") and getattr(kn.vcd, "source_file", None):
+                vcd_path = kn.vcd.source_file
+
+        waveform_html = generate_waveform_studio_tab(
+            vcd_path=vcd_path,
+            failure_timestamp_ns=failure_ts,
+            failure_label=failure_label,
+            tab_id="tab-waveform",
+        )
+
         # Error Timeline Rows
         error_rows = ""
         for idx, err in enumerate(context.get("errors", [])):
@@ -635,7 +662,7 @@ class ReportGeneratorAgent(BaseAgent):
             msg = getattr(err, "message", "")
             comp = getattr(err, "component", "") or getattr(err, "file", "") or "TB/DUT"
             error_rows += f"""
-                <tr class="err-row" data-sev="{sev}">
+                <tr class="err-row" data-sev="{sev}" onclick="jumpToWaveformError('{ts}')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
                     <td class="col-time"><span class="time-tag">@{ts} ns</span></td>
                     <td class="col-sev"><span class="badge {badge_class}">{sev.upper()}</span></td>
                     <td class="col-comp"><span class="comp-tag">{comp}</span></td>
@@ -1609,6 +1636,7 @@ class ReportGeneratorAgent(BaseAgent):
         <!-- Navigation Tabs Bar -->
         <nav class="tabs-header">
             <button class="nav-tab-btn active" onclick="switchTab('tab-rca')">🎯 Root Cause & Recommendations</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-waveform')">🌊 VCD Waveform Viewer</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-timeline')">⏱️ Error Timeline ({context.get('error_count', 0)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-evidence')">⛓️ Evidence Chain ({len(report.evidence)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-reasoning')">🧠 Diagnostic Reasoning ({len(report.reasoning)})</button>
@@ -1684,6 +1712,9 @@ class ReportGeneratorAgent(BaseAgent):
 
         {f'<div id="tab-xtracer" class="tab-pane">{xtracer_items}</div>' if xtracer_items else ''}
 
+        <!-- TAB 6: VCD Waveform Viewer -->
+        {waveform_html}
+
         <!-- Footer -->
         <footer>
             VeriSight Autonomous Silicon Verification Suite • Version 2.4 Enterprise Edition<br>
@@ -1701,7 +1732,20 @@ class ReportGeneratorAgent(BaseAgent):
             const target = document.getElementById(tabId);
             if (target) target.classList.add('active');
             
-            event.currentTarget.classList.add('active');
+            const navBtn = document.querySelector(`.nav-tab-btn[onclick*="${{tabId}}"]`);
+            if (navBtn) {{
+                navBtn.classList.add('active');
+            }} else if (typeof event !== 'undefined' && event && event.currentTarget) {{
+                event.currentTarget.classList.add('active');
+            }}
+        }}
+
+        function jumpToWaveformError(timeStr) {{
+            const timeNs = parseFloat(timeStr) || 0;
+            switchTab('tab-waveform');
+            if (typeof jumpToFailure === 'function') {{
+                jumpToFailure(timeNs);
+            }}
         }}
 
         function filterTimeline() {{

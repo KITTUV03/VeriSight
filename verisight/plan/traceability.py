@@ -21,6 +21,7 @@ from verisight.plan.schemas import (
     TraceabilityRow,
     VerificationPlanReport,
 )
+from verisight.reporter.waveform_studio import generate_waveform_studio_tab
 from verisight.utils.logger import get_logger
 
 logger = get_logger("plan.traceability")
@@ -524,6 +525,13 @@ def export_html(report: VerificationPlanReport, output_path: Path):
 
     cov_sv_code = report.sv_coverage_code or "// No coverage code generated"
     sva_sv_code = report.sv_assertion_code or "// No assertion code generated"
+
+    waveform_studio_html = generate_waveform_studio_tab(
+        vcd_path="examples/waveforms/alu_failure_trace.vcd",
+        failure_timestamp_ns=65.0,
+        failure_label="Unhit Coverage / Corner Overflow",
+        tab_id="tab-waveform",
+    )
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1734,6 +1742,7 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         <!-- Navigation Tabs -->
         <nav class="tabs-header">
             <button class="tab-btn active" onclick="showTab('tab-cockpit', this)">🎯 Live Coverage Cockpit</button>
+            <button class="tab-btn" onclick="showTab('tab-waveform', this)">🌊 Simulation Waveform Viewer</button>
             <button class="tab-btn" onclick="showTab('tab-matrix', this)">📊 Traceability Matrix</button>
             <button class="tab-btn" onclick="showTab('tab-features', this)">📋 Feature Breakdown</button>
             <button class="tab-btn" onclick="showTab('tab-tests', this)">🧪 Test Plan Suite</button>
@@ -1948,6 +1957,9 @@ def export_html(report: VerificationPlanReport, output_path: Path):
             </div>
         </div>
     </div>
+
+    <!-- TAB 7: Simulation Waveform Viewer -->
+    {waveform_studio_html}
 
     <!-- AI Directed Sequence Generator Modal -->
     <div id="directedModal" class="modal-backdrop" onclick="closeModalOnBackdrop(event)">
