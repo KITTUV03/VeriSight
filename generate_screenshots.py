@@ -85,36 +85,203 @@ def render_terminal(title: str, lines: list, output_filename: str):
     print(f"Generated {out_path} ({width}x{height})")
 
 
-def render_browser_vplan(output_filename: str):
+def render_diagram_architecture(output_filename: str):
+    """Render a clean, high-resolution block diagram of the VeriSight Multi-Agent Architecture."""
     width = 980
-    height = 680
+    height = 540
     img = Image.new("RGB", (width, height), (15, 23, 42))  # Slate 900
     draw = ImageDraw.Draw(img)
 
-    # Browser header
+    # Outer border
     draw.rectangle([0, 0, width - 1, height - 1], outline=(51, 65, 85), width=1)
-    draw.rectangle([1, 1, width - 2, 42], fill=(2, 6, 23))  # Slate 950
+    draw.rectangle([1, 1, width - 2, 45], fill=(2, 6, 23))
+    draw.text((25, 14), "VERISIGHT™ SYSTEM ARCHITECTURE — MULTI-AGENT AUTONOMOUS FABRIC", font=font_sans_bold, fill=(56, 189, 248))
+
+    # Inputs Block
+    draw.rounded_rectangle([30, 70, 220, 490], radius=8, fill=(30, 41, 59), outline=(71, 85, 105))
+    draw.text((45, 85), "VERIFICATION INPUTS", font=font_sans_bold, fill=(241, 245, 249))
+    draw.line([45, 108, 205, 108], fill=(71, 85, 105), width=1)
+    
+    inputs_list = [
+        ("• Specification Docs", "PDF, Markdown, Text"),
+        ("• RTL Source Code", "SystemVerilog / Verilog"),
+        ("• UVM Testbench", "Classes, Sequences, SB"),
+        ("• Simulation Logs", "VCS, Questa, Icarus"),
+        ("• Coverage Reports", "UCDB / vDB text reports"),
+        ("• VCD Waveforms", "Value Change Dump"),
+        ("• Gate Netlists", "Yosys / Foundry gates")
+    ]
+    iy = 120
+    for name, sub in inputs_list:
+        draw.text((45, iy), name, font=font_sans, fill=(56, 189, 248))
+        draw.text((45, iy + 16), sub, font=font_sans_sm, fill=(148, 163, 184))
+        iy += 48
+
+    # Arrow to Agent 1 / Sim Runner
+    draw.line([220, 210, 260, 210], fill=(56, 189, 248), width=3)
+    draw.polygon([(260, 210), (250, 204), (250, 216)], fill=(56, 189, 248))
+
+    # Agent 1
+    draw.rounded_rectangle([260, 70, 470, 240], radius=8, fill=(30, 41, 59), outline=(14, 165, 233))
+    draw.text((275, 85), "AGENT 1: KNOWLEDGE ENGINE", font=font_sans_bold, fill=(56, 189, 248))
+    draw.line([275, 108, 455, 108], fill=(71, 85, 105), width=1)
+    draw.text((275, 118), "• Multi-Modal AST Extraction", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 138), "• Port Map & Interface Hierarchy", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 158), "• Tokenized Simulation Log Index", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 178), "• VCD Waveform Parser (pywellen)", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 198), "• Outputs: Unified knowledge.json", font=font_sans_sm, fill=(34, 197, 94))
+
+    # Arrow Agent 1 -> Agent 2
+    draw.line([365, 240, 365, 280], fill=(56, 189, 248), width=3)
+    draw.polygon([(365, 280), (359, 270), (371, 270)], fill=(56, 189, 248))
+
+    # Agent 2
+    draw.rounded_rectangle([260, 280, 470, 490], radius=8, fill=(30, 41, 59), outline=(168, 85, 247))
+    draw.text((275, 295), "AGENT 2: CLASSIFIER", font=font_sans_bold, fill=(168, 85, 247))
+    draw.line([275, 318, 455, 318], fill=(71, 85, 105), width=1)
+    draw.text((275, 328), "• 9 Formal Decision Rules", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 348), "• Multi-Hop Evidence Graph", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 368), "• RTL Bug vs TB Bug vs Spec Bug", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 388), "• Bayesian Confidence Scoring", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 408), "• Alternative Hypothesis Review", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((275, 435), "• Outputs: summary.json", font=font_sans_sm, fill=(34, 197, 94))
+
+    # Arrow Agent 2 -> Agent 3
+    draw.line([470, 385, 510, 385], fill=(168, 85, 247), width=3)
+    draw.polygon([(510, 385), (500, 379), (500, 391)], fill=(168, 85, 247))
+
+    # Agent 3
+    draw.rounded_rectangle([510, 70, 720, 490], radius=8, fill=(30, 41, 59), outline=(234, 179, 8))
+    draw.text((525, 85), "AGENT 3: RTL ANALYZER", font=font_sans_bold, fill=(251, 191, 36))
+    draw.line([525, 108, 705, 108], fill=(71, 85, 105), width=1)
+    
+    a3_modules = [
+        ("1. X-Tracer", "Backward VCD Netlist Tracing"),
+        ("2. Functional", "Spec vs RTL Math Discrepancy"),
+        ("3. CDC Engine", "Async Clock & Metastability"),
+        ("4. AST Lint", "Loops, Latches, Unassigned"),
+        ("5. Structural", "FSM Deadlock & State Graph"),
+        ("6. Protocol", "AXI/AHB/APB Handshaking"),
+        ("7. Misc Timing", "Races & Reset Sequencing")
+    ]
+    my = 120
+    for mname, mdesc in a3_modules:
+        draw.text((525, my), mname, font=font_sans_bold, fill=(241, 245, 249))
+        draw.text((525, my + 16), mdesc, font=font_sans_sm, fill=(148, 163, 184))
+        my += 48
+
+    # Arrow Agent 3 -> Agent 4 & 5
+    draw.line([720, 210, 760, 210], fill=(234, 179, 8), width=3)
+    draw.polygon([(760, 210), (750, 204), (750, 216)], fill=(234, 179, 8))
+
+    # Agent 4 & 5 Block
+    draw.rounded_rectangle([760, 70, 950, 270], radius=8, fill=(30, 41, 59), outline=(34, 197, 94))
+    draw.text((775, 85), "AGENT 4: REPORTER", font=font_sans_bold, fill=(34, 197, 94))
+    draw.line([775, 108, 935, 108], fill=(71, 85, 105), width=1)
+    draw.text((775, 118), "• Interactive report.html", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 138), "• Waveform Studio Integration", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 158), "• Detailed report.md", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 178), "• Schema error.json", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 198), "• Executive summary.txt", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 218), "• ChromaDB Session Archive", font=font_sans_sm, fill=(226, 232, 240))
+
+    draw.rounded_rectangle([760, 290, 950, 490], radius=8, fill=(30, 41, 59), outline=(244, 63, 94))
+    draw.text((775, 305), "AGENT 5: FIX GENERATOR", font=font_sans_bold, fill=(244, 63, 94))
+    draw.line([775, 328, 935, 328], fill=(71, 85, 105), width=1)
+    draw.text((775, 338), "• Minimal Code Region Fix", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 358), "• Strict Non-Hallucination", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 378), "• Unified proposed.patch", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 398), "• Sandbox Syntax Validation", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 418), "• Testbench Regression Run", font=font_sans_sm, fill=(226, 232, 240))
+    draw.text((775, 438), "• Zero-Error Signoff Check", font=font_sans_sm, fill=(34, 197, 94))
+
+    out_path = OUTPUT_DIR / output_filename
+    img.save(out_path, dpi=(150, 150))
+    print(f"Generated {out_path} ({width}x{height})")
+
+
+def render_diagram_flowchart(output_filename: str):
+    """Render a clean, high-resolution flowchart of the Closed-Loop Verification & Repair Cycle."""
+    width = 980
+    height = 540
+    img = Image.new("RGB", (width, height), (15, 23, 42))
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, width - 1, height - 1], outline=(51, 65, 85), width=1)
+    draw.rectangle([1, 1, width - 2, 45], fill=(2, 6, 23))
+    draw.text((25, 14), "VERISIGHT™ CLOSED-LOOP SIMULATION, ROOT-CAUSE & REPAIR CYCLE", font=font_sans_bold, fill=(56, 189, 248))
+
+    # Steps
+    steps = [
+        ("1. SPEC & RTL INGESTION", "Extract requirements, ports, FSMs", 40, 90, (56, 189, 248)),
+        ("2. VERISIGHT PLAN", "Generate coverage model & SVA", 270, 90, (168, 85, 247)),
+        ("3. SIM RUNNER BACKEND", "Compile & simulate with VCD dump", 500, 90, (34, 197, 94)),
+        ("4. SCOREBOARD CHECK", "Examine pass/fail & UVM errors", 730, 90, (251, 191, 36)),
+        
+        ("5. AGENT 1 & 2 RCA", "Parse log, isolate symptom & classify", 730, 310, (244, 63, 94)),
+        ("6. AGENT 3 DEEP AUDIT", "7-module X-Trace, CDC, Lint, FSM", 500, 310, (244, 63, 94)),
+        ("7. AGENT 5 CODE PATCH", "Generate unified diff patch", 270, 310, (168, 85, 247)),
+        ("8. SANDBOX VALIDATION", "Re-run sim & prove 100% fix closure", 40, 310, (34, 197, 94)),
+    ]
+
+    for title, desc, sx, sy, col in steps:
+        draw.rounded_rectangle([sx, sy, sx + 210, sy + 130], radius=8, fill=(30, 41, 59), outline=col, width=2)
+        draw.text((sx + 12, sy + 15), title, font=font_sans_bold, fill=col)
+        draw.line([sx + 12, sy + 38, sx + 198, sy + 38], fill=(71, 85, 105), width=1)
+        draw.text((sx + 12, sy + 50), desc, font=font_sans_sm, fill=(226, 232, 240))
+        draw.text((sx + 12, sy + 85), "Status: Autonomous", font=font_sans_sm, fill=(148, 163, 184))
+
+    # Forward arrows (Top row: Left -> Right)
+    for x in [250, 480, 710]:
+        draw.line([x, 155, x + 20, 155], fill=(56, 189, 248), width=3)
+        draw.polygon([(x + 20, 155), (x + 12, 149), (x + 12, 161)], fill=(56, 189, 248))
+
+    # Down arrow from 4 to 5
+    draw.line([835, 220, 835, 310], fill=(244, 63, 94), width=3)
+    draw.polygon([(835, 310), (829, 300), (841, 300)], fill=(244, 63, 94))
+
+    # Backward arrows (Bottom row: Right -> Left)
+    for x in [730, 500, 270]:
+        draw.line([x, 375, x - 20, 375], fill=(244, 63, 94), width=3)
+        draw.polygon([(x - 20, 375), (x - 12, 369), (x - 12, 381)], fill=(244, 63, 94))
+
+    # Loop-back arrow from 8 up to 3 (Closed-Loop Convergence)
+    draw.line([145, 310, 145, 260], fill=(34, 197, 94), width=3)
+    draw.line([145, 260, 605, 260], fill=(34, 197, 94), width=3)
+    draw.line([605, 260, 605, 220], fill=(34, 197, 94), width=3)
+    draw.polygon([(605, 220), (599, 230), (611, 230)], fill=(34, 197, 94))
+    draw.text((220, 242), "✓ AUTOMATED CLOSED-LOOP RE-SIMULATION & PASS CONFIRMATION", font=font_sans_bold, fill=(34, 197, 94))
+
+    out_path = OUTPUT_DIR / output_filename
+    img.save(out_path, dpi=(150, 150))
+    print(f"Generated {out_path} ({width}x{height})")
+
+
+def render_browser_vplan(output_filename: str):
+    width = 980
+    height = 680
+    img = Image.new("RGB", (width, height), (15, 23, 42))
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, width - 1, height - 1], outline=(51, 65, 85), width=1)
+    draw.rectangle([1, 1, width - 2, 42], fill=(2, 6, 23))
     draw.line([1, 42, width - 2, 42], fill=(51, 65, 85), width=1)
 
     draw.ellipse([14, 16, 24, 26], fill=DOT_RED)
     draw.ellipse([32, 16, 42, 26], fill=DOT_YELLOW)
     draw.ellipse([50, 16, 60, 26], fill=DOT_GREEN)
 
-    # Address bar
     draw.rounded_rectangle([180, 8, width - 180, 34], radius=6, fill=(30, 41, 59), outline=(71, 85, 105))
     draw.text((195, 13), "🔒 http://localhost:8000/output/verification_plan/verification_plan.html", font=font_sans_sm, fill=(148, 163, 184))
 
-    # App Navbar
     draw.rectangle([1, 43, width - 2, 95], fill=(15, 23, 42))
     draw.line([1, 95, width - 2, 95], fill=(51, 65, 85), width=1)
     draw.text((25, 58), "VERISIGHT™ COCKPIT", font=font_sans_bold, fill=(56, 189, 248))
     draw.text((220, 60), "• Live Coverage Closure Cockpit & Verification Plan", font=font_sans, fill=(226, 232, 240))
 
-    # Badge: System Health
     draw.rounded_rectangle([width - 240, 56, width - 25, 82], radius=12, fill=(6, 78, 59), outline=(16, 185, 129))
     draw.text((width - 225, 62), "✓ UCDB INGESTION ACTIVE", font=font_sans_sm, fill=(167, 243, 208))
 
-    # Top KPI Cards Row
     cards = [
         ("TOTAL FEATURES", "22", "100% Decomposed", (56, 189, 248)),
         ("DIRECTED TESTS", "45", "100% Traceable", (168, 85, 247)),
@@ -131,7 +298,6 @@ def render_browser_vplan(output_filename: str):
         draw.text((cx + 15, y_card + 32), val, font=font_sans_lg, fill=col)
         draw.text((cx + 15, y_card + 65), sub, font=font_sans_sm, fill=(203, 213, 225))
 
-    # Section 1: Dynamic Coverage Closure Progress (Planned vs Actual UCDB)
     y_prog = 225
     draw.rounded_rectangle([25, y_prog, width - 25, y_prog + 160], radius=8, fill=(30, 41, 59), outline=(51, 65, 85))
     draw.text((45, y_prog + 15), "🎯 Dynamic Coverage Closure Cockpit (Planned vs. Actual UCDB Simulation)", font=font_sans_bold, fill=(241, 245, 249))
@@ -146,21 +312,17 @@ def render_browser_vplan(output_filename: str):
     for f_name, pct_str, pct_val, sub_note in cov_items:
         draw.text((45, y_row), f_name, font=font_sans_sm, fill=(226, 232, 240))
         draw.text((width - 110, y_row), pct_str, font=font_sans_bold, fill=(34, 197, 94) if pct_val >= 90 else (251, 191, 36))
-        # Bar background
         draw.rounded_rectangle([45, y_row + 18, width - 45, y_row + 26], radius=4, fill=(15, 23, 42))
-        # Bar fill
         fill_w = int((width - 90) * (pct_val / 100.0))
         bar_col = (34, 197, 94) if pct_val >= 90 else (251, 191, 36)
         draw.rounded_rectangle([45, y_row + 18, 45 + fill_w, y_row + 26], radius=4, fill=bar_col)
         draw.text((45, y_row + 30), sub_note, font=font_sans_sm, fill=(148, 163, 184))
         y_row += 38
 
-    # Section 2: Bi-Directional Traceability Matrix & SVA Suite
     y_table = 405
     draw.rounded_rectangle([25, y_table, width - 25, height - 25], radius=8, fill=(30, 41, 59), outline=(51, 65, 85))
     draw.text((45, y_table + 15), "📋 Traceability Matrix, Coverage Model & Assertion Verification Suite", font=font_sans_bold, fill=(241, 245, 249))
     
-    # Table headers
     headers = [("FEATURE ID", 110), ("DESCRIPTION", 290), ("VERIFICATION METHOD", 180), ("STATUS", 110), ("ACTION", 180)]
     tx = 45
     for h, hw in headers:
@@ -179,11 +341,8 @@ def render_browser_vplan(output_filename: str):
         draw.text((45, ty), fid, font=font_sans_bold, fill=(56, 189, 248))
         draw.text((155, ty), fdesc, font=font_sans, fill=(226, 232, 240))
         draw.text((445, ty), fmeth, font=font_sans_sm, fill=(203, 213, 225))
-        
         stat_col = (34, 197, 94) if "PASSED" in fstat else (251, 191, 36)
         draw.text((625, ty), fstat, font=font_sans_bold, fill=stat_col)
-        
-        # Action button
         btn_col = (37, 99, 235) if "Generate" in fact else (51, 65, 85)
         draw.rounded_rectangle([735, ty - 3, width - 55, ty + 20], radius=4, fill=btn_col)
         draw.text((745, ty + 1), fact, font=font_sans_sm, fill=(255, 255, 255))
@@ -197,10 +356,9 @@ def render_browser_vplan(output_filename: str):
 def render_browser_rca_report(output_filename: str):
     width = 980
     height = 680
-    img = Image.new("RGB", (width, height), (15, 23, 42))  # Slate 900
+    img = Image.new("RGB", (width, height), (15, 23, 42))
     draw = ImageDraw.Draw(img)
 
-    # Browser header
     draw.rectangle([0, 0, width - 1, height - 1], outline=(51, 65, 85), width=1)
     draw.rectangle([1, 1, width - 2, 42], fill=(2, 6, 23))
     draw.line([1, 42, width - 2, 42], fill=(51, 65, 85), width=1)
@@ -212,13 +370,11 @@ def render_browser_rca_report(output_filename: str):
     draw.rounded_rectangle([180, 8, width - 180, 34], radius=6, fill=(30, 41, 59), outline=(71, 85, 105))
     draw.text((195, 13), "🔒 http://localhost:8000/output/custom_debug/report.html", font=font_sans_sm, fill=(148, 163, 184))
 
-    # App Navbar
     draw.rectangle([1, 43, width - 2, 95], fill=(15, 23, 42))
     draw.line([1, 95, width - 2, 95], fill=(51, 65, 85), width=1)
     draw.text((25, 58), "VERISIGHT™ RCA STUDIO", font=font_sans_bold, fill=(244, 63, 94))
     draw.text((250, 60), "• Autonomous Silicon Root Cause Analysis & Waveform Diagnostics", font=font_sans, fill=(226, 232, 240))
 
-    # Navigation Tabs
     tabs = ["Overview", "Evidence Chain", "RTL Analyzer (7 Sub-Modules)", "Automated Patch", "Waveform Studio"]
     tab_x = 25
     tab_y = 105
@@ -229,44 +385,38 @@ def render_browser_rca_report(output_filename: str):
         draw.text((tab_x + 12, tab_y + 7), t, font=font_sans_sm, fill=(255, 255, 255) if is_active else (148, 163, 184))
         tab_x += 175
 
-    # Main Card: Classification & Confidence
     y_card = 150
     draw.rounded_rectangle([25, y_card, width - 25, y_card + 110], radius=8, fill=(30, 41, 59), outline=(51, 65, 85))
-    
-    # Classification Badge
     draw.rounded_rectangle([45, y_card + 18, 180, y_card + 54], radius=6, fill=(136, 19, 55), outline=(244, 63, 94))
     draw.text((60, y_card + 26), "RTL BUG DETECTED", font=font_sans_bold, fill=(255, 228, 230))
 
-    # Confidence Pill
     draw.rounded_rectangle([195, y_card + 18, 310, y_card + 54], radius=6, fill=(6, 78, 59), outline=(16, 185, 129))
     draw.text((210, y_card + 26), "CONFIDENCE: 95%", font=font_sans_bold, fill=(167, 243, 208))
 
     draw.text((330, y_card + 26), "Location: fifo_mem.sv:L48 • Sub-Module: Structural / Pointer Boundary", font=font_sans, fill=(203, 213, 225))
     draw.text((45, y_card + 68), "Root Cause: Read pointer decrements improperly on empty condition causing underflow and corrupting RAM index.", font=font_sans, fill=(241, 245, 249))
 
-    # Waveform Studio Section
     y_wf = 280
     draw.rounded_rectangle([25, y_wf, width - 25, height - 25], radius=8, fill=(15, 23, 42), outline=(51, 65, 85))
     draw.rectangle([26, y_wf + 1, width - 26, y_wf + 38], fill=(30, 41, 59))
     draw.text((45, y_wf + 10), "📊 Interactive Waveform Studio (VCD Waveform Time-Correlated Evidence)", font=font_sans_bold, fill=(56, 189, 248))
     draw.text((width - 250, y_wf + 10), "Time Cursor: @ 45,000 ps (Mismatch)", font=font_sans_sm, fill=(251, 191, 36))
 
-    # Waveform signals
     signals = [
-        ("tb.clk", "CLK", [(0, 1), (50, 0), (100, 1), (150, 0), (200, 1), (250, 0), (300, 1), (350, 0), (400, 1), (450, 0), (500, 1), (550, 0), (600, 1), (650, 0)]),
-        ("tb.rst_n", "RESET", [(0, 0), (80, 1), (650, 1)]),
-        ("tb.dut.rd_en", "CONTROL", [(0, 0), (220, 1), (280, 0), (360, 1), (480, 0)]),
-        ("tb.dut.rptr[3:0]", "BUS", [(0, "0"), (220, "1"), (280, "2"), (360, "F (UNDERFLOW!)")]),
-        ("tb.dut.empty", "FLAG", [(0, 1), (180, 0), (360, 1), (450, 0)]),
-        ("tb.dut.data_out", "BUS", [(0, "00"), (220, "A5"), (280, "3C"), (360, "XX (CORRUPTED)")]),
+        ("tb.clk", "CLK", []),
+        ("tb.rst_n", "RESET", []),
+        ("tb.dut.rd_en", "CONTROL", []),
+        ("tb.dut.rptr[3:0]", "BUS", []),
+        ("tb.dut.empty", "FLAG", []),
+        ("tb.dut.data_out", "BUS", []),
     ]
 
     sy = y_wf + 55
-    for sig_name, sig_type, segments in signals:
+    wx_start = 220
+    wx_end = width - 50
+
+    for sig_name, sig_type, _ in signals:
         draw.text((45, sy + 6), sig_name, font=font_reg, fill=(148, 163, 184))
-        # Draw waveform timeline
-        wx_start = 220
-        wx_end = width - 50
         draw.line([wx_start, sy + 25, wx_end, sy + 25], fill=(30, 41, 59), width=1)
         
         if sig_type == "CLK":
@@ -297,7 +447,6 @@ def render_browser_rca_report(output_filename: str):
             draw.line([wx_start + 340, sy + 24, wx_start + 340, sy + 4], fill=(244, 63, 94), width=2)
             draw.line([wx_start + 340, sy + 4, wx_end, sy + 4], fill=(244, 63, 94), width=2)
         elif sig_type == "BUS":
-            # Hex bus brackets
             bx = wx_start
             b_steps = [(120, "0"), (120, "1"), (100, "2"), (340, "UNDERFLOW / XX")]
             for b_len, b_val in b_steps:
@@ -312,7 +461,6 @@ def render_browser_rca_report(output_filename: str):
                 bx += b_len
         sy += 48
 
-    # Red vertical cursor line at failure
     cursor_x = wx_start + 340
     draw.line([cursor_x, y_wf + 40, cursor_x, height - 35], fill=(244, 63, 94), width=2)
     draw.text((cursor_x + 6, y_wf + 44), "FAILURE POINT: 45,000 ps", font=font_sans_sm, fill=(244, 63, 94))
@@ -322,32 +470,33 @@ def render_browser_rca_report(output_filename: str):
     print(f"Generated {out_path} ({width}x{height})")
 
 
-# Now render all screenshots!
-print("Starting screenshot generation...")
+print("Generating updated screenshots and diagrams...")
 
-# 1. Screen 1
+# 1. Screen 1: WITH ALL 6 OFFICIAL WORKFLOW OPTIONS
 render_terminal(
     "Terminal — VeriSight Guided Wizard",
     [
         [("$ ./start.sh", COLOR_GREEN, True)],
         [("╔══════════════════════════════════════════════════════════════════════════════════╗", COLOR_CYAN, True)],
         [("║  🔍 VeriSight — Autonomous Verification & Debugging Platform                     ║", COLOR_CYAN, True)],
-        [("║  Dual-Engine Autonomous Suite: VeriSight Debug & VeriSight Plan                 ║", TEXT_WHITE, True)],
+        [("║  Multi-Engine Autonomous Suite: Debug, Plan, SimRunner, WebCockpit & Demos      ║", TEXT_WHITE, True)],
         [("╚══════════════════════════════════════════════════════════════════════════════════╝", COLOR_CYAN, True)],
         [("Welcome! Select an autonomous workflow below to get started.", TEXT_DIM, False)],
         [("", TEXT_WHITE, False)],
         [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
         [("  [1] ", COLOR_YELLOW, True), ("🛠️  VeriSight Debug", COLOR_GREEN, True), ("  — Root-Cause Analysis & Fix for Sim Failures", TEXT_WHITE, False)],
         [("  [2] ", COLOR_YELLOW, True), ("📋 VeriSight Plan", COLOR_GREEN, True), ("   — Generate Test Plan, Coverage Model & SVA Suite", TEXT_WHITE, False)],
-        [("  [3] ", COLOR_YELLOW, True), ("⚡ Quick Demos", COLOR_YELLOW, True), ("      — Instant 1-Click Run on ALU or FIFO", TEXT_WHITE, False)],
-        [("  [4] ", COLOR_YELLOW, True), ("🚪 Exit", COLOR_RED, True), ("             — Terminate the VeriSight Session", TEXT_WHITE, False)],
+        [("  [3] ", COLOR_YELLOW, True), ("🚀 Closed-Loop Sim", COLOR_GREEN, True), ("  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit", TEXT_WHITE, False)],
+        [("  [4] ", COLOR_YELLOW, True), ("🌐 Live Web Cockpit", COLOR_CYAN, True), (" — Launch Interactive Browser Studio (Sim/Waveforms/RCA)", TEXT_WHITE, False)],
+        [("  [5] ", COLOR_YELLOW, True), ("⚡ Quick Demos", COLOR_YELLOW, True), ("      — Instant 1-Click Run on ALU or FIFO", TEXT_WHITE, False)],
+        [("  [6] ", COLOR_YELLOW, True), ("🚪 Exit", COLOR_RED, True), ("             — Terminate the VeriSight Session", TEXT_WHITE, False)],
         [("", TEXT_WHITE, False)],
-        [("Select an option [1/2/3/4] (1): ", COLOR_YELLOW, True), ("1", COLOR_GREEN, True), (" █", TEXT_WHITE, True)]
+        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("1", COLOR_GREEN, True), (" █", TEXT_WHITE, True)]
     ],
     "screenshot_01_welcome_menu.png"
 )
 
-# 2. Screen 2
+# 2. Screen 2: LLM Configuration
 render_terminal(
     "Terminal — VeriSight LLM Engine Setup",
     [
@@ -372,7 +521,7 @@ render_terminal(
     "screenshot_02_llm_config.png"
 )
 
-# 3. Screen 3
+# 3. Screen 3: Debug Inputs
 render_terminal(
     "Terminal — VeriSight Debug: Input Gathering",
     [
@@ -393,7 +542,7 @@ render_terminal(
     "screenshot_03_agent1_debug_inputs.png"
 )
 
-# 4. Screen 4
+# 4. Screen 4: Debug Results
 render_terminal(
     "Terminal — VeriSight Debug: Root-Cause Analysis & Fix",
     [
@@ -425,7 +574,7 @@ render_terminal(
     "screenshot_04_agent1_debug_results.png"
 )
 
-# 5. Screen 5
+# 5. Screen 5: Plan Inputs
 render_terminal(
     "Terminal — VeriSight Plan: Input Gathering",
     [
@@ -443,7 +592,7 @@ render_terminal(
     "screenshot_05_agent2_plan_inputs.png"
 )
 
-# 6. Screen 6
+# 6. Screen 6: Plan Results
 render_terminal(
     "Terminal — VeriSight Plan: Generation Results",
     [
@@ -477,12 +626,64 @@ render_terminal(
     "screenshot_06_agent2_plan_results.png"
 )
 
-# 7. Screen 7
+# 7. Screen 7: Option 3 Closed-Loop Sim
 render_terminal(
-    "Terminal — VeriSight Quick Demos Menu",
+    "Terminal — Workflow 3: Closed-Loop Simulation & Auto-RCA",
     [
         [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
-        [("Select an option [1/2/3/4] (1): ", COLOR_YELLOW, True), ("3", COLOR_GREEN, True)],
+        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("3", COLOR_GREEN, True)],
+        [("", TEXT_WHITE, False)],
+        [("🚀 Workflow 3: One-Click Closed-Loop Simulation", COLOR_CYAN, True)],
+        [("RTL Source directory or file (.sv, .v) (Required): ", TEXT_WHITE, True), ("examples/rtl/alu.sv", COLOR_GREEN, False)],
+        [("UVM / SV Testbench directory or file (.sv) (Required): ", TEXT_WHITE, True), ("examples/tb/alu_tb.sv", COLOR_GREEN, False)],
+        [("Simulator engine [iverilog/verilator/questa/vcs] (iverilog): ", COLOR_YELLOW, True), ("iverilog", COLOR_GREEN, False)],
+        [("Specification document (.md, .pdf) (Optional): ", TEXT_WHITE, True), ("examples/specs/alu_spec.md", COLOR_GREEN, False)],
+        [("Output directory (output/closed_loop): ", COLOR_YELLOW, True), ("output/closed_loop", COLOR_GREEN, False)],
+        [("", TEXT_WHITE, False)],
+        [("⚙️ [SimRunner] Compiling RTL and Self-Checking Testbench with iverilog...", COLOR_CYAN, False), (" [OK]", COLOR_GREEN, True)],
+        [("⚙️ [SimRunner] Injected VCD dump wrapper ($dumpfile(\"sim.vcd\"))...", COLOR_CYAN, False), (" [OK]", COLOR_GREEN, True)],
+        [("🚀 [SimRunner] Executing simulation binary (vvp)...", COLOR_CYAN, False)],
+        [("  [UVM_ERROR] @ 20 ns: Scoreboard Mismatch! expected=0x00000008, actual=0xXXXXXXXX", COLOR_RED, True)],
+        [("  [UVM_ERROR] @ 40 ns: Scoreboard Mismatch! expected=0x0000000C, actual=0xXXXXXXXX", COLOR_RED, True)],
+        [("✓ [SimRunner] Generated sim.log (1,480 lines) and sim.vcd (48,120 transitions)", COLOR_GREEN, True)],
+        [("🔄 [Handoff] Testbench reported failures! Auto-routing to Agent 1→5 RCA Pipeline...", COLOR_YELLOW, True)],
+        [("  Classification: RTL_BUG (Confidence: 95%) — Missing reset in alu.sv:L34", COLOR_GREEN, True)],
+        [("✓ Unified patch generated: output/closed_loop/fix/proposed.patch", COLOR_GREEN, True)]
+    ],
+    "screenshot_07_workflow3_closed_loop.png"
+)
+
+# 8. Screen 8: Option 4 Live Web Cockpit Launch
+render_terminal(
+    "Terminal — Workflow 4: Launching Live Web Cockpit Server",
+    [
+        [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
+        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("4", COLOR_GREEN, True)],
+        [("", TEXT_WHITE, False)],
+        [("⚡ Launching VeriSight Live Web Cockpit at http://127.0.0.1:8000", COLOR_CYAN, True)],
+        [("INFO:     Started server process [PID 42180]", TEXT_DIM, False)],
+        [("INFO:     Waiting for application startup.", TEXT_DIM, False)],
+        [("INFO:     VeriSight Knowledge Base initialized (ChromaDB: 11 collections)", COLOR_CYAN, False)],
+        [("INFO:     FastAPI Neural Cockpit routes registered:", COLOR_CYAN, False)],
+        [("          • GET  /                        -> Modern Single-Page App (SPA)", TEXT_WHITE, False)],
+        [("          • GET  /api/v1/status           -> Autonomous Engine Health", TEXT_WHITE, False)],
+        [("          • POST /api/v1/simulate         -> Trigger One-Click Closed-Loop Sim", TEXT_WHITE, False)],
+        [("          • POST /api/v1/debug            -> Autonomous Root-Cause Analysis", TEXT_WHITE, False)],
+        [("          • POST /api/v1/plan             -> Verification Plan & Coverage Synthesis", TEXT_WHITE, False)],
+        [("          • GET  /api/v1/waveform         -> Live SVG VCD Waveform Extraction", TEXT_WHITE, False)],
+        [("INFO:     Application startup complete.", COLOR_GREEN, True)],
+        [("INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)", COLOR_YELLOW, True)],
+        [("✓ Opened browser at http://127.0.0.1:8000", COLOR_GREEN, True)]
+    ],
+    "screenshot_08_workflow4_web_cockpit.png"
+)
+
+# 9. Screen 9: Option 5 Quick Demos
+render_terminal(
+    "Terminal — Workflow 5: Quick Demos Menu",
+    [
+        [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
+        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("5", COLOR_GREEN, True)],
         [("", TEXT_WHITE, False)],
         [("Step 2: LLM Configuration -> ✓ Using Gemini API key.", COLOR_GREEN, True)],
         [("", TEXT_WHITE, False)],
@@ -496,75 +697,45 @@ render_terminal(
         [("✓ Auto-configured inputs: spec=alu_spec.md, rtl=examples/rtl/", COLOR_GREEN, False)],
         [("🚀 Launching ALU Verification Plan Architect Demo...", COLOR_CYAN, True)]
     ],
-    "screenshot_07_option3_demos.png"
+    "screenshot_09_workflow5_demos.png"
 )
 
-# 8. Screen 8
+# 10. Screen 10: Option 6 Exit & Headless CLI
 render_terminal(
-    "Terminal — VeriSight Exit & CLI Direct Mode",
+    "Terminal — Workflow 6: Exit & Advanced CLI Direct Mode",
     [
         [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
-        [("Select an option [1/2/3/4] (1): ", COLOR_YELLOW, True), ("4", COLOR_RED, True)],
+        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("6", COLOR_RED, True)],
         [("Exiting VeriSight. Goodbye!", TEXT_DIM, False)],
         [("", TEXT_WHITE, False)],
         [("──────────────────────────────────────────────────────────────────────────────", BORDER_COLOR, False)],
         [("💡 VeriSight Advanced CLI Execution (Headless & CI/CD Mode):", COLOR_YELLOW, True)],
         [("──────────────────────────────────────────────────────────────────────────────", BORDER_COLOR, False)],
         [("# 1. Direct Debug Mode with full parameter overrides:", TEXT_DIM, False)],
-        [("$ python main.py \\", TEXT_WHITE, False)],
-        [("    --spec examples/specs/alu_spec.md \\", COLOR_CYAN, False)],
-        [("    --rtl examples/rtl/ \\", COLOR_CYAN, False)],
-        [("    --log examples/logs/sim.log \\", COLOR_CYAN, False)],
-        [("    --output output/cli_debug_run", COLOR_CYAN, False)],
+        [("$ python main.py --spec examples/specs/alu_spec.md --rtl examples/rtl/ \\", COLOR_WHITE if 'COLOR_WHITE' in dir() else TEXT_WHITE, False)],
+        [("    --log examples/logs/sim.log --output output/cli_debug_run", COLOR_CYAN, False)],
         [("", TEXT_WHITE, False)],
         [("# 2. Direct Verification Plan Synthesis Mode:", TEXT_DIM, False)],
-        [("$ python main.py plan \\", TEXT_WHITE, False)],
-        [("    --spec examples/specs/alu_spec.md \\", COLOR_CYAN, False)],
-        [("    --rtl examples/rtl/ \\", COLOR_CYAN, False)],
+        [("$ python main.py plan --spec examples/specs/alu_spec.md --rtl examples/rtl/ \\", COLOR_WHITE if 'COLOR_WHITE' in dir() else TEXT_WHITE, False)],
         [("    --output output/verification_plan", COLOR_CYAN, False)],
         [("", TEXT_WHITE, False)],
-        [("# 3. Quick Run via Shell wrapper:", TEXT_DIM, False)],
-        [("$ ./start.sh", COLOR_GREEN, True)]
-    ],
-    "screenshot_08_cli_and_exit.png"
-)
-
-# 9. Screen 9: Live Coverage Cockpit GUI
-render_browser_vplan("screenshot_09_vplan_cockpit.png")
-
-# 10. Screen 10: RCA Diagnostic Dashboard GUI
-render_browser_rca_report("screenshot_10_rca_dashboard.png")
-
-# 11. Screen 11: One-Click Simulation Runner
-render_terminal(
-    "Terminal — VeriSight One-Click Closed-Loop Simulation Runner",
-    [
-        [("$ python main.py simulate \\", COLOR_GREEN, True)],
-        [("    --rtl examples/rtl/alu.sv \\", COLOR_CYAN, False)],
-        [("    --tb examples/tb/alu_tb.sv \\", COLOR_CYAN, False)],
-        [("    --simulator iverilog \\", COLOR_CYAN, False)],
-        [("    --output output/closed_loop", COLOR_CYAN, False)],
+        [("# 3. Direct One-Click Simulation Mode:", TEXT_DIM, False)],
+        [("$ python main.py simulate --rtl examples/rtl/alu.sv --tb examples/tb/alu_tb.sv \\", COLOR_WHITE if 'COLOR_WHITE' in dir() else TEXT_WHITE, False)],
+        [("    --simulator iverilog --output output/sim_run", COLOR_CYAN, False)],
         [("", TEXT_WHITE, False)],
-        [("⚙️ [SimRunner] Detecting simulator backend: iverilog (Icarus Verilog v12.0)...", COLOR_CYAN, False), (" [OK]", COLOR_GREEN, True)],
-        [("⚙️ [SimRunner] Compiling RTL and Self-Checking Testbench...", COLOR_CYAN, False), (" [OK]", COLOR_GREEN, True)],
-        [("⚙️ [SimRunner] Auto-injecting VCD waveform dump wrapper ($dumpfile(\"sim.vcd\"))...", COLOR_CYAN, False), (" [OK]", COLOR_GREEN, True)],
-        [("🚀 [SimRunner] Executing simulation binary (vvp)...", COLOR_CYAN, False)],
-        [("--------------------------------------------------------------------------------", BORDER_COLOR, False)],
-        [("  [SIM START] Time: 0 ns | ALU Verification Testbench Initialized", TEXT_DIM, False)],
-        [("  [TEST 1] Testing ADD opcode: a=0x00000005, b=0x00000003 -> expected 0x8", TEXT_WHITE, False)],
-        [("  [UVM_ERROR] @ 20 ns: Scoreboard Mismatch! expected=0x00000008, actual=0xXXXXXXXX", COLOR_RED, True)],
-        [("  [TEST 2] Testing SUB opcode: a=0x00000010, b=0x00000004 -> expected 0xC", TEXT_WHITE, False)],
-        [("  [UVM_ERROR] @ 40 ns: Scoreboard Mismatch! expected=0x0000000C, actual=0xXXXXXXXX", COLOR_RED, True)],
-        [("  [SIM FINISH] Total Tests: 12, Errors: 2, Simulation Time: 120 ns", COLOR_YELLOW, True)],
-        [("--------------------------------------------------------------------------------", BORDER_COLOR, False)],
-        [("✓ [SimRunner] Simulation generated: output/closed_loop/sim.log (1,480 lines)", COLOR_GREEN, True)],
-        [("✓ [SimRunner] VCD Waveform dumped: output/closed_loop/sim.vcd (48,120 transitions)", COLOR_GREEN, True)],
-        [("🚀 [Pipeline] Feeding fresh log and waveform directly into VeriSight Agent 1→5...", COLOR_CYAN, True)]
+        [("# 4. Launch Web Cockpit Server:", TEXT_DIM, False)],
+        [("$ python main.py serve --port 8000", COLOR_GREEN, True)]
     ],
-    "screenshot_11_sim_runner.png"
+    "screenshot_10_workflow6_exit_cli.png"
 )
 
-# 12. Screen 12: Automated Fix Generator & Sandbox Validation
+# 11. Screen 11: Live Coverage Cockpit GUI
+render_browser_vplan("screenshot_11_vplan_cockpit_gui.png")
+
+# 12. Screen 12: RCA Diagnostic Dashboard GUI
+render_browser_rca_report("screenshot_12_rca_dashboard_gui.png")
+
+# 13. Screen 13: Automated Fix & Sandbox Validation
 render_terminal(
     "Terminal — VeriSight Agent 5: Automated Fix & Sandbox Validation",
     [
@@ -590,17 +761,15 @@ render_terminal(
         [("✓ Fix Confidence: 98% (Syntax verified + Regression closed)", COLOR_GREEN, True)],
         [("💡 Apply patch to repository: git apply output/fix/proposed.patch", COLOR_YELLOW, True)]
     ],
-    "screenshot_12_automated_fix.png"
+    "screenshot_13_automated_patch.png"
 )
 
-# 13. Screen 13: FastAPI Live Web Cockpit Server
+# 14. Screen 14: FastAPI Live Web Cockpit Server Log
 render_terminal(
-    "Terminal — VeriSight Live Web Cockpit Server (FastAPI + Uvicorn)",
+    "Terminal — FastAPI Neural Web Server Startup & API Endpoints",
     [
         [("$ python main.py serve --host 127.0.0.1 --port 8000", COLOR_GREEN, True)],
-        [("", TEXT_WHITE, False)],
         [("INFO:     Started server process [PID 41820]", TEXT_DIM, False)],
-        [("INFO:     Waiting for application startup.", TEXT_DIM, False)],
         [("INFO:     VeriSight Knowledge Base initialized (ChromaDB: 11 collections)", COLOR_CYAN, False)],
         [("INFO:     FastAPI Neural Cockpit routes registered:", COLOR_CYAN, False)],
         [("          • GET  /                        -> Modern Single-Page App (SPA)", TEXT_WHITE, False)],
@@ -612,15 +781,14 @@ render_terminal(
         [("INFO:     Application startup complete.", COLOR_GREEN, True)],
         [("INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)", COLOR_YELLOW, True)],
         [("INFO:     127.0.0.1:48210 - \"GET / HTTP/1.1\" 200 OK", TEXT_DIM, False)],
-        [("INFO:     127.0.0.1:48210 - \"GET /api/v1/status HTTP/1.1\" 200 OK", TEXT_DIM, False)],
         [("✓ VeriSight Web Cockpit ready! Open http://localhost:8000 in your browser.", COLOR_GREEN, True)]
     ],
-    "screenshot_13_web_cockpit_server.png"
+    "screenshot_14_fastapi_web_server.png"
 )
 
-# 14. Screen 14: Headless CI/CD Pipeline
+# 15. Screen 15: Headless CI/CD Nightly Regression
 render_terminal(
-    "Terminal — VeriSight Headless CI/CD Regression Pipeline",
+    "Terminal — VeriSight Headless CI/CD Nightly Regression Pipeline",
     [
         [("$ # GitHub Actions / GitLab CI Automated Nightly Regression Step:", TEXT_DIM, False)],
         [("$ python main.py --spec specs/soc_spec.md --rtl rtl/ --tb tb/ --log logs/nightly.log \\", COLOR_GREEN, True)],
@@ -634,7 +802,13 @@ render_terminal(
         [("✓ Summary JSON saved: artifacts/regression_triage/summary.json", COLOR_GREEN, True)],
         [("✓ Exit code 0 returned. Regression triage completed in 1.42 seconds.", COLOR_GREEN, True)]
     ],
-    "screenshot_14_ci_cd_pipeline.png"
+    "screenshot_15_ci_cd_regression.png"
 )
 
-print("All 14 screenshots generated successfully in docs/screenshots/!")
+# 16. Diagram 1: Architecture Block Diagram
+render_diagram_architecture("diagram_01_system_architecture.png")
+
+# 17. Diagram 2: Closed-Loop Flowchart
+render_diagram_flowchart("diagram_02_closed_loop_flow.png")
+
+print("All screenshots and architectural diagrams generated successfully in docs/screenshots/!")
