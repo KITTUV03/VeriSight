@@ -1718,7 +1718,7 @@ class ReportGeneratorAgent(BaseAgent):
         <!-- Footer -->
         <footer>
             VeriSight Autonomous Silicon Verification Suite • Version 2.4 Enterprise Edition<br>
-            Engineered by Patel Kittu (@KITTUV03) • Mirafra Technologies
+            Engineered by Kittu Patel (@KITTUV03)
         </footer>
     </div>
 
