@@ -1,0 +1,71 @@
+// ==============================================================================
+// Questa SIM / ModelSim Coverage Report: vcover report -cvg -details
+// Database: alu_test_regression.ucdb
+// Generated: 2026-10-20 09:30:15
+// ==============================================================================
+
+Coverage Summary by Type:
+  Line Coverage:       96.4%
+  Branch Coverage:     94.2%
+  Toggle Coverage:     91.8%
+  Functional Coverage: 91.67%
+  Assertion Coverage:  95.0%
+
+--------------------------------------------------------------------------------
+Covergroup /top_tb/cg_alu_operations
+  Coverage: 91.67%
+  Sample Trigger: @(posedge clk iff !rst_n)
+
+  Coverpoint cp_opcode
+    Target Signal: op[2:0]
+    Coverage: 100.0%
+    bin_add          : 154 hits (at least 1) [COVERED]
+    bin_sub          : 122 hits (at least 1) [COVERED]
+    bin_and          : 98 hits (at least 1) [COVERED]
+    bin_or           : 87 hits (at least 1) [COVERED]
+    bin_xor          : 93 hits (at least 1) [COVERED]
+    bin_not          : 76 hits (at least 1) [COVERED]
+    bin_shl          : 64 hits (at least 1) [COVERED]
+    bin_shr          : 59 hits (at least 1) [COVERED]
+
+  Coverpoint cp_corner_cases
+    Target Signal: flags[3:0]
+    Coverage: 83.33%
+    bin_zero_flag    : 45 hits (at least 1) [COVERED]
+    bin_negative_flag: 38 hits (at least 1) [COVERED]
+    bin_carry_flag   : 29 hits (at least 1) [COVERED]
+    bin_max_values   : 14 hits (at least 1) [COVERED]
+    bin_min_values   : 18 hits (at least 1) [COVERED]
+    bin_overflow     : 0 hits (at least 1) [UNCOVERED]
+
+  Coverpoint cp_error_injection
+    Target Signal: pslverr
+    Coverage: 50.0%
+    bin_normal_resp  : 230 hits (at least 1) [COVERED]
+    bin_err_response : 0 hits (at least 1) [UNCOVERED]
+
+--------------------------------------------------------------------------------
+Covergroup /top_tb/cg_alu_operands
+  Coverage: 95.0%
+  Sample Trigger: @(posedge clk iff (op == ALU_ADD || op == ALU_SUB))
+
+  Coverpoint cp_operand_a
+    Target Signal: operand_a[31:0]
+    Coverage: 100.0%
+    bin_all_zeros    : 12 hits (at least 1) [COVERED]
+    bin_all_ones     : 8 hits (at least 1) [COVERED]
+    bin_alternating  : 16 hits (at least 1) [COVERED]
+    bin_random_data  : 240 hits (at least 1) [COVERED]
+
+  Coverpoint cp_operand_b
+    Target Signal: operand_b[31:0]
+    Coverage: 90.0%
+    bin_all_zeros    : 15 hits (at least 1) [COVERED]
+    bin_all_ones     : 11 hits (at least 1) [COVERED]
+    bin_alternating  : 14 hits (at least 1) [COVERED]
+    bin_sub_underflow: 0 hits (at least 1) [UNCOVERED]
+
+// Total Uncovered Holes: 3 bins
+// bin_overflow     in cp_corner_cases (0 hits)
+// bin_err_response in cp_error_injection (0 hits)
+// bin_sub_underflow in cp_operand_b (0 hits)

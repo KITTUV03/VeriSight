@@ -1,0 +1,50 @@
+{
+  "simulator": "Synopsys VCS vDB / Questa UCDB",
+  "design": "ALU",
+  "overall_coverage": 91.67,
+  "covergroups": [
+    {
+      "group_name": "cg_alu_operations",
+      "coverage": 91.67,
+      "coverpoints": [
+        {
+          "name": "cp_opcode",
+          "target_signal": "op[2:0]",
+          "coverage": 100.0,
+          "bins": [
+            {"name": "bin_add", "hits": 154, "status": "Covered", "condition": "op == 3'b000"},
+            {"name": "bin_sub", "hits": 122, "status": "Covered", "condition": "op == 3'b001"},
+            {"name": "bin_and", "hits": 98, "status": "Covered", "condition": "op == 3'b010"},
+            {"name": "bin_or", "hits": 87, "status": "Covered", "condition": "op == 3'b011"},
+            {"name": "bin_xor", "hits": 93, "status": "Covered", "condition": "op == 3'b100"},
+            {"name": "bin_not", "hits": 76, "status": "Covered", "condition": "op == 3'b101"},
+            {"name": "bin_shl", "hits": 64, "status": "Covered", "condition": "op == 3'b110"},
+            {"name": "bin_shr", "hits": 59, "status": "Covered", "condition": "op == 3'b111"}
+          ]
+        },
+        {
+          "name": "cp_corner_cases",
+          "target_signal": "flags[3:0]",
+          "coverage": 83.33,
+          "bins": [
+            {"name": "bin_zero_flag", "hits": 45, "status": "Covered", "condition": "flags[0] == 1'b1"},
+            {"name": "bin_negative_flag", "hits": 38, "status": "Covered", "condition": "flags[1] == 1'b1"},
+            {"name": "bin_carry_flag", "hits": 29, "status": "Covered", "condition": "flags[2] == 1'b1"},
+            {"name": "bin_max_values", "hits": 14, "status": "Covered", "condition": "a == 32'hFFFFFFFF"},
+            {"name": "bin_min_values", "hits": 18, "status": "Covered", "condition": "b == 32'h00000000"},
+            {"name": "bin_overflow", "hits": 0, "status": "Unhit", "condition": "cout == 1 && cin == 1"}
+          ]
+        },
+        {
+          "name": "cp_error_injection",
+          "target_signal": "pslverr",
+          "coverage": 50.0,
+          "bins": [
+            {"name": "bin_normal_resp", "hits": 230, "status": "Covered", "condition": "pslverr == 1'b0"},
+            {"name": "bin_err_response", "hits": 0, "status": "Unhit", "condition": "pslverr == 1'b1"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -363,7 +363,7 @@ def main():
                 kb = None
 
         planner = VeriSightPlanner(output_dir=plan_output, knowledge_base=kb)
-        planner.run(spec_path=args.spec, rtl_path=args.rtl)
+        planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
         return
 
     # Normalize output dir (drop any trailing separators so display/paths

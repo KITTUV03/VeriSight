@@ -472,6 +472,7 @@ def run_plan_flow(
     model_name: Optional[str],
     spec_path: Optional[str] = None,
     rtl_path: Optional[str] = None,
+    coverage_path: Optional[str] = None,
     output_dir: Optional[str] = None,
     airgap: bool = False,
     anonymize_rtl: bool = False,
@@ -485,6 +486,8 @@ def run_plan_flow(
         spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default="")
     if not rtl_path:
         rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
+    if coverage_path is None:
+        coverage_path = _prompt_path("Simulator Coverage Database / Report (optional .ucdb, .vdb, .txt, .json)", required=False, default="")
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for verification plan[/bold]", default="output/verification_plan").strip()
 
@@ -518,7 +521,11 @@ def run_plan_flow(
     console.print("\n[bold cyan]🚀 Launching VeriSight Plan Architect...[/bold cyan]\n")
     try:
         planner = VeriSightPlanner(output_dir=output_dir, knowledge_base=kb)
-        report = planner.run(spec_path=spec_path, rtl_path=rtl_path)
+        report = planner.run(
+            spec_path=spec_path,
+            rtl_path=rtl_path,
+            coverage_path=coverage_path if coverage_path else None,
+        )
 
         console.print("\n" + "=" * 62)
         console.print("[bold green]🎉 Verification Plan Generated Successfully![/bold green]")
@@ -528,6 +535,8 @@ def run_plan_flow(
         console.print(f"  [bold]Defined Test Scenarios:[/] {report.total_tests}")
         console.print(f"  [bold]Coverage Points:[/]        {report.total_coverage_points}")
         console.print(f"  [bold]SVA Formal Assertions:[/] {report.total_assertions}")
+        console.print(f"  [bold]Simulator Coverage:[/]    [cyan]{report.actual_coverage_overall}% Hit[/cyan] (Target: {report.target_coverage_overall}%)")
+        console.print(f"  [bold]Unhit Coverage Holes:[/]  [yellow]{report.unhit_bins_count} bins[/yellow]")
         console.print()
         console.print(f"  [bold cyan]Generated Artifacts in {output_dir}/:[/bold cyan]")
         console.print(f"    • [white]verification_plan.html[/white]  (Interactive HTML Dashboard)")

@@ -14,16 +14,6 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
-class FeatureItem(BaseModel):
-    """Decomposed functional requirement or feature."""
-    feature_id: str = Field(description="Unique ID e.g. FEAT-001")
-    title: str = Field(description="Short descriptive title")
-    description: str = Field(description="Full functional requirement description")
-    category: str = Field(default="Functional", description="Functional, Interface, Register, CornerCase, Protocol, Performance")
-    source_section: Optional[str] = Field(default=None, description="Section in spec document")
-    priority: str = Field(default="High", description="Critical, High, Medium, Low")
-    rtl_cross_check: Optional[str] = Field(default=None, description="Correlation status with RTL: Confirmed, Missing_In_RTL, Undocumented_In_Spec")
-
 
 class TestScenario(BaseModel):
     """Specific test case scenario defined in the Test Plan."""
@@ -43,6 +33,9 @@ class CoverageBin(BaseModel):
     bin_type: str = "bins"  # bins, illegal_bins, ignore_bins
     condition: str
     description: Optional[str] = None
+    hits: Optional[int] = None
+    hit_status: Optional[str] = None  # Covered, Unhit, Excluded
+    target_hits: int = 1
 
 
 class CoveragePoint(BaseModel):
@@ -54,6 +47,10 @@ class CoveragePoint(BaseModel):
     sample_event: str = Field(default="@(posedge clk)", description="Sampling event or clock edge")
     bins: List[CoverageBin] = Field(default_factory=list, description="Defined bins")
     description: str = Field(description="Verification intent of this coverage point")
+    actual_coverage: Optional[float] = Field(default=None, description="Actual hit percentage from simulator DB")
+    hit_bins_count: Optional[int] = None
+    total_bins_count: Optional[int] = None
+    unhit_bins: List[str] = Field(default_factory=list, description="Names of unhit bins")
 
 
 class CovergroupDef(BaseModel):
@@ -63,6 +60,7 @@ class CovergroupDef(BaseModel):
     coverpoints: List[CoveragePoint] = Field(default_factory=list)
     crosses: List[str] = Field(default_factory=list, description="Cross coverage expressions")
     description: str = Field(description="Scope and purpose of this covergroup")
+    actual_coverage: Optional[float] = Field(default=None, description="Actual covergroup % from simulator DB")
 
 
 class SVAProperty(BaseModel):
@@ -78,6 +76,22 @@ class SVAProperty(BaseModel):
     description: str = Field(description="Formal verification or simulation intent")
 
 
+class FeatureItem(BaseModel):
+    """Decomposed functional requirement or feature."""
+    feature_id: str = Field(description="Unique ID e.g. FEAT-001")
+    title: str = Field(description="Short descriptive title")
+    description: str = Field(description="Full functional requirement description")
+    category: str = Field(default="Functional", description="Functional, Interface, Register, CornerCase, Protocol, Performance")
+    source_section: Optional[str] = Field(default=None, description="Section in spec document")
+    priority: str = Field(default="High", description="Critical, High, Medium, Low")
+    rtl_cross_check: Optional[str] = Field(default=None, description="Correlation status with RTL: Confirmed, Missing_In_RTL, Undocumented_In_Spec")
+    target_coverage: float = Field(default=100.0, description="Target coverage percentage (default 100%)")
+    actual_coverage: Optional[float] = Field(default=None, description="Actual simulator coverage hit percentage")
+    coverage_status: Optional[str] = Field(default=None, description="Coverage closure status: Closed, Near Closure, Critical Hole, Uncovered")
+    unhit_bins: List[Dict[str, Any]] = Field(default_factory=list, description="List of unhit coverage bins for this feature")
+    directed_stimulus_hint: Optional[str] = Field(default=None, description="AI-synthesized directed sequence hint to hit remaining bins")
+
+
 class TraceabilityRow(BaseModel):
     """Single row in the bi-directional traceability matrix."""
     feature_id: str
@@ -86,6 +100,9 @@ class TraceabilityRow(BaseModel):
     coverage_ids: List[str] = Field(default_factory=list)
     assertion_ids: List[str] = Field(default_factory=list)
     status: str = Field(default="Covered", description="Covered, Partial, Uncovered")
+    target_coverage: float = Field(default=100.0, description="Target coverage %")
+    actual_coverage: Optional[float] = Field(default=None, description="Actual hit %")
+    unhit_bins_count: int = Field(default=0, description="Number of unhit coverage holes")
 
 
 class VerificationPlanReport(BaseModel):
@@ -95,15 +112,22 @@ class VerificationPlanReport(BaseModel):
     timestamp: str
     spec_source: str
     rtl_source: Optional[str] = None
+    coverage_db_source: Optional[str] = None
     total_features: int = 0
     total_tests: int = 0
     total_coverage_points: int = 0
     total_assertions: int = 0
+    actual_coverage_overall: Optional[float] = None
+    target_coverage_overall: float = 100.0
+    total_bins: int = 0
+    hit_bins: int = 0
+    unhit_bins_count: int = 0
     features: List[FeatureItem] = Field(default_factory=list)
     test_scenarios: List[TestScenario] = Field(default_factory=list)
     covergroups: List[CovergroupDef] = Field(default_factory=list)
     assertions: List[SVAProperty] = Field(default_factory=list)
     traceability_matrix: List[TraceabilityRow] = Field(default_factory=list)
+    coverage_holes: List[Dict[str, Any]] = Field(default_factory=list)
     rag_cached: bool = False
     sv_coverage_code: Optional[str] = None
     sv_assertion_code: Optional[str] = None

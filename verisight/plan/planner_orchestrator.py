@@ -23,6 +23,7 @@ from verisight.plan.feature_extractor import FeatureExtractor
 from verisight.plan.test_planner import TestPlanner
 from verisight.plan.coverage_architect import CoverageArchitect
 from verisight.plan.assertion_architect import AssertionArchitect
+from verisight.plan.coverage_correlator import CoverageCorrelator
 from verisight.plan.traceability import (
     build_traceability_matrix,
     export_csv,
@@ -47,12 +48,14 @@ class VeriSightPlanner:
         self.test_planner = TestPlanner()
         self.coverage_architect = CoverageArchitect()
         self.assertion_architect = AssertionArchitect()
+        self.coverage_correlator = CoverageCorrelator()
 
     def run(
         self,
         spec_path: str,
         rtl_path: Optional[str] = None,
         design_name: Optional[str] = None,
+        coverage_path: Optional[str] = None,
     ) -> VerificationPlanReport:
         """
         Execute full autonomous verification planning pipeline.
@@ -143,6 +146,7 @@ class VeriSightPlanner:
             timestamp=timestamp,
             spec_source=spec_path,
             rtl_source=rtl_path,
+            coverage_db_source=coverage_path,
             total_features=len(features),
             total_tests=len(test_scenarios),
             total_coverage_points=total_cov_points,
@@ -157,6 +161,13 @@ class VeriSightPlanner:
             sv_assertion_code=sv_assertion_code,
         )
 
+        # 6. Dynamic Coverage Closure Ingestion (Planned vs. Actual UCDB/vDB)
+        logger.info("Correlating Planned Requirements with Simulator Coverage Database...")
+        report = self.coverage_correlator.correlate(
+            report=report,
+            coverage_path=coverage_path,
+        )
+
         # 6. Save Artifacts
         # JSON Schema
         with open(self.output_dir / "verification_plan.json", "w", encoding="utf-8") as f:
@@ -169,7 +180,7 @@ class VeriSightPlanner:
         export_html(report, self.output_dir / "verification_plan.html")
 
         # Traceability CSV
-        export_csv(traceability_matrix, self.output_dir / "traceability_matrix.csv")
+        export_csv(report.traceability_matrix, self.output_dir / "traceability_matrix.csv")
 
         # SystemVerilog Code Files
         with open(self.output_dir / "coverage_model.sv", "w", encoding="utf-8") as f:
