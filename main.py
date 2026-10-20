@@ -55,12 +55,17 @@ Examples:
         "command",
         nargs="?",
         default=None,
-        help="Optional command: 'start' (guided wizard) or 'plan' (verification plan architect)",
+        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), or 'sim' (closed-loop simulation runner)",
     )
     parser.add_argument(
         "--interactive", "-i",
         action="store_true",
         help="Launch the interactive guided setup wizard",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open HTML report in browser automatically",
     )
 
     # Input files
@@ -364,6 +369,59 @@ def main():
 
         planner = VeriSightPlanner(output_dir=plan_output, knowledge_base=kb)
         planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
+        return
+
+    # Handle 'sim' / 'simulate' command: One-Click Closed-Loop Runner
+    if args.command in ("sim", "simulate"):
+        if not args.rtl or not args.tb:
+            console.print("[red]Error:[/red] 'sim' command requires both --rtl and --tb.")
+            console.print("  Example: python main.py sim --rtl examples/rtl/alu.sv --tb examples/tb/alu_tb.sv --spec examples/specs/alu_spec.md")
+            sys.exit(1)
+
+        sim_output = args.output if args.output != "output" else "output/closed_loop"
+        console.print("[bold cyan]🚀 VeriSight One-Click Closed-Loop Simulation Runner[/bold cyan]")
+        console.print(f"  [dim]RTL Source:[/]   {args.rtl}")
+        console.print(f"  [dim]Testbench:[/]    {args.tb}")
+        console.print(f"  [dim]Simulator:[/]    {args.simulator}")
+        console.print(f"  [dim]Output Dir:[/]   {sim_output}\n")
+
+        res = sim_runner.execute_closed_loop_flow(
+            rtl_path=args.rtl,
+            tb_path=args.tb,
+            spec_path=args.spec,
+            simulator=args.simulator,
+            top_module=args.sim_top or args.top or "",
+            uvm_home=args.uvm_home or os.getenv("VERISIGHT_UVM_HOME", ""),
+            timeout_s=args.sim_timeout,
+            output_dir=sim_output,
+            provider=args.provider,
+            api_key=args.api_key,
+            model_name=args.model,
+            airgap=args.airgap,
+            anonymize_rtl=args.anonymize_rtl,
+            local_endpoint=args.local_endpoint,
+        )
+
+        sim_res = res["sim_result"]
+        dbg = res["debug_report"]
+        console.print("\n" + "=" * 62)
+        console.print("[bold green]🎉 Closed-Loop Simulation & Analysis Complete![/bold green]")
+        console.print("=" * 62)
+        console.print(f"  [bold]Simulator Backend:[/]   {sim_res.simulator} (Exit Code: {sim_res.returncode})")
+        console.print(f"  [bold]Simulation Time:[/]     {sim_res.duration_s}s")
+        console.print(f"  [bold]Errors Caught:[/]       {sim_res.error_count}")
+        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification} (Confidence: {int(dbg.confidence*100)}%)")
+        console.print(f"  [bold]Root Cause:[/]          {dbg.root_cause[:70]}...")
+        console.print()
+        console.print("  [bold cyan]Interactive HTML Dashboards:[/bold cyan]")
+        console.print(f"    • [white]{res['report_html']}[/white]  (Root Cause Debug + Waveform Studio)")
+        if res.get("plan_html"):
+            console.print(f"    • [white]{res['plan_html']}[/white]  (Live Coverage Cockpit & Traceability)")
+        console.print("=" * 62 + "\n")
+
+        if not args.no_browser:
+            from verisight.wizard import _open_html_in_browser
+            _open_html_in_browser(Path(res['report_html']))
         return
 
     # Normalize output dir (drop any trailing separators so display/paths

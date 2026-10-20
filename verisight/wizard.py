@@ -653,6 +653,100 @@ def run_debug_flow(
         console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")
 
 
+def run_sim_flow(
+    provider: str,
+    api_key: Optional[str],
+    model_name: Optional[str],
+    rtl_path: Optional[str] = None,
+    tb_path: Optional[str] = None,
+    spec_path: Optional[str] = None,
+    simulator: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    airgap: bool = False,
+    anonymize_rtl: bool = False,
+    local_endpoint: str = "",
+):
+    """Execute the VeriSight One-Click Closed-Loop Simulation Runner."""
+    from verisight.tools.sim_runner import execute_closed_loop_flow, find_best_simulator
+
+    console.print("\n[bold cyan]🚀 One-Click Closed-Loop Simulation Runner[/bold cyan]")
+    console.print("[dim]Simulate RTL + TB -> Capture Log, VCD & Coverage -> Auto-trigger RCA & Plan[/dim]\n")
+
+    detected_sim = find_best_simulator()
+    console.print(f"  [dim]Auto-detected system simulator:[/] [bold green]{detected_sim or 'None (fallback hints available)'}[/bold green]\n")
+
+    if not rtl_path:
+        rtl_path = _prompt_path("RTL Source file or directory (.sv, .v)", required=True, default="examples/rtl/alu.sv")
+    if not tb_path:
+        tb_path = _prompt_path("Testbench file or directory (.sv, .v)", required=True, default="examples/tb/alu_tb.sv")
+    if not spec_path:
+        spec_path = _prompt_path("Design Specification document (.md) [optional]", required=False, default="examples/specs/alu_spec.md")
+
+    if not simulator:
+        sim_choices = ["auto", "iverilog", "verilator", "questa", "modelsim", "vcs"]
+        simulator = Prompt.ask(
+            "[bold]Select EDA Simulator[/bold]",
+            choices=sim_choices,
+            default="auto" if detected_sim else "iverilog",
+        )
+
+    if not output_dir:
+        output_dir = Prompt.ask("[bold]Output root directory[/bold]", default="output/closed_loop").strip()
+
+    console.print("\n[bold cyan]⚡ Launching Closed-Loop Flow...[/bold cyan]\n")
+    try:
+        results = execute_closed_loop_flow(
+            rtl_path=rtl_path,
+            tb_path=tb_path,
+            spec_path=spec_path if spec_path else None,
+            output_dir=output_dir,
+            simulator=simulator,
+            airgap=airgap,
+            anonymize_rtl=anonymize_rtl,
+            api_key=api_key,
+            provider=provider,
+            model_name=model_name,
+            local_endpoint=local_endpoint,
+            launch_browser=False,
+        )
+
+        sim_res = results.get("sim")
+        console.print("\n" + "=" * 62)
+        console.print("[bold green]🎉 Closed-Loop Execution Completed![/bold green]")
+        console.print("=" * 62)
+        if sim_res:
+            status_tag = "[bold green]PASS[/bold green]" if sim_res.success else "[bold red]FAIL (Anomalies Found)[/bold red]"
+            console.print(f"  [bold]Sim Status:[/]     {status_tag}")
+            console.print(f"  [bold]Simulator:[/]      {sim_res.simulator}")
+            console.print(f"  [bold]Sim Errors:[/]     {sim_res.error_count} error(s)")
+            console.print(f"  [bold]Sim Warnings:[/]   {sim_res.warning_count} warning(s)")
+            console.print(f"  [bold]VCD Trace:[/]      {sim_res.vcd_path or 'None'}")
+            console.print(f"  [bold]Log File:[/]       {sim_res.log_path}")
+
+        rca_res = results.get("rca")
+        if rca_res:
+            console.print(f"\n  [bold cyan]RCA Diagnosis:[/]   {rca_res.classification} ({rca_res.confidence}% conf)")
+            console.print(f"  [bold]Root Cause:[/]      {rca_res.root_cause}")
+
+        dashboards = results.get("dashboards", {})
+        console.print(f"\n  [bold cyan]Interactive Cockpits & Dashboards:[/bold cyan]")
+        if "debug_report_html" in dashboards:
+            console.print(f"    • [white]Debug Waveform Cockpit:[/] {dashboards['debug_report_html']}")
+        if "plan_cockpit_html" in dashboards:
+            console.print(f"    • [white]Coverage Closure Plan:[/]  {dashboards['plan_cockpit_html']}")
+
+        open_choice = Confirm.ask("\n[bold]Open dashboards in your browser now?[/bold]", default=True)
+        if open_choice:
+            for k, p in dashboards.items():
+                p_path = Path(p)
+                if p_path.exists():
+                    _open_html_in_browser(p_path)
+                    console.print(f"[green]✓ Opened: file://{p_path.resolve()}[/green]")
+
+    except Exception as e:
+        console.print(f"\n[bold red]Closed-Loop Execution failed:[/] {e}")
+
+
 def run_wizard():
     """Execute the unified interactive guided setup wizard."""
     _print_welcome_banner()
@@ -660,17 +754,18 @@ def run_wizard():
     console.print("[bold cyan]Step 1: Choose Autonomous Workflow[/bold cyan]")
     console.print("  [1] [bold green]🛠️  VeriSight Debug[/bold green]  — Root-Cause Analysis & Fix for Sim Failures")
     console.print("  [2] [bold green]📋 VeriSight Plan[/bold green]   — Generate Test Plan, Coverage Model & SVA Suite")
-    console.print("  [3] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
-    console.print("  [4] [bold red]🚪 Exit[/bold red]")
+    console.print("  [3] [bold green]🚀 Closed-Loop Sim[/bold green]  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit")
+    console.print("  [4] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
+    console.print("  [5] [bold red]🚪 Exit[/bold red]")
     console.print()
 
     workflow = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4"],
+        choices=["1", "2", "3", "4", "5"],
         default="1",
     )
 
-    if workflow == "4":
+    if workflow == "5":
         console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
         sys.exit(0)
 
@@ -690,13 +785,20 @@ def run_wizard():
         )
 
     elif workflow == "3":
+        run_sim_flow(
+            provider, api_key, model_name,
+            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+        )
+
+    elif workflow == "4":
         console.print("\n[bold cyan]Select Pre-packaged Demo:[/bold cyan]")
         console.print("  [1] ALU Debug Demo   (Detect Missing Reset Bug)")
         console.print("  [2] FIFO Debug Demo  (Synchronous FIFO UVM Debug)")
         console.print("  [3] ALU Plan Demo    (Generate Full Test Plan, SV Coverage & SVA for ALU)")
         console.print("  [4] FIFO Plan Demo   (Generate Full Test Plan, SV Coverage & SVA for FIFO)")
+        console.print("  [5] ALU Closed-Loop  (Simulate ALU RTL+TB -> Waveform RCA -> Coverage)")
 
-        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4"], default="1")
+        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4", "5"], default="1")
 
         if demo_sel == "1":
             run_debug_flow(
@@ -732,5 +834,14 @@ def run_wizard():
                 spec_path="projects/fifo/specs/spec.md",
                 rtl_path="projects/fifo/rtl/",
                 output_dir="output/demo_fifo_plan",
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+        elif demo_sel == "5":
+            run_sim_flow(
+                provider, api_key, model_name,
+                rtl_path="examples/rtl/alu.sv",
+                tb_path="examples/tb/alu_tb.sv",
+                spec_path="examples/specs/alu_spec.md",
+                output_dir="output/demo_alu_closed_loop",
                 airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
             )

@@ -22,9 +22,10 @@ and less mature SystemVerilog class/UVM support — pick it explicitly via
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Tuple
 
 from verisight.utils.file_utils import discover_files, RTL_EXTENSIONS, TB_EXTENSIONS
 from verisight.utils.logger import get_logger
@@ -43,6 +44,14 @@ SIM_INSTALL_HINTS = {
         "  Debian/Ubuntu: sudo apt install verilator\n"
         "  macOS:         brew install verilator\n"
         "Or build from source: https://github.com/verilator/verilator"
+    ),
+    "questa": (
+        "vlog/vsim were not found on PATH. Ensure Siemens Questa SIM / ModelSim "
+        "is installed and added to your environment PATH."
+    ),
+    "vcs": (
+        "vcs was not found on PATH. Ensure Synopsys VCS is installed and added "
+        "to your environment PATH."
     ),
 }
 
@@ -76,14 +85,47 @@ class SimulationError(RuntimeError):
 class SimResult:
     log_path: Path
     vcd_path: Path
-    returncode: int
-    simulator: str
-    top_module: str
+    returncode: int = 0
+    simulator: str = ""
+    top_module: str = ""
+    coverage_path: Optional[Path] = None
+    duration_s: float = 0.0
+    error_count: int = 0
+    warning_count: int = 0
+    success: bool = False
+
+    def __post_init__(self):
+        if not self.success:
+            self.success = (self.returncode == 0 and self.error_count == 0)
+
+
+def find_best_simulator() -> str:
+    """Auto-detect the best available simulator on system PATH."""
+    if shutil.which("vsim"):
+        return "questa"
+    if shutil.which("vcs"):
+        return "vcs"
+    if shutil.which("iverilog"):
+        return "iverilog"
+    if shutil.which("verilator"):
+        return "verilator"
+    return "iverilog"
 
 
 def find_simulator(name: str) -> str:
-    """Resolve the primary binary for a simulator ('iverilog' or 'verilator')."""
-    binary = shutil.which(name)
+    """Resolve the primary binary for a simulator ('iverilog', 'verilator', 'questa', 'vcs')."""
+    if name == "auto":
+        name = find_best_simulator()
+
+    bin_map = {
+        "iverilog": "iverilog",
+        "verilator": "verilator",
+        "questa": "vsim",
+        "modelsim": "vsim",
+        "vcs": "vcs",
+    }
+    target = bin_map.get(name, name)
+    binary = shutil.which(target)
     if not binary:
         raise SimulatorNotFoundError(SIM_INSTALL_HINTS.get(name, f"{name} not found on PATH"))
     return binary
@@ -185,6 +227,7 @@ def run_iverilog(
     find_simulator("iverilog")
     vvp_bin = find_simulator("vvp")
 
+    start_time = time.time()
     output_dir.mkdir(parents=True, exist_ok=True)
     sources, all_files = _collect_sources(rtl_path, tb_path)
     if not sources:
@@ -247,6 +290,18 @@ def run_iverilog(
     log_path.write_text(run_result.stdout + run_result.stderr)
     logger.info(f"Simulation log written to {log_path}")
 
+    # If the user's testbench produced a local sim.vcd in the cwd, move it to output_dir
+    local_vcd = Path("sim.vcd")
+    if local_vcd.exists() and not vcd_path.exists():
+        try:
+            shutil.move(str(local_vcd), str(vcd_path))
+        except Exception:
+            pass
+
+    full_log = run_result.stdout + run_result.stderr
+    log_path.write_text(full_log)
+    logger.info(f"Simulation log written to {log_path}")
+
     if not vcd_path.exists():
         logger.warning(
             f"Simulation completed but no VCD was produced at {vcd_path} — "
@@ -254,9 +309,17 @@ def run_iverilog(
             f"testbench finished before the dump wrapper's initial block ran"
         )
 
+    err_matches = len(re.findall(r"(?:UVM_ERROR|UVM_FATAL|Error:|MISMATCH:|FAILED)", full_log, re.IGNORECASE))
+    duration_s = round(time.time() - start_time, 2)
+
     return SimResult(
-        log_path=log_path, vcd_path=vcd_path,
-        returncode=run_result.returncode, simulator="iverilog", top_module=top_module,
+        log_path=log_path,
+        vcd_path=vcd_path,
+        returncode=run_result.returncode,
+        simulator="iverilog",
+        top_module=top_module,
+        duration_s=duration_s,
+        error_count=err_matches,
     )
 
 
@@ -269,11 +332,7 @@ def run_verilator(
     timeout_s: int = 300,
 ) -> SimResult:
     """
-    Compile and run with Verilator (--binary --trace). Experimental/
-    best-effort backend: Verilator's SystemVerilog class/UVM support is
-    less complete than Icarus's for typical UVM-lite testbenches, so this
-    is offered for users who need raw simulation speed on synthesizable-
-    heavy designs and have already validated their TB compiles under it.
+    Compile and run with Verilator (--binary --trace).
     """
     find_simulator("verilator")
 
@@ -290,6 +349,7 @@ def run_verilator(
 
     log_path = output_dir / "sim.log"
     include_dirs = sorted({str(p.resolve().parent) for p in all_files})
+    start_time = time.time()
 
     cmd = [
         "verilator", "--binary", "--trace", "--timing",
@@ -325,39 +385,260 @@ def run_verilator(
             f"Simulation timed out after {timeout_s}s. Partial log saved to {log_path}"
         )
 
-    log_path.write_text(run_result.stdout + run_result.stderr)
+    full_log = run_result.stdout + run_result.stderr
+    log_path.write_text(full_log)
     logger.info(f"Simulation log written to {log_path}")
 
     # Verilator's --trace writes VCD next to the binary's cwd by default.
     vcd_path = next(output_dir.glob("*.vcd"), output_dir / "sim.vcd")
+    duration_s = round(time.time() - start_time, 2)
+    err_matches = len(re.findall(r"(?:UVM_ERROR|UVM_FATAL|Error:|MISMATCH:|FAILED)", full_log, re.IGNORECASE))
 
     return SimResult(
-        log_path=log_path, vcd_path=vcd_path,
-        returncode=run_result.returncode, simulator="verilator", top_module=top_module,
+        log_path=log_path,
+        vcd_path=vcd_path,
+        returncode=run_result.returncode,
+        simulator="verilator",
+        top_module=top_module,
+        duration_s=duration_s,
+        error_count=err_matches,
+    )
+
+
+def run_questa(
+    rtl_path: str,
+    tb_path: str,
+    top_module: str,
+    output_dir: Path,
+    uvm_home: str = "",
+    timeout_s: int = 300,
+) -> SimResult:
+    """Compile with vlog and simulate with vsim, generating UCDB coverage and VCD."""
+    find_simulator("questa")
+    vlog_bin = shutil.which("vlog") or "vlog"
+    vsim_bin = shutil.which("vsim") or "vsim"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    sources, all_files = _collect_sources(rtl_path, tb_path)
+    if not sources:
+        raise SimulationError(f"No RTL/TB source files found under {rtl_path!r}, {tb_path!r}")
+
+    top_module = top_module or _guess_top_module(all_files)
+    if not top_module:
+        raise SimulationError("Could not determine top module to simulate")
+
+    log_path = output_dir / "sim.log"
+    vcd_path = output_dir / "sim.vcd"
+    ucdb_path = output_dir / "coverage.ucdb"
+    start_time = time.time()
+
+    include_dirs = sorted({str(p.resolve().parent) for p in all_files})
+    work_dir = output_dir / "work"
+
+    vlog_cmd = [vlog_bin, "-sv", "+cover=bcesfx", "-work", str(work_dir)]
+    for d in include_dirs:
+        vlog_cmd += ["+incdir+" + d]
+    if uvm_home:
+        vlog_cmd += ["+incdir+" + uvm_home]
+    vlog_cmd += [str(p) for p in sources]
+
+    logger.info(f"Compiling with Questa vlog: {' '.join(vlog_cmd)}")
+    c_res = subprocess.run(vlog_cmd, capture_output=True, text=True)
+    if c_res.returncode != 0:
+        raise SimulationError(f"Questa vlog failed:\n{c_res.stderr or c_res.stdout}")
+
+    do_commands = f"coverage save -onexit {ucdb_path}; vcd file {vcd_path}; vcd add -r /*; run -all; quit"
+    vsim_cmd = [vsim_bin, "-c", "-do", do_commands, "-lib", str(work_dir), top_module]
+    logger.info(f"Running Questa vsim: {' '.join(vsim_cmd)}")
+    run_result = subprocess.run(vsim_cmd, capture_output=True, text=True, timeout=timeout_s)
+
+    full_log = run_result.stdout + run_result.stderr
+    log_path.write_text(full_log)
+    duration_s = round(time.time() - start_time, 2)
+    err_matches = len(re.findall(r"(?:UVM_ERROR|UVM_FATAL|Error:|MISMATCH:|FAILED)", full_log, re.IGNORECASE))
+
+    return SimResult(
+        log_path=log_path,
+        vcd_path=vcd_path,
+        returncode=run_result.returncode,
+        simulator="questa",
+        top_module=top_module,
+        coverage_path=ucdb_path if ucdb_path.exists() else None,
+        duration_s=duration_s,
+        error_count=err_matches,
     )
 
 
 def run_simulation(
-    rtl_path: str,
-    tb_path: str,
-    simulator: str = "iverilog",
+    rtl_path: Optional[Any] = None,
+    tb_path: Optional[Any] = None,
+    simulator: str = "auto",
     top_module: str = "",
     uvm_home: str = "",
     timeout_s: int = 300,
-    output_dir: Optional[Path] = None,
+    output_dir: Optional[Any] = None,
+    **kwargs,
 ) -> SimResult:
     """
-    Dispatch to the requested simulator backend and return its SimResult.
-
-    Raises:
-        SimulatorNotFoundError: the simulator binary isn't installed.
-        SimulationError: compile failure, timeout, or no sources found.
+    Dispatch to the requested simulator backend ('auto', 'iverilog', 'verilator', 'questa')
+    and return its SimResult.
     """
+    rtl_in = rtl_path or kwargs.get("rtl_files")
+    tb_in = tb_path or kwargs.get("tb_files")
+    if not rtl_in or not tb_in:
+        raise ValueError("Both rtl_path and tb_path must be provided to run_simulation")
+
     output_dir = Path(output_dir) if output_dir else Path("output") / "sim"
 
+    if simulator == "auto":
+        simulator = find_best_simulator()
+        logger.info(f"Auto-selected simulator backend: {simulator}")
+
     if simulator == "iverilog":
-        return run_iverilog(rtl_path, tb_path, top_module, output_dir, uvm_home, timeout_s)
+        return run_iverilog(rtl_in, tb_in, top_module, output_dir, uvm_home, timeout_s)
     elif simulator == "verilator":
-        return run_verilator(rtl_path, tb_path, top_module, output_dir, uvm_home, timeout_s)
+        return run_verilator(rtl_in, tb_in, top_module, output_dir, uvm_home, timeout_s)
+    elif simulator in ("questa", "modelsim"):
+        return run_questa(rtl_in, tb_in, top_module, output_dir, uvm_home, timeout_s)
     else:
-        raise SimulationError(f"Unknown simulator '{simulator}' — expected 'iverilog' or 'verilator'")
+        raise SimulationError(
+            f"Unknown simulator '{simulator}' — expected 'auto', 'iverilog', 'verilator', or 'questa'"
+        )
+
+
+def execute_closed_loop_flow(
+    rtl_path: str,
+    tb_path: str,
+    spec_path: Optional[str] = None,
+    simulator: str = "auto",
+    top_module: str = "",
+    uvm_home: str = "",
+    timeout_s: int = 300,
+    output_dir: str = "output/closed_loop",
+    provider: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model_name: Optional[str] = None,
+    airgap: bool = False,
+    anonymize_rtl: bool = False,
+    local_endpoint: str = "",
+    launch_browser: bool = False,
+) -> Dict[str, Any]:
+    """
+    Unified One-Click Closed-Loop Simulation Runner:
+    1. Runs RTL + TB simulation via chosen or auto-detected simulator (Icarus / Verilator / Questa).
+    2. Collects sim.log and sim.vcd waveform trace.
+    3. Triggers Root-Cause Analysis (Agents 1-4 + Fix) -> generates report.html with embedded Waveform Studio!
+    4. If spec_path is provided, triggers VeriSight Plan -> correlates coverage & generates verification_plan.html!
+    5. Returns artifact paths and metrics.
+    """
+    from verisight.orchestrator import VeriSightPipeline
+    from verisight.plan.planner_orchestrator import VeriSightPlanner
+    from verisight.config import set_config, VeriSightConfig, LLMConfig
+
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    sim_out = out_path / "sim"
+
+    logger.info(f"Step 1: Running Simulation with {simulator} backend...")
+    sim_res = run_simulation(
+        rtl_path=rtl_path,
+        tb_path=tb_path,
+        simulator=simulator,
+        top_module=top_module,
+        uvm_home=uvm_home,
+        timeout_s=timeout_s,
+        output_dir=sim_out,
+    )
+
+    logger.info(
+        f"Simulation finished (exit={sim_res.returncode}, duration={sim_res.duration_s}s, "
+        f"{sim_res.error_count} error patterns detected in log)"
+    )
+
+    # Configure AI Engine
+    from verisight.config import (
+        set_config,
+        VeriSightConfig,
+        LLMConfig,
+        PipelineConfig,
+        ChromaConfig,
+        XTracerConfig,
+        FixConfig,
+    )
+
+    cfg = VeriSightConfig(
+        llm=LLMConfig(
+            provider=provider or "gemini",
+            api_key=api_key,
+            model_name=model_name or "gemini-2.0-flash",
+            airgap=airgap,
+            anonymize_rtl=anonymize_rtl,
+            local_endpoint=local_endpoint,
+        ),
+        pipeline=PipelineConfig(
+            output_dir=str(out_path / "debug"),
+            save_intermediates=True,
+            enable_rag=bool(api_key and not airgap),
+            verbose=False,
+        ),
+        chroma=ChromaConfig(),
+        xtracer=XTracerConfig(),
+        fix=FixConfig(enabled=True),
+    )
+    set_config(cfg)
+
+    # Step 2: Root-Cause Analysis Pipeline
+    logger.info("Step 2: Launching Autonomous Debug Analysis Engine...")
+    pipeline = VeriSightPipeline(config=cfg)
+    debug_report = pipeline.run(
+        log_path=str(sim_res.log_path),
+        rtl_path=rtl_path,
+        spec_path=spec_path,
+        tb_path=tb_path,
+        vcd_path=str(sim_res.vcd_path) if sim_res.vcd_path.exists() else None,
+        coverage_path=str(sim_res.coverage_path) if sim_res.coverage_path and sim_res.coverage_path.exists() else None,
+    )
+
+    # Step 3: Verification Plan & Live Coverage Cockpit
+    plan_report = None
+    if spec_path and Path(spec_path).exists():
+        logger.info("Step 3: Launching Autonomous Verification Plan Architect...")
+        planner = VeriSightPlanner(output_dir=str(out_path / "plan"))
+        cov_source = str(sim_res.coverage_path) if sim_res.coverage_path and sim_res.coverage_path.exists() else None
+        plan_report = planner.run(
+            spec_path=spec_path,
+            rtl_path=rtl_path,
+            design_name=sim_res.top_module or "DUT",
+            coverage_path=cov_source,
+        )
+
+    debug_html = out_path / "debug" / "report.html"
+    plan_html = (out_path / "plan" / "verification_plan.html") if plan_report else None
+
+    dashboards = {
+        "debug_report_html": str(debug_html),
+    }
+    if plan_html and plan_html.exists():
+        dashboards["plan_cockpit_html"] = str(plan_html)
+
+    if launch_browser:
+        import webbrowser
+        if debug_html.exists():
+            webbrowser.open(f"file://{debug_html.resolve()}")
+        if plan_html and plan_html.exists():
+            webbrowser.open(f"file://{plan_html.resolve()}")
+
+    return {
+        "sim": sim_res,
+        "sim_result": sim_res,
+        "rca": debug_report,
+        "debug_report": debug_report,
+        "plan": plan_report,
+        "plan_report": plan_report,
+        "dashboards": dashboards,
+        "output_dir": out_path,
+        "report_html": debug_html,
+        "plan_html": plan_html,
+        "vcd_path": sim_res.vcd_path,
+        "log_path": sim_res.log_path,
+    }
