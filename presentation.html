@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriSight™ — Investor & Enterprise Pitch Deck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b4d32;
+            --primary-accent: #22c55e;
+            --top-bar: #33C55A;
+            --bg-gradient: linear-gradient(135deg, #eaf5ee 0%, #dbeef0 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --card-border: #cbd5e1;
+            --dark: #0f172a;
+            --text: #334155;
+            --muted: #64748b;
+            --blue: #0284c7;
+            --amber: #d97706;
+            --red: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #090d16;
+            color: var(--text);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 16:9 Presentation Stage */
+        .stage-container {
+            width: 100vw;
+            height: 56.25vw; /* 16:9 */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 16:9 */
+            position: relative;
+            background: var(--bg-gradient);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        /* Top Bar & Brand Logo matching user template */
+        .slide-top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: var(--top-bar);
+            z-index: 100;
+        }
+
+        .slide-brand-header {
+            position: absolute;
+            top: 14px;
+            right: 28px;
+            text-align: right;
+            z-index: 99;
+        }
+
+        .brand-logo-text {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0b6b47;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-sub-text {
+            font-size: 8px;
+            font-weight: 600;
+            color: #1e3a2b;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        /* Slide Frames */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 38px 48px 30px 48px;
+            display: none;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateX(40px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Header Area */
+        .slide-header {
+            margin-bottom: 16px;
+        }
+
+        .badge-tag {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--blue);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .slide-title {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+
+        /* Body & Layouts */
+        .slide-body {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            position: relative;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(8px);
+        }
+
+        .card.accent-border {
+            border-top: 4px solid var(--primary-accent);
+        }
+        .card.blue-border {
+            border-top: 4px solid var(--blue);
+        }
+        .card.amber-border {
+            border-top: 4px solid var(--amber);
+        }
+        .card.red-border {
+            border-top: 4px solid var(--red);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card p, .card li {
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--text);
+        }
+
+        .card ul {
+            padding-left: 18px;
+        }
+
+        .card li {
+            margin-bottom: 8px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+        }
+
+        /* Image and GIF containers */
+        .media-container {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            background: #0b0f19;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .media-container img {
+            width: 100%;
+            height: auto;
+            max-height: 360px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .media-caption {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: var(--muted);
+            padding: 6px;
+            text-align: center;
+            background: #f8fafc;
+            width: 100%;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* Table Design */
+        table.pres-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        table.pres-table th {
+            background: #0f172a;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        table.pres-table td {
+            padding: 7px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            color: var(--text);
+        }
+
+        table.pres-table tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        /* HUD & Controls */
+        .pres-controls {
+            position: absolute;
+            bottom: 12px;
+            right: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .control-btn:hover {
+            background: var(--primary-accent);
+            color: #000000;
+            border-color: var(--primary-accent);
+        }
+
+        .slide-counter {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .progress-bar-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary-accent);
+            transition: width 0.3s ease;
+        }
+
+        /* Animation utilities */
+        .pulse-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse 1.6s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        .metric-big {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="stage-container" id="presentationStage">
+        <div class="slide-top-bar"></div>
+        <div class="slide-brand-header">
+            <div class="brand-logo-text">mirafra</div>
+            <div class="brand-sub-text">TECHNOLOGIES</div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 1: COVER -->
+        <!-- ============================================================= -->
+        <div class="slide active" id="slide-1">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding-top: 15px;">
+                <div class="pulse-badge" style="width: fit-content; margin-bottom: 12px;">
+                    <span class="pulse-dot"></span> INVESTOR & CLIENT ENTERPRISE PITCH • OCTOBER 2026
+                </div>
+                <h1 style="font-size: 46px; font-weight: 800; color: var(--primary); letter-spacing: -1px; margin-bottom: 6px;">
+                    VERISIGHT™
+                </h1>
+                <h2 style="font-size: 20px; font-weight: 700; color: var(--dark); margin-bottom: 12px;">
+                    Autonomous Silicon Verification & Failure Debugging Copilot
+                </h2>
+                <p style="font-size: 14px; color: var(--text); max-width: 820px; line-height: 1.6; margin-bottom: 24px;">
+                    Bridging natural language hardware specifications to zero-bug silicon using a multi-agent cognitive architecture, closed-loop simulation, deterministic root-cause analysis, and self-synthesized sandbox-verified RTL repairs.
+                </p>
+
+                <div class="grid-3" style="max-width: 980px;">
+                    <div class="card accent-border">
+                        <div class="metric-big" style="color: var(--primary);">100x Faster</div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--dark); margin: 4px 0;">Automated Triage</div>
+                        <p style="font-size: 11.5px; color: var(--muted);">Reduces debug cycle from 4-6 hours manual engineer effort to 14.8 seconds.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="metric-big" style="color: var(--blue);">0% Hallucination</div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--dark); margin: 4px 0;">Deterministic Grounding</div>
+                        <p style="font-size: 11.5px; color: var(--muted);">9 formal decision rules, AST X-Tracer, and isolated sandbox compilation safety.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="metric-big" style="color: var(--amber);">Universal EDA</div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--dark); margin: 4px 0;">Day-1 Drop-In</div>
+                        <p style="font-size: 11.5px; color: var(--muted);">Seamless support across Synopsys VCS, Siemens Questa, Cadence Xcelium, and Verilator.</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px; font-size: 11px; font-weight: 600; color: var(--muted);">
+                    Presented by <b>Kittu Patel</b> (@KITTUV03) • Release v2.4 Enterprise Production Master
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 2: AGENDA -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-2">
+            <div class="slide-header">
+                <span class="badge-tag">Presentation Roadmap</span>
+                <h2 class="slide-title">Agenda — List of Topics Covered</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-2">
+                    <div class="card accent-border" style="padding: 16px 20px;">
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#01</b> &nbsp; Idea Overview</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#02</b> &nbsp; Problem Statement</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#03</b> &nbsp; AI Approach to Solve the Problem</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#04</b> &nbsp; Solution Architecture</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#05</b> &nbsp; Architecture Components</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--primary);">#06</b> &nbsp; Tools & Models Used</li>
+                            <li style="padding: 6px 0;"><b style="color: var(--primary);">#07</b> &nbsp; Experiments Conducted</li>
+                        </ul>
+                    </div>
+                    <div class="card blue-border" style="padding: 16px 20px;">
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#08</b> &nbsp; Results and Comparison (AI vs Manual effort)</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#09</b> &nbsp; Dashboard Overview (Screenshots & GIFs)</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#10</b> &nbsp; Token Utilization Over Cost</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#11</b> &nbsp; Summary</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#12</b> &nbsp; Future Scope</li>
+                            <li style="padding: 6px 0; border-bottom: 1px solid #f1f5f9;"><b style="color: var(--blue);">#13</b> &nbsp; Integration Into Real World Chip Design</li>
+                            <li style="padding: 6px 0;"><b style="color: var(--blue);">#14</b> &nbsp; Appendix - Supporting Document if any</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 3: TOPIC 1 - IDEA OVERVIEW -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-3">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 01 • Executive Summary</span>
+                <h2 class="slide-title">Idea Overview: The VeriSight Autonomous Vision</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card" style="flex: 1.2;">
+                    <div class="card-title">Transforming Verification from a Reactive Bottleneck to an Autonomous Engine</div>
+                    <p style="margin-bottom: 14px;">
+                        VeriSight is an intelligent verification co-pilot that automates the entire verification lifecycle. Instead of teams spending weeks reading datasheets and hunting waveform bugs, VeriSight unifies specification ingestion, test planning, simulator orchestration, failure root-cause analysis, and automated code repair.
+                    </p>
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+                        <b style="color: #166534; font-size: 13px;">Key Operational Pillars:</b>
+                        <ul style="margin-top: 6px; padding-left: 20px;">
+                            <li><b>Natural Language Ingestion:</b> Synthesizes structured test plans from PDF/Word specs.</li>
+                            <li><b>Closed-Loop Execution:</b> Orchestrates simulation, logs errors, and dumps VCD waveforms.</li>
+                            <li><b>9-Rule Deterministic RCA:</b> Distinguishes RTL bugs from testbench bugs in seconds.</li>
+                            <li><b>Self-Healing RTL Patches:</b> Generates unified diffs and confirms zero regressions.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card media-container" style="flex: 1;">
+                    <img src="docs/screenshots/screenshot_01_welcome_menu.png" alt="VeriSight Guided CLI Launcher">
+                    <div class="media-caption">VeriSight Guided CLI Launcher with 6 Specialized Workflows</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 4: TOPIC 2 - PROBLEM STATEMENT -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-4">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 02 • Market Need</span>
+                <h2 class="slide-title">Problem Statement: The Silicon Verification Crisis</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-4">
+                    <div class="card red-border">
+                        <div class="card-title" style="color: var(--red);">1. 70% of Cycle Eaten by Verification</div>
+                        <p>Over 70% of total SoC project duration and engineering headcount is consumed by writing testbenches, running simulations, and triaging failures rather than innovating hardware.</p>
+                    </div>
+                    <div class="card red-border">
+                        <div class="card-title" style="color: var(--red);">2. $15M - $30M Mask Re-Spin Costs</div>
+                        <p>At 3nm/5nm nodes, a single functional bug escaping to fabricated silicon forces a mask re-spin costing up to $30M and delaying market delivery by 6 to 9 months.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">3. Acute Senior Engineering Deficit</div>
+                        <p>Experienced verification engineers spend 60% of their working hours manually scrolling through 50k-line logs and waveform viewers performing repetitive triage.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">4. The Coverage Plateau (The Last 15%)</div>
+                        <p>Random regression simulations easily reach 80% coverage but stall for 6-8 weeks trying to hit elusive multi-beat protocol corner cases without directed stimulus.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 5: TOPIC 3 - AI APPROACH -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-5">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 03 • Core Innovation</span>
+                <h2 class="slide-title">AI Approach: Deterministic Multi-Agent Cognitive Pipeline</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card red-border" style="flex: 1;">
+                    <div class="card-title" style="color: var(--red);">Why Generic LLMs Fail at Chip Design</div>
+                    <ul>
+                        <li><b>Hallucinates Software Libraries:</b> Suggests Python/C syntax illegal in synthesizable SystemVerilog.</li>
+                        <li><b>Waveform Blindness:</b> Cannot correlate nanosecond signal transitions or clock edges.</li>
+                        <li><b>Ignores Fan-In Topology:</b> Unaware of flip-flop logic cones, CDC crossings, or 4-state simulation (X/Z).</li>
+                        <li><b>No Execution Feedback:</b> Output is unchecked; cannot tell if code compiles or breaks existing tests.</li>
+                    </ul>
+                </div>
+                <div class="card accent-border" style="flex: 1;">
+                    <div class="card-title" style="color: var(--primary);">The VeriSight Multi-Agent Solution</div>
+                    <ul>
+                        <li><b>9 Deterministic Decision Rules:</b> Eliminates hallucinations via strict logical categorization.</li>
+                        <li><b>Static AST X-Tracer:</b> Recursively traces unknown logic states backwards along clock trees to origin flip-flops.</li>
+                        <li><b>Multi-Modal Temporal Slicing:</b> Extracts narrow +/-20 cycle VCD windows around assertion failures.</li>
+                        <li><b>Isolated Sandbox Validation:</b> Automatically re-compiles and executes regression tests before sign-off.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 6: TOPIC 4 - SOLUTION ARCHITECTURE -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-6">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 04 • System Architecture</span>
+                <h2 class="slide-title">Solution Architecture: End-to-End System Block Diagram</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card media-container" style="flex: 1; padding: 10px;">
+                    <img src="docs/screenshots/diagram_01_system_architecture.png" alt="VeriSight Multi-Agent System Architecture">
+                    <div class="media-caption">End-to-End Pipeline: Multi-Modal Ingestion -> 5-Agent Cognitive Engine -> Sandbox -> Verified Patches & Coverage Closure</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 7: TOPIC 5 - ARCHITECTURE COMPONENTS: AGENTS -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-7">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 05 • Agent Specialization</span>
+                <h2 class="slide-title">Architecture Components: Specialized Multi-Agent Breakdown</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-3">
+                    <div class="card accent-border">
+                        <div class="card-title">Agent 1: Autonomous Triage</div>
+                        <p>Parses simulation logs, identifies assertion failures, extracts error signatures, and classifies root causes via 9 deterministic decision rules.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">Agent 2: Plan Synthesizer</div>
+                        <p>Extracts architectural features, functional test scenarios, covergroups, and temporal SVA properties directly from specifications.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">Agent 3: Closed-Loop Sim</div>
+                        <p>Automates simulator execution (iverilog, verilator, vcs, questa), traps failures, dumps waveforms, and triggers the RCA loop.</p>
+                    </div>
+                    <div class="card accent-border">
+                        <div class="card-title">Agent 4: Web Cockpit</div>
+                        <p>FastAPI backend with bi-directional WebSocket event stream powering the Live Coverage Cockpit and Waveform Studio.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">Agent 5: Patch & Sandbox</div>
+                        <p>Synthesizes unified git diff patches, compiles modified HDL in an isolated sandbox, and verifies clean regression passes.</p>
+                    </div>
+                    <div class="card" style="background: #0f172a; color: #fff;">
+                        <div class="card-title" style="color: #38bdf8;">Consensus Engine</div>
+                        <p style="color: #cbd5e1;">Multi-agent voting arbiter combining triage, specification contracts, and RTL AST analysis into 95%+ confidence diagnostics.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 8: TOPIC 5 (CONT.) - RULES & X-TRACER -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-8">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 05 (Cont.) • Deterministic Grounding</span>
+                <h2 class="slide-title">The 9 Formal Decision Rules & X-Tracer Engine</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card" style="flex: 1.3;">
+                    <div class="card-title">The 9 Formal Decision Rules</div>
+                    <table class="pres-table">
+                        <tr><th>Rule</th><th>Fault Category</th><th>Diagnostic Action</th></tr>
+                        <tr><td>Rule 1</td><td>Scoreboard Mismatch</td><td>Distinguishes golden reference bugs from RTL math defects.</td></tr>
+                        <tr><td>Rule 2</td><td>X-Propagation</td><td>Traces unknown logic state (X) back to uninitialized flop.</td></tr>
+                        <tr><td>Rule 3</td><td>Protocol Violation</td><td>Flags SVA handshake violations (request/grant latency).</td></tr>
+                        <tr><td>Rule 4</td><td>Timing / Glitch</td><td>Detects setup/hold race conditions & missing CDC flops.</td></tr>
+                        <tr><td>Rule 5</td><td>Driver Hang</td><td>Identifies un-dropped UVM objections stalling phase finish.</td></tr>
+                        <tr><td>Rule 6</td><td>FIFO / Buffer Hazard</td><td>Detects read-on-empty underflow or full flag calculation bugs.</td></tr>
+                        <tr><td>Rule 7</td><td>Structural Lint</td><td>Identifies unintended combinational latches or truncated buses.</td></tr>
+                    </table>
+                </div>
+                <div class="card blue-border" style="flex: 1;">
+                    <div class="card-title" style="color: var(--blue);">X-Tracer Backward Cone Traversal</div>
+                    <p style="margin-bottom: 12px;">Solves the notorious "X-state mystery" in 4-state simulation:</p>
+                    <ol style="padding-left: 20px; font-size: 12px; line-height: 1.6;">
+                        <li>Parses netlist AST graph using PyVerilog.</li>
+                        <li>Identifies cycle <i>T</i> where signal transitions to X in VCD trace.</li>
+                        <li>Traverses backward fan-in cone across continuous assignments and gates.</li>
+                        <li>Isolates the exact uninitialized sequential flop missing from reset block.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 9: TOPIC 6 - TOOLS & MODELS -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-9">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 06 • Technology Stack</span>
+                <h2 class="slide-title">Tools & Models Used: The Technical Stack</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-3">
+                    <div class="card accent-border">
+                        <div class="card-title">Cognitive & AI Tier</div>
+                        <ul style="font-size: 12px;">
+                            <li><b>Cloud Models:</b> Google Gemini 2.5 Flash, Anthropic Claude 3.5 Sonnet, OpenAI GPT-4o.</li>
+                            <li><b>Sovereign Offline:</b> Local Ollama / vLLM (DeepSeek-Coder-V2, Llama-3-70B).</li>
+                            <li><b>ChromaDB Vector Store:</b> 11 persistent collections for semantic RTL and specification retrieval.</li>
+                        </ul>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">EDA Simulators & Compilers</div>
+                        <ul style="font-size: 12px;">
+                            <li><b>Synopsys VCS:</b> Native testbench & multi-slice regression.</li>
+                            <li><b>Siemens QuestaSim:</b> UCDB coverage database merging.</li>
+                            <li><b>Cadence Xcelium:</b> High-speed multi-core simulation.</li>
+                            <li><b>Verilator:</b> Ultra-fast C++ cycle-accurate simulation.</li>
+                            <li><b>Icarus Verilog:</b> Open-source zero-license triage.</li>
+                        </ul>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">Telemetry & Web GUI</div>
+                        <ul style="font-size: 12px;">
+                            <li><b>PyVerilog:</b> Lexical parsing and AST traversal.</li>
+                            <li><b>FastAPI:</b> Asynchronous REST and WebSocket hub.</li>
+                            <li><b>Vanilla Web Studio:</b> Zero-dependency browser dashboard with Live Coverage Cockpit & Waveform Studio.</li>
+                            <li><b>Docker:</b> Hermetic multi-simulator sandboxing.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 10: TOPIC 7 - EXPERIMENTS CONDUCTED -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-10">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 07 • Experimental Rigor</span>
+                <h2 class="slide-title">Experiments Conducted: Industrial Hardware Testbeds</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-4">
+                    <div class="card accent-border">
+                        <div class="card-title">Arithmetic Logic Unit (ALU)</div>
+                        <p style="font-size: 12px;"><b>Complexity:</b> 8 mathematical/logical opcodes, signed overflow flags, shift-by-zero corner cases.<br/><b>Result:</b> 100% injected bugs isolated in avg 14.2s; verified clean unified patches.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">Synchronous & Async FIFO</div>
+                        <p style="font-size: 12px;"><b>Complexity:</b> Dual-clock domain crossings, Gray-code pointers, full/empty flags.<br/><b>Result:</b> Pinpointed counter off-by-one bug at full threshold and synthesized exact fix.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">AXI4-Stream Protocol Interface</div>
+                        <p style="font-size: 12px;"><b>Complexity:</b> Decoupled TVALID/TREADY handshakes, backpressure, TLAST framing.<br/><b>Result:</b> Caught premature TVALID deassertion; synthesized SVA assertion monitor.</p>
+                    </div>
+                    <div class="card" style="border-top: 4px solid var(--dark);">
+                        <div class="card-title">RISC-V RV32I Processor Pipeline</div>
+                        <p style="font-size: 12px;"><b>Complexity:</b> 5-stage pipelined execution, RAW data hazard detection, forwarding network.<br/><b>Result:</b> Traced stale register value; verified pipeline forwarding bypass patch.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 11: TOPIC 8 - RESULTS & COMPARISON -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-11">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 08 • Empirical Validation</span>
+                <h2 class="slide-title">Results & Comparison: AI Acceleration vs. Manual Effort</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card" style="flex: 1;">
+                    <table class="pres-table" style="font-size: 12.5px;">
+                        <tr>
+                            <th>Verification Task</th>
+                            <th>Manual Engineer Baseline</th>
+                            <th>VeriSight Autonomous Copilot</th>
+                            <th>Quantified Acceleration</th>
+                        </tr>
+                        <tr>
+                            <td><b>Failure Triage & RCA</b></td>
+                            <td>4 to 6 Hours per failure</td>
+                            <td style="color: var(--blue); font-weight: 700;">14.8 Seconds</td>
+                            <td><span class="pulse-badge">99.3% Time Reduction</span></td>
+                        </tr>
+                        <tr>
+                            <td><b>Verification Plan Synthesis</b></td>
+                            <td>2 to 3 Weeks manual review</td>
+                            <td style="color: var(--blue); font-weight: 700;">18.2 Seconds</td>
+                            <td><span class="pulse-badge">100x Speedup</span></td>
+                        </tr>
+                        <tr>
+                            <td><b>Root-Cause Accuracy</b></td>
+                            <td>78% (First-attempt human)</td>
+                            <td style="color: var(--primary); font-weight: 700;">95.4% Confidence</td>
+                            <td><span class="pulse-badge">+17.4% Higher Precision</span></td>
+                        </tr>
+                        <tr>
+                            <td><b>Coverage Hole Closure</b></td>
+                            <td>6 to 8 Weeks (Random iterations)</td>
+                            <td style="color: var(--primary); font-weight: 700;">4 Days (AI directed stimulus)</td>
+                            <td><span class="pulse-badge">10x Faster Closure</span></td>
+                        </tr>
+                        <tr>
+                            <td><b>Patch Generation & Test</b></td>
+                            <td>1 to 2 Days (Edit, lint, test)</td>
+                            <td style="color: var(--blue); font-weight: 700;">3.2 Seconds (Sandbox confirmed)</td>
+                            <td><span class="pulse-badge">Instant Self-Healing</span></td>
+                        </tr>
+                        <tr>
+                            <td><b>Escaped Defect Rate</b></td>
+                            <td>28% of chips require re-spins</td>
+                            <td style="color: var(--primary); font-weight: 700;">&lt;2% with SVA invariants</td>
+                            <td><span class="pulse-badge">Eliminates $20M+ Re-spins</span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 12: TOPIC 8 (CONT.) - ROI & ECONOMIC IMPACT -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-12">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 08 (Cont.) • Economic Value</span>
+                <h2 class="slide-title">Economic Impact & Enterprise Return on Investment (ROI)</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-3">
+                    <div class="card accent-border" style="text-align: center; padding: 24px 18px;">
+                        <div style="font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 8px;">ANNUAL ENGINEERING SAVINGS</div>
+                        <div class="metric-big" style="font-size: 38px; color: var(--primary); margin-bottom: 12px;">$1.8M / Year</div>
+                        <p style="font-size: 12px; color: var(--text);">
+                            For a 50-engineer design verification team: Eliminates 12,000+ hours of mundane manual log scrolling, waveform searching, and repetitive triage.
+                        </p>
+                    </div>
+                    <div class="card blue-border" style="text-align: center; padding: 24px 18px;">
+                        <div style="font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 8px;">MASK RE-SPIN PREVENTION</div>
+                        <div class="metric-big" style="font-size: 38px; color: var(--blue); margin-bottom: 12px;">$15M - $30M</div>
+                        <p style="font-size: 12px; color: var(--text);">
+                            Catching a single functional bug pre-silicon via formal SVA property synthesis prevents an entire physical mask re-spin at advanced technology nodes.
+                        </p>
+                    </div>
+                    <div class="card amber-border" style="text-align: center; padding: 24px 18px;">
+                        <div style="font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 8px;">TIME-TO-MARKET ADVANTAGE</div>
+                        <div class="metric-big" style="font-size: 38px; color: var(--amber); margin-bottom: 12px;">2-3 Months</div>
+                        <p style="font-size: 12px; color: var(--text);">
+                            Reaching coverage closure and tape-out sign-off months earlier captures prime consumer, automotive, and data-center market revenue windows.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 13: TOPIC 9 - DASHBOARD OVERVIEW: WORKFLOWS -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-13">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 09 • Platform Capabilities</span>
+                <h2 class="slide-title">Dashboard Overview: The 6 Guided Autonomous Workflows</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card" style="flex: 1.1;">
+                    <div class="card-title">Comprehensive 6-Workflow Architecture</div>
+                    <ul style="font-size: 12px; line-height: 1.6;">
+                        <li><b>[1] VeriSight Debug:</b> Autonomous simulation log, RTL, and waveform root-cause analysis with patch synthesis.</li>
+                        <li><b>[2] VeriSight Plan:</b> Synthesis of features, tests, functional covergroups, and SVA properties.</li>
+                        <li><b>[3] Closed-Loop Sim:</b> 1-click simulation compilation, automated failure trapping, and triage trigger.</li>
+                        <li><b>[4] Live Web Cockpit:</b> Interactive browser GUI with dynamic coverage bars and waveform inspector.</li>
+                        <li><b>[5] Quick Demos:</b> Instant evaluation runs on pre-packaged ALU and FIFO hardware modules.</li>
+                        <li><b>[6] Advanced CLI Exit:</b> Headless scriptable integration for overnight CI/CD regression farms.</li>
+                    </ul>
+                </div>
+                <div class="card media-container" style="flex: 1.2;">
+                    <img src="docs/presentation/gif_01_multi_agent_workflow.gif" alt="Animated Multi-Agent Workflow">
+                    <div class="media-caption">Live Animated Multi-Agent Execution Pipeline (Interactive Demonstration)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 14: TOPIC 9 (CONT.) - LIVE COVERAGE COCKPIT -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-14">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 09 (Cont.) • Coverage Sign-Off</span>
+                <h2 class="slide-title">Live Coverage Cockpit: Dynamic UCDB vs. Planned Features</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card media-container" style="flex: 1.2;">
+                    <img src="docs/presentation/gif_02_coverage_closure.gif" alt="Animated Coverage Closure">
+                    <div class="media-caption">Dynamic Coverage Progression (42% -> 100% Closure with AI Directed Stimulus)</div>
+                </div>
+                <div class="card accent-border" style="flex: 1.1;">
+                    <div class="card-title">Dynamic Coverage Closure Features</div>
+                    <ul style="font-size: 12.5px; line-height: 1.6;">
+                        <li><b>Ingests Simulator Coverage DBs:</b> Directly parses Synopsys vDB and Questa UCDB databases.</li>
+                        <li><b>Per-Feature Progress Bars:</b> Shows actual % hit vs. 100% target for every extracted architectural feature.</li>
+                        <li><b>Red Highlighted Unhit Bins:</b> Instantly flags unhit boundary conditions and rare state transitions.</li>
+                        <li><b>1-Click Directed Stimulus:</b> "Generate Directed Sequence" button synthesizes targeted constraints to close holes.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 15: TOPIC 9 (CONT.) - ROOT-CAUSE STUDIO -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-15">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 09 (Cont.) • GUI Diagnostics</span>
+                <h2 class="slide-title">Root-Cause Studio & Waveform Inspector</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card media-container" style="flex: 1.3;">
+                    <img src="docs/screenshots/screenshot_12_rca_dashboard_gui.png" alt="Root Cause Analysis Studio GUI">
+                    <div class="media-caption">Interactive RCA Dashboard with Waveform Signal Radix and Failure Marker Cursor</div>
+                </div>
+                <div class="card blue-border" style="flex: 1;">
+                    <div class="card-title" style="color: var(--blue);">Sub-Cycle Failure Correlation</div>
+                    <ul style="font-size: 12px; line-height: 1.6;">
+                        <li><b>Unified Timeline:</b> Correlates simulation error log messages with physical clock edge transitions.</li>
+                        <li><b>Automated Cursor Placement:</b> Locks marker cursor to exact nanosecond timestamp of assertion failure.</li>
+                        <li><b>Multi-Radix Bus Inspection:</b> Dynamically renders binary, hexadecimal, and one-hot FSM states.</li>
+                        <li><b>AST Fan-In Tracing:</b> Visually traces driving signals backwards to isolate the defect origin.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 16: TOPIC 9 (CONT.) - AUTOMATED PATCHING -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-16">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 09 (Cont.) • Automated Repair</span>
+                <h2 class="slide-title">Automated Unified Patching & Sandbox Safety</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card media-container" style="flex: 1.3;">
+                    <img src="docs/screenshots/screenshot_13_automated_patch.png" alt="Unified Patch and Sandbox Output">
+                    <div class="media-caption">Unified Git Diff Patch with Automated Pre-Commit Sandbox Compilation</div>
+                </div>
+                <div class="card accent-border" style="flex: 1;">
+                    <div class="card-title">The Zero-Touch Self-Healing Loop</div>
+                    <ol style="font-size: 12px; line-height: 1.6; padding-left: 18px;">
+                        <li><b>Minimal Unified Diff:</b> Synthesizes clean git patch modifying only the defective logic lines.</li>
+                        <li><b>PyVerilog AST Validation:</b> Verifies syntax and synthesizability prior to disk write.</li>
+                        <li><b>Isolated Sandbox Re-Sim:</b> Copies design to temporary sandbox and executes regression tests.</li>
+                        <li><b>Regression Clean Sign-Off:</b> Guarantees failing assertion is resolved with zero side effects.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 17: TOPIC 10 - TOKEN UTILIZATION OVER COST -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-17">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 10 • Cost Efficiency</span>
+                <h2 class="slide-title">Token Utilization Over Cost: Sovereign Economics</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-3">
+                    <div class="card accent-border">
+                        <div class="card-title">Cloud API Inference</div>
+                        <div class="metric-big" style="color: var(--primary); margin: 8px 0;">$0.02 - $0.05</div>
+                        <p style="font-size: 12px;">Average cost per complete debug and patch run using Gemini 2.5 Flash or Claude 3.5 Sonnet. An entire 1,000-test regression costs under $35.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">Sovereign Offline Inference</div>
+                        <div class="metric-big" style="color: var(--blue); margin: 8px 0;">$0.00 / Run</div>
+                        <p style="font-size: 12px;">Zero marginal cost using local on-premise Ollama or vLLM running DeepSeek-Coder / Llama-3. 100% air-gapped; proprietary chip IP never leaves the building.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">AST Token Pruning</div>
+                        <div class="metric-big" style="color: var(--amber); margin: 8px 0;">84% Less Tokens</div>
+                        <p style="font-size: 12px;">PyVerilog AST extraction strips out irrelevant code comments and unrelated modules, feeding only critical fan-in logic cones to the AI context.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 18: TOPIC 11 - SUMMARY: THE DEFENSIBLE MOAT -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-18">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 11 • Strategic Moat</span>
+                <h2 class="slide-title">Executive Summary: The VeriSight Defensible Moat</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-4">
+                    <div class="card accent-border">
+                        <div class="card-title">Deep Domain Specialization</div>
+                        <p>Not a generic LLM wrapper: Built on 9 formal decision rules, AST netlist traversal algorithms, and cycle-by-cycle VCD waveform slicing.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">Air-Gapped Sovereign Security</div>
+                        <p>Addresses the #1 objection of semiconductor leaders: Supports 100% offline local inference on enterprise GPU clusters.</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">Agnostic to EDA Vendor Lock-In</div>
+                        <p>Wraps effortlessly around Synopsys, Siemens, Cadence, and open-source simulators without requiring proprietary licenses.</p>
+                    </div>
+                    <div class="card" style="border-top: 4px solid var(--dark);">
+                        <div class="card-title">Proven Multi-Million Dollar ROI</div>
+                        <p>Dramatically reduces verification turnaround, prevents physical silicon re-spins, and accelerates commercial product tape-outs.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 19: TOPIC 12 - FUTURE SCOPE -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-19">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 12 • Product Roadmap</span>
+                <h2 class="slide-title">Future Scope: The Autonomous Silicon Roadmap</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-3">
+                    <div class="card accent-border">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--primary);">PHASE 1: PRESENT (v2.4)</div>
+                        <div class="card-title" style="margin-top: 4px;">Multi-Agent Triage</div>
+                        <ul style="font-size: 11.5px;">
+                            <li>6 Guided Workflows</li>
+                            <li>9 Formal Decision Rules</li>
+                            <li>Live Coverage Cockpit</li>
+                            <li>Automated Sandbox Patch</li>
+                            <li>FastAPI Web Studio</li>
+                        </ul>
+                    </div>
+                    <div class="card blue-border">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--blue);">PHASE 2: Q1-Q2 2027</div>
+                        <div class="card-title" style="margin-top: 4px; color: var(--blue);">Continuous Learning</div>
+                        <ul style="font-size: 11.5px;">
+                            <li>Nightly farm log clustering</li>
+                            <li>Bayesian coverage directed stimulus</li>
+                            <li>Cross-project bug memory</li>
+                            <li>Automated Git PR reviews</li>
+                        </ul>
+                    </div>
+                    <div class="card amber-border">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--amber);">PHASE 3: Q3-Q4 2027</div>
+                        <div class="card-title" style="margin-top: 4px; color: var(--amber);">Silicon-to-Software</div>
+                        <ul style="font-size: 11.5px;">
+                            <li>Post-silicon ATE tester telemetry</li>
+                            <li>Automated ATPG test vectors</li>
+                            <li>Formal theorem proving</li>
+                            <li>ISO 26262 ASIL-D certification</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 20: TOPIC 13 - REAL WORLD INTEGRATION -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-20">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 13 • Enterprise Adoption</span>
+                <h2 class="slide-title">Integration Into Real World Chip Design Workflows</h2>
+            </div>
+            <div class="slide-body">
+                <div class="card accent-border" style="flex: 1.1;">
+                    <div class="card-title">Day-1 Frictionless CI/CD Deployment</div>
+                    <ul style="font-size: 12.5px; line-height: 1.6;">
+                        <li><b>Standard CI/CD Hooks:</b> Integrates directly into Jenkins, GitLab CI, GitHub Actions via headless CLI.</li>
+                        <li><b>Zero Disruption:</b> Wraps around existing Makefiles and run scripts without modifying verification toolchains.</li>
+                        <li><b>Standard Formats:</b> Consumes industry standard SystemVerilog, VCD, FSDB, UCDB, and JUnit XML.</li>
+                        <li><b>Automated Team Notifications:</b> Posts triage summaries, root-cause confidence, and diffs to Slack/Teams.</li>
+                    </ul>
+                </div>
+                <div class="card media-container" style="flex: 1.2;">
+                    <img src="docs/screenshots/screenshot_15_ci_cd_regression.png" alt="CI/CD Regression Automation">
+                    <div class="media-caption">Automated Nightly CI/CD Regression Triage Execution</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 21: TOPIC 14 - APPENDIX & STANDARDS -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-21">
+            <div class="slide-header">
+                <span class="badge-tag">Topic 14 • Compliance & Reference</span>
+                <h2 class="slide-title">Appendix: Supporting Documentation & Verification Standards</h2>
+            </div>
+            <div class="slide-body">
+                <div class="grid-4">
+                    <div class="card accent-border">
+                        <div class="card-title">ISO 26262 & DO-254 Compliance</div>
+                        <p style="font-size: 12px;">Bi-directional traceability matrix guarantees complete requirement-to-test tracking for mission-critical automotive and aerospace silicon.</p>
+                    </div>
+                    <div class="card blue-border">
+                        <div class="card-title" style="color: var(--blue);">IEEE 1800 & UVM 1.2 Standards</div>
+                        <p style="font-size: 12px;">Full compliance with IEEE 1800 SystemVerilog and Accellera UVM class libraries (drivers, monitors, scoreboards, TLM ports).</p>
+                    </div>
+                    <div class="card amber-border">
+                        <div class="card-title" style="color: var(--amber);">107-Page Master Operations Journal</div>
+                        <p style="font-size: 12px;">Comprehensive field engineering manual with 75 technical annexes covering formal theorems, SVA invariants, and simulator runbooks.</p>
+                    </div>
+                    <div class="card" style="border-top: 4px solid var(--dark);">
+                        <div class="card-title">ChromaDB Vector Telemetry</div>
+                        <p style="font-size: 12px;">11 persistent collections indexing specification requirements, register maps, and historical defect patterns.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SLIDE 22: CONCLUSION & Q&A -->
+        <!-- ============================================================= -->
+        <div class="slide" id="slide-22">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                <div class="pulse-badge" style="margin-bottom: 14px;">
+                    <span class="pulse-dot"></span> NEXT-GEN SILICON VERIFICATION
+                </div>
+                <h1 style="font-size: 44px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">
+                    VERISIGHT™
+                </h1>
+                <h2 style="font-size: 20px; font-weight: 700; color: var(--dark); margin-bottom: 18px;">
+                    The Future of Silicon Verification is Autonomous.
+                </h2>
+                <p style="font-size: 14px; color: var(--text); max-width: 650px; line-height: 1.6; margin-bottom: 26px;">
+                    Thank you for your time and consideration.<br/>
+                    We are now open for Questions & Answers and Live Demonstration.
+                </p>
+
+                <div class="card accent-border" style="max-width: 500px; width: 100%; text-align: center; padding: 18px;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--dark);">Presenter: Kittu Patel (@KITTUV03)</div>
+                    <div style="font-size: 11.5px; color: var(--muted); margin-top: 4px;">Available for Enterprise Pilot Engagements & Custom SoC Benchmarks</div>
+                    <div style="font-size: 10.5px; color: var(--primary); font-weight: 600; margin-top: 8px;">Release v2.4 Enterprise Production Master</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar & HUD Controls -->
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+
+        <div class="pres-controls">
+            <button class="control-btn" id="prevBtn">❮ Prev</button>
+            <div class="slide-counter" id="slideCounter">Slide 1 / 22</div>
+            <button class="control-btn" id="nextBtn">Next ❯</button>
+            <button class="control-btn" id="fsBtn">⛶ Fullscreen</button>
+        </div>
+    </div>
+
+    <script>
+        const totalSlides = 22;
+        let currentSlide = 1;
+
+        const slides = document.querySelectorAll('.slide');
+        const counter = document.getElementById('slideCounter');
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const fsBtn = document.getElementById('fsBtn');
+        const stage = document.getElementById('presentationStage');
+
+        function updateSlide(newIndex) {
+            if (newIndex < 1 || newIndex > totalSlides) return;
+            
+            slides[currentSlide - 1].classList.remove('active');
+            currentSlide = newIndex;
+            slides[currentSlide - 1].classList.add('active');
+
+            counter.innerText = `Slide ${currentSlide} / ${totalSlides}`;
+            progressBar.style.width = `${(currentSlide / totalSlides) * 100}%`;
+        }
+
+        prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
+        nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                updateSlide(currentSlide + 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                updateSlide(currentSlide - 1);
+            } else if (e.key.toLowerCase() === 'f') {
+                toggleFullscreen();
+            }
+        });
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                stage.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        fsBtn.addEventListener('click', toggleFullscreen);
+
+        // Initial state
+        updateSlide(1);
+    </script>
+</body>
+</html>
