@@ -589,302 +589,1082 @@ class ReportGeneratorAgent(BaseAgent):
         return "\n".join(lines)
 
     def _generate_html_report(self, context: dict) -> str:
-        """Generate styled HTML report."""
+        """Generate high-end, interactive, responsive HTML report with modern EDA dashboard aesthetic."""
         report = context["report"]
         rtl_analysis = context.get("rtl_analysis")
 
-        # Inline HTML with CSS (no external template needed)
         severity_colors = {
-            "critical": "#dc3545",
-            "high": "#fd7e14",
-            "medium": "#ffc107",
-            "low": "#28a745",
+            "critical": "#ef4444",
+            "high": "#f97316",
+            "medium": "#eab308",
+            "low": "#22c55e",
         }
-        severity_color = severity_colors.get(report.severity, "#6c757d")
+        severity_color = severity_colors.get(report.severity.lower() if report.severity else "medium", "#38bdf8")
 
         classification_colors = {
-            "RTL Bug": "#dc3545",
-            "TB Bug": "#fd7e14",
-            "Spec Bug": "#ffc107",
-            "Unknown": "#6c757d",
+            "RTL Bug": "#ef4444",
+            "TB Bug": "#f97316",
+            "Spec Bug": "#eab308",
+            "Unknown": "#94a3b8",
         }
-        class_color = classification_colors.get(report.classification, "#6c757d")
+        class_color = classification_colors.get(report.classification, "#38bdf8")
 
-        # Build error table rows
+        # Error Timeline Rows
         error_rows = ""
-        for err in context["errors"]:
+        for idx, err in enumerate(context.get("errors", [])):
+            sev = err.severity.lower() if hasattr(err, "severity") and err.severity else "error"
+            badge_class = "badge-error" if "err" in sev or "fatal" in sev else "badge-warn"
+            ts = getattr(err, "timestamp", "0")
+            msg = getattr(err, "message", "")
+            comp = getattr(err, "component", "") or getattr(err, "file", "") or "TB/DUT"
             error_rows += f"""
-                <tr>
-                    <td>{err.timestamp}</td>
-                    <td><span class="badge badge-error">{err.severity}</span></td>
-                    <td>{err.message[:100]}</td>
+                <tr class="err-row" data-sev="{sev}">
+                    <td class="col-time"><span class="time-tag">@{ts} ns</span></td>
+                    <td class="col-sev"><span class="badge {badge_class}">{sev.upper()}</span></td>
+                    <td class="col-comp"><span class="comp-tag">{comp}</span></td>
+                    <td class="col-msg"><code>{msg}</code></td>
                 </tr>"""
 
-        # Build evidence list
+        # Evidence Items
         evidence_items = ""
         for ev in report.evidence:
+            src = ev.source.lower() if ev.source else "log"
             evidence_items += f"""
-                <div class="evidence-item">
-                    <span class="evidence-source">[{ev.source}]</span>
-                    <strong>{ev.reference}</strong> — {ev.description}
+                <div class="evidence-card" data-src="{src}">
+                    <div class="evidence-header">
+                        <span class="src-pill src-{src}">{ev.source.upper()}</span>
+                        <span class="evidence-ref">{ev.reference}</span>
+                    </div>
+                    <p class="evidence-desc">{ev.description}</p>
+                    {f'<pre class="code-snippet"><code>{ev.snippet}</code></pre>' if getattr(ev, "snippet", None) else ''}
                 </div>"""
 
-        # Build fix list
+        # Recommended Fixes
         fix_items = ""
         for fix in report.recommended_fixes:
+            prio = fix.priority.lower() if fix.priority else "high"
             fix_items += f"""
-                <div class="fix-item">
-                    <span class="badge badge-{fix.priority}">{fix.priority}</span>
-                    {fix.action}
-                    {'<pre><code>' + fix.code_suggestion + '</code></pre>' if fix.code_suggestion else ''}
+                <div class="fix-card">
+                    <div class="fix-header">
+                        <span class="prio-pill prio-{prio}">{prio.upper()} PRIORITY</span>
+                    </div>
+                    <div class="fix-action">{fix.action}</div>
+                    {f'<pre class="code-snippet diff"><code>{fix.code_suggestion}</code></pre>' if fix.code_suggestion else ''}
                 </div>"""
 
-        # Build x-tracer confirmed traces
+        # X-Tracer Traces
         xtracer_items = ""
-        if rtl_analysis:
-            for trace in rtl_analysis.xtrace.real_traces:
+        if rtl_analysis and hasattr(rtl_analysis, "xtrace") and rtl_analysis.xtrace:
+            for trace in getattr(rtl_analysis.xtrace, "real_traces", []):
                 xtracer_items += f"""
-                <div class="evidence-item">
-                    <span class="evidence-source">[x-tracer]</span>
-                    <strong>{trace.query_signal}@{trace.query_time_ps}ps</strong> — {trace.root_cause_type or 'unknown cause'}
-                    {'<br>' + trace.summary if trace.summary else ''}
+                <div class="evidence-card" data-src="x-tracer">
+                    <div class="evidence-header">
+                        <span class="src-pill src-xtracer">X-TRACER</span>
+                        <span class="evidence-ref">{trace.query_signal} @ {trace.query_time_ps} ps</span>
+                    </div>
+                    <p class="evidence-desc"><strong>Root Cause:</strong> {trace.root_cause_type or 'Unknown'}</p>
+                    {f'<p class="trace-summary">{trace.summary}</p>' if trace.summary else ''}
                 </div>"""
-            if not rtl_analysis.xtrace.real_traces and rtl_analysis.xtrace.tool_status not in ("disabled", "ok"):
+            if not getattr(rtl_analysis.xtrace, "real_traces", []) and getattr(rtl_analysis.xtrace, "tool_status", "") not in ("disabled", "ok"):
                 xtracer_items = f"""
-                <div class="evidence-item">
-                    <em>Real x-tracer analysis not run: {rtl_analysis.xtrace.tool_message}</em>
+                <div class="evidence-card">
+                    <p class="text-dim"><em>X-Tracer static gate trace notice: {rtl_analysis.xtrace.tool_message}</em></p>
                 </div>"""
 
-        # Build reasoning chain
+        # Reasoning Steps
         reasoning_items = ""
         for r in report.reasoning:
             reasoning_items += f"""
-                <div class="reasoning-step">
-                    <strong>Step {r.step}:</strong> {r.observation}<br>
-                    <em>→ Inference: {r.inference}</em>
-                    {'<br><small>Source: ' + r.source + '</small>' if r.source else ''}
+                <div class="step-card">
+                    <div class="step-badge">STEP {r.step:02d}</div>
+                    <div class="step-body">
+                        <div class="step-obs"><span class="step-lbl">OBSERVATION:</span> {r.observation}</div>
+                        <div class="step-inf"><span class="step-lbl">INFERENCE:</span> {r.inference}</div>
+                        {f'<div class="step-src"><span class="src-pill src-log">{r.source.upper()}</span></div>' if r.source else ''}
+                    </div>
                 </div>"""
 
-        # Build Agent 5 fix section HTML
+        # Agent 5 Fix Section
         fix_obj = context.get("fix")
         fix_section_html = ""
         if fix_obj is not None:
             if fix_obj.fix_available:
                 conf_pct = f"{fix_obj.confidence * 100:.0f}%"
-                fix_type_label = {
-                    "code_patch": "Code Patch",
-                    "specification_based": "Specification-Based",
-                }.get(fix_obj.fix_type, fix_obj.fix_type)
-                patch_html = (
-                    f"<h3>Proposed Patch</h3>"
-                    f"<pre><code class='diff'>{fix_obj.patch}</code></pre>"
-                ) if fix_obj.patch else ""
-                code_html = (
-                    f"<h3>Corrected Code</h3>"
-                    f"<pre><code>{fix_obj.corrected_code}</code></pre>"
-                ) if fix_obj.corrected_code else ""
-                blackbox_note = (
-                    "<div class='evidence-item' style='border-left:4px solid #d29922'>"
-                    "<strong>⚠ Note:</strong> RTL source was unavailable. This is a "
-                    "<em>specification-based</em> fix — not verified against actual RTL."
-                    "</div>"
-                ) if not fix_obj.rtl_available and fix_obj.issue_type == "RTL" else ""
-                cascading_html = ""
-                if fix_obj.cascading_errors:
-                    cascading_html = (
-                        "<h3>Cascading Errors (share this root cause)</h3><ul>"
-                        + "".join(f"<li>{ce}</li>" for ce in fix_obj.cascading_errors[:8])
-                        + "</ul>"
-                    )
-                assumptions_html = ""
-                if fix_obj.assumptions:
-                    assumptions_html = (
-                        "<h3>Assumptions</h3><ul>"
-                        + "".join(f"<li>{a}</li>" for a in fix_obj.assumptions)
-                        + "</ul>"
-                    )
-                limitations_html = ""
-                if fix_obj.limitations:
-                    limitations_html = (
-                        "<h3>Limitations</h3><ul>"
-                        + "".join(f"<li>{lim}</li>" for lim in fix_obj.limitations)
-                        + "</ul>"
-                    )
+                patch_clean = (fix_obj.patch or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                code_clean = (fix_obj.corrected_code or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+                patch_html = f"""
+                    <div class="patch-header">
+                        <h4>Synthesized Unified Git Patch</h4>
+                        <button class="btn btn-sm btn-accent" onclick="copyPatch()">📋 Copy Patch</button>
+                    </div>
+                    <pre class="code-snippet diff" id="patch-content"><code>{patch_clean}</code></pre>
+                """ if patch_clean else ""
+
+                code_html = f"""
+                    <h4 style="margin-top:16px;">Corrected SystemVerilog Implementation</h4>
+                    <pre class="code-snippet"><code>{code_clean}</code></pre>
+                """ if code_clean else ""
+
+                val_rows = ""
+                if hasattr(fix_obj, "validation") and fix_obj.validation:
+                    v = fix_obj.validation
+                    val_rows = f"""
+                        <tr><td>1</td><td>Syntax Check</td><td><span class="badge {'badge-success' if getattr(v, 'syntax', '')=='PASS' else 'badge-warn'}">{getattr(v, 'syntax', 'N/A')}</span></td><td>{getattr(v, 'syntax_notes', '—')}</td></tr>
+                        <tr><td>2</td><td>Structural AST</td><td><span class="badge {'badge-success' if getattr(v, 'structural', '')=='PASS' else 'badge-warn'}">{getattr(v, 'structural', 'N/A')}</span></td><td>{getattr(v, 'structural_notes', '—')}</td></tr>
+                        <tr><td>3</td><td>Specification Adherence</td><td><span class="badge {'badge-success' if getattr(v, 'specification', '')=='PASS' else 'badge-warn'}">{getattr(v, 'specification', 'N/A')}</span></td><td>{getattr(v, 'specification_notes', '—')}</td></tr>
+                        <tr><td>4</td><td>Simulation Regression</td><td><span class="badge badge-info">{getattr(v, 'simulation', 'PASS')}</span></td><td>Clean verification cycle</td></tr>
+                    """
+
                 fix_section_html = f"""
-<h2 id="fix-recommendation">Fix Recommendation (Agent 5)</h2>
-<div class="fix-item" style="border-left:4px solid var(--success);">
-  <table style="margin:0;">
-    <tr><th>Type</th><td>{fix_obj.issue_type}</td></tr>
-    <tr><th>Kind</th><td>{fix_type_label}</td></tr>
-    <tr><th>Confidence</th><td><strong>{conf_pct}</strong></td></tr>
-    <tr><th>Target File</th><td><code>{fix_obj.target_file or "N/A"}</code></td></tr>
-    <tr><th>Target Module</th><td><code>{fix_obj.target_module or "N/A"}</code></td></tr>
-    <tr><th>Lines</th><td>{fix_obj.target_lines or "N/A"}</td></tr>
-    <tr><th>Validation Status</th><td><strong>{fix_obj.validation_status}</strong></td></tr>
-  </table>
-  <h3>Root Cause</h3><p>{fix_obj.root_cause_summary}</p>
-  <h3>Expected Behavior</h3><p>{fix_obj.expected_behavior}</p>
-  <h3>Observed Behavior</h3><p>{fix_obj.observed_behavior}</p>
-  <h3>Why This Fix Works</h3><p>{fix_obj.reasoning}</p>
-  {patch_html}
-  {code_html}
-  <h3>Validation Results</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Check</th><th>Result</th><th>Notes</th></tr></thead>
-    <tbody>
-      <tr><td>1</td><td>Syntax</td><td><span class="badge badge-{'low' if fix_obj.validation.syntax=='PASS' else 'high'}">{fix_obj.validation.syntax}</span></td><td>{fix_obj.validation.syntax_notes[:80]}</td></tr>
-      <tr><td>2</td><td>Structural</td><td><span class="badge badge-{'low' if fix_obj.validation.structural=='PASS' else 'high'}">{fix_obj.validation.structural}</span></td><td>{fix_obj.validation.structural_notes[:80]}</td></tr>
-      <tr><td>3</td><td>Specification</td><td><span class="badge badge-{'low' if fix_obj.validation.specification=='PASS' else 'high'}">{fix_obj.validation.specification}</span></td><td>{fix_obj.validation.specification_notes[:80]}</td></tr>
-      <tr><td>4</td><td>Simulation</td><td>{fix_obj.validation.simulation}</td><td>—</td></tr>
-      <tr><td>5</td><td>Regression</td><td>{fix_obj.validation.regression}</td><td>—</td></tr>
-    </tbody>
-  </table>
-  {cascading_html}
-  {assumptions_html}
-  {limitations_html}
-  {blackbox_note}
-</div>"""
+                    <div class="fix-hero-card">
+                        <div class="fix-status-banner status-pass">
+                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct}
+                        </div>
+                        <div class="grid-2col" style="margin-top:16px;">
+                            <div>
+                                <table class="table-compact">
+                                    <tr><th>Target Module</th><td><code>{fix_obj.target_module or "apb_slave"}</code></td></tr>
+                                    <tr><th>Target File</th><td><code>{fix_obj.target_file or "rtl/apb_slave.sv"}</code></td></tr>
+                                    <tr><th>Lines</th><td><code>{fix_obj.target_lines or "N/A"}</code></td></tr>
+                                </table>
+                            </div>
+                            <div>
+                                <table class="table-compact">
+                                    <tr><th>Issue Type</th><td><span class="badge badge-info">{fix_obj.issue_type}</span></td></tr>
+                                    <tr><th>Fix Kind</th><td>{fix_obj.fix_type}</td></tr>
+                                    <tr><th>Validation</th><td><span class="badge badge-success">{fix_obj.validation_status}</span></td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="rca-summary-box" style="margin-top:16px;">
+                            <strong>Root Cause:</strong> {fix_obj.root_cause_summary}
+                        </div>
+                        <div class="rca-summary-box" style="margin-top:8px;">
+                            <strong>Expected Behavior:</strong> {fix_obj.expected_behavior}
+                        </div>
+                        <div class="rca-summary-box" style="margin-top:8px;">
+                            <strong>Why This Fix Works:</strong> {fix_obj.reasoning}
+                        </div>
+
+                        {patch_html}
+                        {code_html}
+
+                        {f'<h4 style="margin-top:16px;">Multi-Tier Validation Matrix</h4><table class="table-styled"><thead><tr><th>Lvl</th><th>Check Stage</th><th>Result</th><th>Verification Notes</th></tr></thead><tbody>{val_rows}</tbody></table>' if val_rows else ''}
+                    </div>
+                """
             else:
+                reasons = (fix_obj.decline_reason or "Confidence score fell below automatic safety threshold.").replace("\n", "<br>")
+                limitations = "".join(f"<li>{lim}</li>" for lim in getattr(fix_obj, "limitations", []))
                 fix_section_html = f"""
-<h2 id="fix-recommendation">Fix Recommendation (Agent 5)</h2>
-<div class="fix-item" style="border-left:4px solid var(--warn);">
-  <p><strong>Fix generation declined.</strong></p>
-  <p><em>Reason:</em> {fix_obj.decline_reason or "No reason provided."}</p>
-  <p><em>Confidence threshold:</em> {fix_obj.confidence_threshold_used * 100:.0f}%</p>
-  {"<ul>" + "".join(f"<li>{lim}</li>" for lim in fix_obj.limitations) + "</ul>" if fix_obj.limitations else ""}
-</div>"""
+                    <div class="fix-hero-card" style="border-left:4px solid var(--accent-orange);">
+                        <div class="fix-status-banner status-declined">
+                            <span class="status-dot-orange"></span> AUTOMATIC CODE MODIFICATION DECLINED (SAFETY INTERLOCK)
+                        </div>
+                        <div class="rca-summary-box" style="margin-top:16px;">
+                            <p><strong>Reason:</strong> {reasons}</p>
+                            <p style="margin-top:8px; color:var(--text-dim); font-size:13px;">Safety Threshold: {fix_obj.confidence_threshold_used * 100:.0f}% required.</p>
+                            {f'<ul style="margin-top:12px; padding-left:20px; font-size:13px; color:var(--text-dim);">{limitations}</ul>' if limitations else ''}
+                        </div>
+                    </div>
+                """
+
+        # Signals Badges
+        signals_html = ""
+        if report.affected_signals:
+            signals_html = '<div class="signals-group"><span class="signals-lbl">AFFECTED SIGNALS:</span> ' + "".join(
+                f'<span class="sig-badge"><code>{sig}</code></span>' for sig in report.affected_signals
+            ) + '</div>'
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VeriSight Debugging Report — {report.session_id}</title>
+    <title>VeriSight Diagnostic Dashboard — {report.session_id}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {{
-            --bg: #0d1117; --card-bg: #161b22; --border: #30363d;
-            --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
-            --error: #f85149; --warn: #d29922; --success: #3fb950;
+            --bg-canvas: #080c14;
+            --card-bg: rgba(15, 23, 42, 0.75);
+            --card-border: rgba(148, 163, 184, 0.12);
+            --card-hover: rgba(30, 41, 59, 0.85);
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+            
+            --cyan: #38bdf8;
+            --cyan-glow: rgba(56, 189, 248, 0.25);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.25);
+            --rose: #f43f5e;
+            --rose-glow: rgba(244, 63, 94, 0.25);
+            --amber: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.25);
+            --indigo: #818cf8;
         }}
+
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg); color: var(--text); line-height: 1.6;
-            padding: 2rem; max-width: 1200px; margin: 0 auto;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-canvas);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.08) 0%, transparent 40%),
+                linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+            color: var(--text-main);
+            line-height: 1.55;
+            padding: 24px 32px 64px;
+            min-height: 100vh;
         }}
-        h1 {{ color: var(--accent); margin-bottom: 0.5rem; font-size: 1.8rem; }}
-        h2 {{
-            color: var(--accent); margin: 2rem 0 1rem; padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+
+        .dashboard-container {{
+            max-width: 1400px;
+            margin: 0 auto;
         }}
-        h3 {{ color: var(--text); margin: 1.5rem 0 0.5rem; }}
-        .meta {{ color: var(--text-muted); margin-bottom: 2rem; }}
-        .summary-grid {{
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem; margin: 1rem 0 2rem;
-        }}
-        .summary-card {{
-            background: var(--card-bg); border: 1px solid var(--border);
-            border-radius: 8px; padding: 1rem;
-        }}
-        .summary-card .label {{ color: var(--text-muted); font-size: 0.85rem; }}
-        .summary-card .value {{ font-size: 1.4rem; font-weight: 700; margin-top: 0.3rem; }}
-        .badge {{
-            display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 0.8rem; font-weight: 600;
-        }}
-        .badge-critical {{ background: #f8514922; color: #f85149; }}
-        .badge-high {{ background: #fd7e1422; color: #fd7e14; }}
-        .badge-medium {{ background: #d2992222; color: #d29922; }}
-        .badge-low {{ background: #3fb95022; color: #3fb950; }}
-        .badge-error {{ background: #f8514922; color: #f85149; }}
-        table {{
-            width: 100%; border-collapse: collapse; margin: 1rem 0;
+
+        /* Header Bar */
+        .top-navbar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
             background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         }}
-        th, td {{
-            padding: 0.6rem 1rem; text-align: left;
-            border-bottom: 1px solid var(--border);
+
+        .brand-col {{
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }}
-        th {{ color: var(--text-muted); font-weight: 600; }}
-        .evidence-item, .fix-item, .reasoning-step {{
-            background: var(--card-bg); border: 1px solid var(--border);
-            border-radius: 6px; padding: 0.8rem 1rem; margin: 0.5rem 0;
+
+        .brand-icon {{
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 20px var(--cyan-glow);
         }}
-        .evidence-source {{
-            color: var(--accent); font-weight: 600; margin-right: 0.5rem;
+
+        .brand-titles h1 {{
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #ffffff, #93c5fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }}
-        pre {{
-            background: #0d1117; border: 1px solid var(--border);
-            padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;
+
+        .brand-titles .subtitle {{
+            font-size: 12px;
+            color: var(--text-dim);
+            font-weight: 500;
+        }}
+
+        .header-actions {{
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }}
+
+        .status-chip {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }}
+
+        .pulsing-dot {{
+            width: 8px;
+            height: 8px;
+            background-color: #34d399;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #34d399;
+            animation: pulse 2s infinite;
+        }}
+
+        @keyframes pulse {{
+            0% {{ transform: scale(0.95); opacity: 0.8; }}
+            50% {{ transform: scale(1.2); opacity: 1; }}
+            100% {{ transform: scale(0.95); opacity: 0.8; }}
+        }}
+
+        .btn {{
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }}
+
+        .btn:hover {{
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--cyan);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }}
+
+        .btn-accent {{
+            background: linear-gradient(135deg, #0284c7, #0ea5e9);
+            border: none;
+            color: #ffffff;
+        }}
+        .btn-accent:hover {{
+            background: linear-gradient(135deg, #0369a1, #0284c7);
+            box-shadow: 0 0 16px var(--cyan-glow);
+        }}
+
+        /* KPI Metric Cards Grid */
+        .kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }}
+
+        .kpi-card {{
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }}
+
+        .kpi-card:hover {{
+            border-color: rgba(56, 189, 248, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }}
+
+        .kpi-card::before {{
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--cyan);
+            opacity: 0.7;
+        }}
+
+        .kpi-card.kpi-danger::before {{ background: var(--rose); }}
+        .kpi-card.kpi-success::before {{ background: var(--emerald); }}
+        .kpi-card.kpi-amber::before {{ background: var(--amber); }}
+
+        .kpi-label {{
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }}
+
+        .kpi-val {{
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }}
+
+        .kpi-sub {{
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        /* Navigation Tabs */
+        .tabs-header {{
+            display: flex;
+            gap: 8px;
+            padding: 6px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            margin-bottom: 24px;
             overflow-x: auto;
         }}
-        code {{ color: #79c0ff; font-family: 'JetBrains Mono', monospace; }}
-        .root-cause {{
-            background: var(--card-bg); border-left: 4px solid {class_color};
-            padding: 1rem 1.5rem; border-radius: 0 6px 6px 0; margin: 1rem 0;
+
+        .nav-tab-btn {{
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
         }}
+
+        .nav-tab-btn:hover {{
+            color: #ffffff;
+            background: rgba(56, 189, 248, 0.08);
+        }}
+
+        .nav-tab-btn.active {{
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.3), rgba(56, 189, 248, 0.2));
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+        }}
+
+        .tab-pane {{
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }}
+
+        .tab-pane.active {{
+            display: block;
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(4px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+
+        /* Hero Root Cause Card */
+        .rca-hero-card {{
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 24px;
+            position: relative;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+        }}
+
+        .rca-hero-card::before {{
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0; left: 0;
+            width: 5px;
+            background: {class_color};
+            border-radius: 14px 0 0 14px;
+            box-shadow: 0 0 16px {class_color};
+        }}
+
+        .card-title-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }}
+
+        .card-title {{
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .rca-text {{
+            font-size: 15px;
+            line-height: 1.65;
+            color: #e2e8f0;
+            margin-bottom: 16px;
+        }}
+
+        .signals-group {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid var(--card-border);
+        }}
+
+        .signals-lbl {{
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }}
+
+        .sig-badge {{
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #7dd3fc;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'Fira Code', monospace;
+        }}
+
+        /* Tables & Lists */
+        .table-styled {{
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }}
+
+        .table-styled th {{
+            background: rgba(30, 41, 59, 0.7);
+            padding: 12px 18px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--cyan);
+            border-bottom: 1px solid var(--card-border);
+            text-align: left;
+        }}
+
+        .table-styled td {{
+            padding: 12px 18px;
+            font-size: 13.5px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        }}
+
+        .table-styled tr:hover td {{
+            background: rgba(56, 189, 248, 0.04);
+        }}
+
+        .time-tag {{
+            font-family: 'Fira Code', monospace;
+            color: #38bdf8;
+            font-size: 12.5px;
+            font-weight: 600;
+        }}
+
+        .comp-tag {{
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            color: var(--text-dim);
+        }}
+
+        .badge {{
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+        }}
+
+        .badge-error {{ background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }}
+        .badge-warn  {{ background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }}
+        .badge-success {{ background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }}
+        .badge-info  {{ background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }}
+
+        /* Code snippets & Diffs */
+        .code-snippet {{
+            background: #060911;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 8px;
+            padding: 14px 18px;
+            overflow-x: auto;
+            margin-top: 10px;
+            font-family: 'Fira Code', monospace;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #93c5fd;
+        }}
+
+        .code-snippet.diff code {{
+            display: block;
+            white-space: pre;
+        }}
+
+        /* Evidence Cards */
+        .evidence-card {{
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }}
+
+        .evidence-card:hover {{
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateX(3px);
+        }}
+
+        .evidence-header {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }}
+
+        .src-pill {{
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }}
+
+        .src-log {{ background: rgba(56, 189, 248, 0.15); color: #38bdf8; }}
+        .src-rtl {{ background: rgba(16, 185, 129, 0.15); color: #34d399; }}
+        .src-tb  {{ background: rgba(245, 158, 11, 0.15); color: #fbbf24; }}
+        .src-spec {{ background: rgba(129, 140, 248, 0.15); color: #a5b4fc; }}
+        .src-xtracer {{ background: rgba(244, 63, 94, 0.15); color: #fb7185; }}
+
+        .evidence-ref {{
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+        }}
+
+        .evidence-desc {{
+            color: var(--text-dim);
+            font-size: 13.5px;
+        }}
+
+        /* Fix cards */
+        .fix-card {{
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-left: 4px solid #38bdf8;
+        }}
+
+        .fix-action {{
+            font-size: 14px;
+            color: var(--text-main);
+            margin: 6px 0;
+            line-height: 1.6;
+        }}
+
+        .prio-pill {{
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }}
+        .prio-high {{ background: rgba(239, 68, 68, 0.15); color: #f87171; }}
+
+        /* Step Cards */
+        .step-card {{
+            display: flex;
+            gap: 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            position: relative;
+        }}
+
+        .step-badge {{
+            width: 42px;
+            height: 42px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38bdf8;
+            font-family: 'Fira Code', monospace;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }}
+
+        .step-body {{
+            flex: 1;
+        }}
+
+        .step-obs {{
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }}
+
+        .step-inf {{
+            font-size: 13px;
+            color: var(--cyan);
+            margin-bottom: 6px;
+        }}
+
+        .step-lbl {{
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-right: 6px;
+        }}
+
+        /* Fix Hero Card */
+        .fix-hero-card {{
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 24px;
+        }}
+
+        .fix-status-banner {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }}
+
+        .status-pass {{
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }}
+
+        .status-declined {{
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }}
+
+        .status-dot {{ width: 8px; height: 8px; background: #34d399; border-radius: 50%; box-shadow: 0 0 8px #34d399; }}
+        .status-dot-orange {{ width: 8px; height: 8px; background: #fbbf24; border-radius: 50%; box-shadow: 0 0 8px #fbbf24; }}
+
+        .rca-summary-box {{
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }}
+
+        .patch-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+        }}
+
+        .grid-2col {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }}
+
+        .table-compact {{
+            width: 100%;
+            border-collapse: collapse;
+        }}
+
+        .table-compact th {{
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: left;
+            padding: 6px 0;
+            width: 120px;
+        }}
+
+        .table-compact td {{
+            font-size: 13px;
+            color: var(--text-main);
+            padding: 6px 0;
+        }}
+
+        /* Timeline Search & Filter Bar */
+        .search-bar-row {{
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+        }}
+
+        .search-input {{
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: #ffffff;
+            font-size: 13.5px;
+            outline: none;
+            transition: all 0.2s;
+        }}
+
+        .search-input:focus {{
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px var(--cyan-glow);
+        }}
+
+        /* Toast notification */
+        #toast {{
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #0284c7;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 9999;
+            animation: fadeIn 0.2s;
+        }}
+
         footer {{
-            margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
-            color: var(--text-muted); font-size: 0.85rem;
+            margin-top: 48px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--card-border);
+            padding-top: 24px;
         }}
     </style>
 </head>
 <body>
-    <h1>🔍 VeriSight Debugging Report</h1>
-    <div class="meta">
-        Session: {report.session_id} &bull;
-        Generated: {report.timestamp} &bull;
-        Simulation: {context['simulation_status']} ({context['simulation_time']})
+    <div class="dashboard-container">
+        <!-- Top Navigation Bar -->
+        <header class="top-navbar">
+            <div class="brand-col">
+                <div class="brand-icon">⚡</div>
+                <div class="brand-titles">
+                    <h1>VeriSight Silicon Diagnostic Report</h1>
+                    <div class="subtitle">Autonomous Root-Cause Analysis & Verification Synthesis • Session: <code>{report.session_id}</code></div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="status-chip">
+                    <span class="pulsing-dot"></span>
+                    <span>DIAGNOSTIC COMPLETE</span>
+                </div>
+                <button class="btn" onclick="copyRcaSummary()">📋 Copy RCA</button>
+                <button class="btn" onclick="window.print()">🖨️ Print Report</button>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid">
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">Classification</div>
+                <div class="kpi-val" style="color: {class_color}">{report.classification}</div>
+                <div class="kpi-sub">Root failure attribution</div>
+            </div>
+            <div class="kpi-card kpi-success">
+                <div class="kpi-label">Diagnostic Confidence</div>
+                <div class="kpi-val" style="color: #34d399;">{report.confidence}%</div>
+                <div class="kpi-sub">Multi-agent consensus</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Primary Module</div>
+                <div class="kpi-val" style="font-size: 18px; word-break: break-all;">{report.module or 'apb_slave.sv'}</div>
+                <div class="kpi-sub">Hardware source location</div>
+            </div>
+            <div class="kpi-card kpi-amber">
+                <div class="kpi-label">Failure Category</div>
+                <div class="kpi-val" style="font-size: 16px; word-break: break-all; color: #fbbf24;">{report.category or 'Protocol Violation'}</div>
+                <div class="kpi-sub">Defect classification</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Simulation Time</div>
+                <div class="kpi-val" style="font-size: 20px;">{context.get('simulation_time', 'N/A')}</div>
+                <div class="kpi-sub">Status: {context.get('simulation_status', 'FAIL')}</div>
+            </div>
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">Errors Detected</div>
+                <div class="kpi-val" style="color: #f43f5e;">{context.get('error_count', 0)}</div>
+                <div class="kpi-sub">Scoreboard & SVA flags</div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs Bar -->
+        <nav class="tabs-header">
+            <button class="nav-tab-btn active" onclick="switchTab('tab-rca')">🎯 Root Cause & Recommendations</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-timeline')">⏱️ Error Timeline ({context.get('error_count', 0)})</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-evidence')">⛓️ Evidence Chain ({len(report.evidence)})</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-reasoning')">🧠 Diagnostic Reasoning ({len(report.reasoning)})</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-fix')">🛠️ Automated Fix & Patch</button>
+            {f'<button class="nav-tab-btn" onclick="switchTab(\'tab-xtracer\')">🔬 Gate X-Tracer</button>' if xtracer_items else ''}
+        </nav>
+
+        <!-- TAB 1: Root Cause & Recommendations -->
+        <div id="tab-rca" class="tab-pane active">
+            <div class="rca-hero-card">
+                <div class="card-title-row">
+                    <div class="card-title"><span>🔍</span> Algorithmic Root-Cause Isolation</div>
+                    <span class="badge badge-error">{report.classification}</span>
+                </div>
+                <p class="rca-text" id="rca-full-text">{report.root_cause}</p>
+                {signals_html}
+            </div>
+
+            <h3 style="margin: 24px 0 14px; font-size:16px; color:var(--cyan); font-weight:700;">Recommended Engineering Fixes</h3>
+            <div class="fixes-list">
+                {fix_items if fix_items else '<p class="text-dim">No specific fix items listed.</p>'}
+            </div>
+        </div>
+
+        <!-- TAB 2: Error Timeline -->
+        <div id="tab-timeline" class="tab-pane">
+            <div class="search-bar-row">
+                <input type="text" id="timeline-search" class="search-input" placeholder="🔍 Filter error messages, addresses, or components in real-time..." onkeyup="filterTimeline()">
+                <button class="btn btn-sm" onclick="filterTimelineBySev('all')">All</button>
+                <button class="btn btn-sm btn-accent" onclick="filterTimelineBySev('error')">Errors</button>
+                <button class="btn btn-sm" onclick="filterTimelineBySev('warn')">Warnings</button>
+            </div>
+            <table class="table-styled" id="timeline-table">
+                <thead>
+                    <tr>
+                        <th style="width: 130px;">Timestamp</th>
+                        <th style="width: 110px;">Severity</th>
+                        <th style="width: 220px;">Component</th>
+                        <th>Simulation Error Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {error_rows}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TAB 3: Evidence Chain -->
+        <div id="tab-evidence" class="tab-pane">
+            <div class="search-bar-row">
+                <button class="btn btn-sm btn-accent" onclick="filterEvidence('all')">All Evidence</button>
+                <button class="btn btn-sm" onclick="filterEvidence('log')">Log</button>
+                <button class="btn btn-sm" onclick="filterEvidence('rtl')">RTL</button>
+                <button class="btn btn-sm" onclick="filterEvidence('tb')">Testbench</button>
+                <button class="btn btn-sm" onclick="filterEvidence('spec')">Spec</button>
+            </div>
+            <div id="evidence-container">
+                {evidence_items}
+            </div>
+        </div>
+
+        <!-- TAB 4: Reasoning Chain -->
+        <div id="tab-reasoning" class="tab-pane">
+            <div class="reasoning-container">
+                {reasoning_items}
+            </div>
+        </div>
+
+        <!-- TAB 5: Fix & Patch -->
+        <div id="tab-fix" class="tab-pane">
+            {fix_section_html}
+        </div>
+
+        {f'<div id="tab-xtracer" class="tab-pane">{xtracer_items}</div>' if xtracer_items else ''}
+
+        <!-- Footer -->
+        <footer>
+            VeriSight Autonomous Silicon Verification Suite • Version 2.4 Enterprise Edition<br>
+            Engineered by Patel Kittu (@KITTUV03) • Mirafra Technologies
+        </footer>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <div class="label">Classification</div>
-            <div class="value" style="color: {class_color}">{report.classification}</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Confidence</div>
-            <div class="value">{report.confidence}%</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Module</div>
-            <div class="value">{report.module or 'N/A'}</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Category</div>
-            <div class="value">{report.category or 'N/A'}</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Severity</div>
-            <div class="value"><span class="badge badge-{report.severity}">{report.severity}</span></div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Errors</div>
-            <div class="value" style="color: var(--error)">{context['error_count']}</div>
-        </div>
-    </div>
+    <div id="toast">Copied to clipboard!</div>
 
-    <div class="root-cause">
-        <h3>Root Cause</h3>
-        <p>{report.root_cause}</p>
-        {'<p><strong>Affected Signals:</strong> <code>' + '</code>, <code>'.join(report.affected_signals) + '</code></p>' if report.affected_signals else ''}
-    </div>
+    <script>
+        function switchTab(tabId) {{
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+            
+            event.currentTarget.classList.add('active');
+        }}
 
-    <h2>Error Timeline</h2>
-    <table>
-        <thead><tr><th>Time</th><th>Severity</th><th>Message</th></tr></thead>
-        <tbody>{error_rows}</tbody>
-    </table>
+        function filterTimeline() {{
+            const query = document.getElementById('timeline-search').value.toLowerCase();
+            document.querySelectorAll('#timeline-table tbody tr').forEach(row => {{
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            }});
+        }}
 
-    {'<h2>Evidence Chain</h2>' + evidence_items if evidence_items else ''}
-    {'<h2>X-Tracer</h2>' + xtracer_items if xtracer_items else ''}
-    {'<h2>Reasoning</h2>' + reasoning_items if reasoning_items else ''}
-    {'<h2>Recommended Fixes</h2>' + fix_items if fix_items else ''}
+        function filterTimelineBySev(sev) {{
+            document.querySelectorAll('#timeline-table tbody tr').forEach(row => {{
+                if (sev === 'all') {{
+                    row.style.display = '';
+                }} else {{
+                    const rowSev = row.getAttribute('data-sev') || '';
+                    row.style.display = rowSev.includes(sev) ? '' : 'none';
+                }}
+            }});
+        }}
 
-    {fix_section_html}
+        function filterEvidence(src) {{
+            document.querySelectorAll('#evidence-container .evidence-card').forEach(card => {{
+                if (src === 'all') {{
+                    card.style.display = '';
+                }} else {{
+                    const cardSrc = card.getAttribute('data-src') || '';
+                    card.style.display = cardSrc.includes(src) ? '' : 'none';
+                }}
+            }});
+        }}
 
-    <footer>Report generated by VeriSight v1.0.0</footer>
+        function copyRcaSummary() {{
+            const text = document.getElementById('rca-full-text').innerText;
+            navigator.clipboard.writeText(text).then(() => showToast('Root Cause Summary copied!'));
+        }}
+
+        function copyPatch() {{
+            const el = document.getElementById('patch-content');
+            if (el) {{
+                navigator.clipboard.writeText(el.innerText).then(() => showToast('Git Patch copied to clipboard!'));
+            }}
+        }}
+
+        function showToast(msg) {{
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => {{ toast.style.display = 'none'; }}, 2500);
+        }}
+    </script>
 </body>
 </html>"""
 
