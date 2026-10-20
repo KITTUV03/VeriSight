@@ -335,6 +335,17 @@ class BaseAgent(ABC):
                     raise
 
             except Exception as e:
+                err_str = str(e).lower()
+                is_auth_error = any(
+                    k in err_str
+                    for k in ("api_key_invalid", "api key not valid", "401", "unauthorized", "airgapviolation", "forbidden")
+                )
+                if is_auth_error:
+                    self.logger.warning(
+                        f"Authentication or Air-Gap policy prevented LLM call: {e}. "
+                        "Skipping redundant retries and falling back gracefully."
+                    )
+                    raise
                 self.logger.error(
                     f"LLM call failed (attempt {attempt + 1}): {e}"
                 )
