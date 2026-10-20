@@ -107,31 +107,47 @@ def _print_welcome_banner():
     )
 
 
-def _configure_api_key() -> Tuple[str, Optional[str], Optional[str]]:
+def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool, str]:
     """
-    Handle API key setup supporting Gemini, Anthropic Claude, custom keys, or offline mode.
+    Handle API key setup supporting Gemini, Anthropic Claude, Sovereign Air-Gapped (Ollama/vLLM),
+    custom keys, or deterministic offline mode.
 
     Returns:
-        (provider, api_key, model_name)
+        (provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint)
     """
     gemini_env = os.getenv("GEMINI_API_KEY", "").strip()
     anthropic_env = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
-    table = Table(title="Detected LLM Environment", box=box.ROUNDED, show_lines=True)
-    table.add_column("Provider", style="cyan", width=18)
-    table.add_column("Status", width=36)
+    # Probe local inference server (Ollama / vLLM)
+    ollama_online = False
+    try:
+        import urllib.request
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=0.3) as r:
+            ollama_online = (r.status == 200)
+    except Exception:
+        ollama_online = False
+
+    table = Table(title="Detected AI Execution Environments", box=box.ROUNDED, show_lines=True)
+    table.add_column("Environment / Provider", style="cyan", width=28)
+    table.add_column("Security & Status", width=42)
 
     table.add_row(
-        "Google Gemini",
+        "Google Gemini (Cloud)",
         f"[green]✓ Found in environment[/green] ({gemini_env[:4]}...{gemini_env[-4:]})"
         if gemini_env
         else "[yellow]Not detected[/yellow]",
     )
     table.add_row(
-        "Anthropic Claude",
+        "Anthropic Claude (Cloud)",
         f"[green]✓ Found in environment[/green] ({anthropic_env[:4]}...{anthropic_env[-4:]})"
         if anthropic_env
         else "[yellow]Not detected[/yellow]",
+    )
+    table.add_row(
+        "🛡️ Sovereign On-Prem (Ollama/vLLM)",
+        "[bold green]✓ Local engine active (:11434)[/bold green] (Zero Cloud Leakage)"
+        if ollama_online
+        else "[bold cyan]Ready On-Prem[/bold cyan] (Zero Cloud RTL Leakage Certified)",
     )
     console.print(table)
     console.print()
@@ -140,28 +156,33 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str]]:
     choice_map = {}
     idx = 1
 
+    # Option: Sovereign Air-Gap (Enterprise Zero-Leakage)
+    choices.append(f"{idx}. 🛡️  Sovereign Air-Gapped Mode (Local Ollama/vLLM — Zero Cloud RTL Leakage)")
+    choice_map[str(idx)] = "airgap"
+    idx += 1
+
     if gemini_env:
-        choices.append(f"{idx}. Use detected Gemini API key (gemini-2.0-flash)")
-        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-2.0-flash")
+        choices.append(f"{idx}. Use detected Gemini Cloud key (gemini-2.0-flash)")
+        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-2.0-flash", False, False, "")
         idx += 1
 
     if anthropic_env:
-        choices.append(f"{idx}. Use detected Claude API key (claude-sonnet-5)")
-        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5")
+        choices.append(f"{idx}. Use detected Claude Cloud key (claude-sonnet-5)")
+        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5", False, False, "")
         idx += 1
 
-    choices.append(f"{idx}. Enter a new / custom Google Gemini API key")
+    choices.append(f"{idx}. Enter custom Google Gemini Cloud key")
     choice_map[str(idx)] = "custom_gemini"
     idx += 1
 
-    choices.append(f"{idx}. Enter a new / custom Anthropic Claude API key")
+    choices.append(f"{idx}. Enter custom Anthropic Claude Cloud key")
     choice_map[str(idx)] = "custom_claude"
     idx += 1
 
-    choices.append(f"{idx}. Run in Offline / Deterministic Mode (no LLM, heuristic analysis)")
+    choices.append(f"{idx}. Run in Offline / Deterministic Mode (no LLM, purely heuristic)")
     choice_map[str(idx)] = "offline"
 
-    console.print("[bold]Select LLM & API Key option:[/bold]")
+    console.print("[bold]Select AI Execution & Security Mode:[/bold]")
     for c in choices:
         console.print(f"  [cyan]{c}[/cyan]")
 
@@ -173,10 +194,32 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str]]:
 
     action = choice_map[sel]
 
+    # Sovereign Air-Gap Selection
+    if action == "airgap":
+        console.print("\n[bold green]🛡️ Sovereign Air-Gapped Mode Activated![/bold green]")
+        console.print("[dim]Enforcing zero cloud RTL leakage. Outbound internet calls will be blocked.[/dim]")
+        
+        local_model = Prompt.ask(
+            "[bold]Local LLM Model[/bold]",
+            default="deepseek-coder:33b",
+        ).strip()
+        
+        local_endpoint = Prompt.ask(
+            "[bold]Local Inference Endpoint[/bold]",
+            default="http://localhost:11434",
+        ).strip()
+
+        anonymize = Confirm.ask(
+            "[bold]Enable Confidential RTL IP Token Masking (scrub proprietary signal names)?[/bold]",
+            default=True,
+        )
+
+        return "ollama", "sovereign_local_key", local_model, True, anonymize, local_endpoint
+
     if isinstance(action, tuple):
-        provider, key, model = action
+        provider, key, model, airgap, anon, endpoint = action
         console.print(f"[green]✓[/green] Using {provider.capitalize()} API key.")
-        return provider, key, model
+        return provider, key, model, airgap, anon, endpoint
 
     if action == "custom_gemini":
         key = Prompt.ask("[bold]Enter your Google Gemini API key[/bold]", password=True)
@@ -185,7 +228,8 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str]]:
             key = Prompt.ask("[bold]Enter your Google Gemini API key[/bold]", password=True)
         key = key.strip()
         _offer_save_key("GEMINI_API_KEY", key)
-        return "gemini", key, "gemini-2.0-flash"
+        anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Google Cloud?", default=False)
+        return "gemini", key, "gemini-2.0-flash", False, anon, ""
 
     if action == "custom_claude":
         key = Prompt.ask("[bold]Enter your Anthropic Claude API key[/bold]", password=True)
@@ -194,11 +238,12 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str]]:
             key = Prompt.ask("[bold]Enter your Anthropic Claude API key[/bold]", password=True)
         key = key.strip()
         _offer_save_key("ANTHROPIC_API_KEY", key)
-        return "anthropic", key, "claude-sonnet-5"
+        anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Anthropic Cloud?", default=False)
+        return "anthropic", key, "claude-sonnet-5", False, anon, ""
 
     # Offline mode
     console.print("[yellow]! Running in offline deterministic mode (no LLM will be queried).[/yellow]")
-    return "gemini", None, "gemini-2.0-flash"
+    return "gemini", None, "gemini-2.0-flash", True, False, ""
 
 
 def _offer_save_key(var_name: str, key_val: str):
@@ -320,7 +365,17 @@ def _prompt_path(
         return str(p)
 
 
-def run_plan_flow(provider: str, api_key: Optional[str], model_name: Optional[str], spec_path: Optional[str] = None, rtl_path: Optional[str] = None, output_dir: Optional[str] = None):
+def run_plan_flow(
+    provider: str,
+    api_key: Optional[str],
+    model_name: Optional[str],
+    spec_path: Optional[str] = None,
+    rtl_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    airgap: bool = False,
+    anonymize_rtl: bool = False,
+    local_endpoint: str = "",
+):
     """Execute the VeriSight Plan workflow."""
     console.print("\n[bold cyan]📋 VeriSight Plan — Verification & Architecture Plan[/bold cyan]")
     console.print("[dim]Generate Test Plan, Feature Decomposition, SystemVerilog Coverage & SVA Suite.[/dim]\n")
@@ -333,7 +388,12 @@ def run_plan_flow(provider: str, api_key: Optional[str], model_name: Optional[st
         output_dir = Prompt.ask("[bold]Output directory for verification plan[/bold]", default="output/verification_plan").strip()
 
     # Configure VeriSight environment for Plan
-    llm_kwargs: Dict[str, Any] = {"provider": provider}
+    llm_kwargs: Dict[str, Any] = {
+        "provider": provider,
+        "airgap": airgap,
+        "anonymize_rtl": anonymize_rtl,
+        "local_endpoint": local_endpoint,
+    }
     if api_key:
         llm_kwargs["api_key"] = api_key
     if model_name:
@@ -347,7 +407,7 @@ def run_plan_flow(provider: str, api_key: Optional[str], model_name: Optional[st
     set_config(cfg)
 
     kb = None
-    if api_key:
+    if api_key and not airgap:
         try:
             kb = KnowledgeBase()
             kb.initialize_collections()
@@ -390,7 +450,19 @@ def run_plan_flow(provider: str, api_key: Optional[str], model_name: Optional[st
         console.print(f"\n[bold red]Verification Planning failed:[/] {e}")
 
 
-def run_debug_flow(provider: str, api_key: Optional[str], model_name: Optional[str], spec_path: Optional[str] = None, rtl_path: Optional[str] = None, tb_path: Optional[str] = None, log_path: Optional[str] = None, output_dir: Optional[str] = None):
+def run_debug_flow(
+    provider: str,
+    api_key: Optional[str],
+    model_name: Optional[str],
+    spec_path: Optional[str] = None,
+    rtl_path: Optional[str] = None,
+    tb_path: Optional[str] = None,
+    log_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    airgap: bool = False,
+    anonymize_rtl: bool = False,
+    local_endpoint: str = "",
+):
     """Execute the VeriSight Debug workflow."""
     console.print("\n[bold cyan]🛠️ VeriSight Debug — Autonomous Simulation RCA & Fix[/bold cyan]")
     console.print("[dim]Analyze simulation logs, trace root cause, and generate automated code fixes.[/dim]\n")
@@ -406,7 +478,12 @@ def run_debug_flow(provider: str, api_key: Optional[str], model_name: Optional[s
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for reports[/bold]", default="output/custom_debug").strip()
 
-    llm_kwargs: Dict[str, Any] = {"provider": provider}
+    llm_kwargs: Dict[str, Any] = {
+        "provider": provider,
+        "airgap": airgap,
+        "anonymize_rtl": anonymize_rtl,
+        "local_endpoint": local_endpoint,
+    }
     if api_key:
         llm_kwargs["api_key"] = api_key
     if model_name:
@@ -417,7 +494,7 @@ def run_debug_flow(provider: str, api_key: Optional[str], model_name: Optional[s
         chroma=ChromaConfig(),
         pipeline=PipelineConfig(
             save_intermediates=True,
-            enable_rag=bool(api_key),
+            enable_rag=bool(api_key and not airgap),
             output_dir=output_dir,
             verbose=False,
         ),
@@ -488,13 +565,19 @@ def run_wizard():
         sys.exit(0)
 
     console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
-    provider, api_key, model_name = _configure_api_key()
+    provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
 
     if workflow == "1":
-        run_debug_flow(provider, api_key, model_name)
+        run_debug_flow(
+            provider, api_key, model_name,
+            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+        )
 
     elif workflow == "2":
-        run_plan_flow(provider, api_key, model_name)
+        run_plan_flow(
+            provider, api_key, model_name,
+            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+        )
 
     elif workflow == "3":
         console.print("\n[bold cyan]Select Pre-packaged Demo:[/bold cyan]")
@@ -513,6 +596,7 @@ def run_wizard():
                 tb_path="examples/tb/",
                 log_path="examples/logs/sim.log",
                 output_dir="output/demo_alu_debug",
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
             )
         elif demo_sel == "2":
             run_debug_flow(
@@ -522,6 +606,7 @@ def run_wizard():
                 tb_path="projects/fifo/tb/",
                 log_path="projects/fifo/logs/sim.log",
                 output_dir="output/demo_fifo_debug",
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
             )
         elif demo_sel == "3":
             run_plan_flow(
@@ -529,6 +614,7 @@ def run_wizard():
                 spec_path="examples/specs/alu_spec.md",
                 rtl_path="examples/rtl/",
                 output_dir="output/demo_alu_plan",
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
             )
         elif demo_sel == "4":
             run_plan_flow(
@@ -536,4 +622,5 @@ def run_wizard():
                 spec_path="projects/fifo/specs/spec.md",
                 rtl_path="projects/fifo/rtl/",
                 output_dir="output/demo_fifo_plan",
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
             )

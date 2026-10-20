@@ -214,18 +214,34 @@ Examples:
     parser.add_argument(
         "--provider",
         type=str,
-        choices=["gemini", "anthropic", "claude"],
-        help="LLM provider (default: gemini or auto-detected from environment)",
+        choices=["gemini", "anthropic", "claude", "ollama", "local", "vllm", "airgap"],
+        help="LLM provider (default: gemini, claude, or sovereign local 'ollama'/'vllm')",
     )
     parser.add_argument(
         "--api-key",
         type=str,
-        help="LLM API key (overrides GEMINI_API_KEY or ANTHROPIC_API_KEY env var)",
+        help="LLM API key (overrides GEMINI_API_KEY or ANTHROPIC_API_KEY env var; not needed for local/airgap)",
     )
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (default: gemini-2.0-flash or claude-sonnet-4-20250514)",
+        help="LLM model name (e.g. gemini-2.0-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
+    )
+    parser.add_argument(
+        "--airgap",
+        action="store_true",
+        help="Enforce Sovereign Air-Gap policy: Zero Cloud RTL Leakage. Strictly blocks all outbound WAN/cloud connections.",
+    )
+    parser.add_argument(
+        "--local-endpoint",
+        type=str,
+        default="http://localhost:11434",
+        help="URL of on-premise local inference server (default: http://localhost:11434)",
+    )
+    parser.add_argument(
+        "--anonymize-rtl",
+        action="store_true",
+        help="Sanitize and mask proprietary module and signal identifiers before model ingestion for confidential IP protection.",
     )
 
     return parser.parse_args()
@@ -322,6 +338,12 @@ def main():
             kwargs["api_key"] = args.api_key
         if args.model:
             kwargs["model_name"] = args.model
+        if args.airgap:
+            kwargs["airgap"] = True
+        if args.local_endpoint:
+            kwargs["local_endpoint"] = args.local_endpoint
+        if args.anonymize_rtl:
+            kwargs["anonymize_rtl"] = True
 
         llm_config = LLMConfig(**kwargs)
         plan_output = args.output if args.output != "output" else "output/verification_plan"
@@ -399,6 +421,12 @@ def main():
         kwargs["api_key"] = args.api_key
     if args.model:
         kwargs["model_name"] = args.model
+    if args.airgap:
+        kwargs["airgap"] = True
+    if args.local_endpoint:
+        kwargs["local_endpoint"] = args.local_endpoint
+    if args.anonymize_rtl:
+        kwargs["anonymize_rtl"] = True
 
     llm_config = LLMConfig(**kwargs)
 

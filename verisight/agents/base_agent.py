@@ -18,12 +18,19 @@ from pydantic import BaseModel, ValidationError
 from verisight.config import get_config
 from verisight.utils.logger import get_logger
 
+from verisight.utils.airgap import enable_airgap_guard, is_airgap_enabled, AirGapViolationError
+from verisight.utils.anonymizer import RTLAnonymizer
+
 logger = get_logger("base_agent")
 T = TypeVar("T", bound=BaseModel)
 
 
 class LLMAdapter:
-    """Adapter for LLM API calls. Supports Gemini and Anthropic Claude."""
+    """
+    Adapter for LLM API calls.
+    Supports Google Gemini, Anthropic Claude, and Sovereign On-Premise (Ollama / vLLM).
+    Enforces Zero Cloud RTL Leakage under Air-Gap policy.
+    """
 
     def __init__(self):
         config = get_config()
@@ -32,10 +39,17 @@ class LLMAdapter:
         self.model_name = config.llm.model_name
         self.temperature = config.llm.temperature
         self.max_output_tokens = config.llm.max_output_tokens
+        self.airgap = config.llm.airgap
+        self.local_endpoint = config.llm.local_endpoint
+        self.anonymize_rtl = config.llm.anonymize_rtl
         self._model = None
         # Set to False after the API rejects 'temperature', so later calls
         # skip the probe instead of burning a failed request every time.
         self._supports_temperature = True
+
+        if self.airgap:
+            enable_airgap_guard()
+            logger.info("🛡️ Sovereign Air-Gap Guard ENFORCED. Zero Cloud RTL Leakage policy active.")
 
     def _init_gemini(self):
         """Initialize Gemini model."""
@@ -77,20 +91,93 @@ class LLMAdapter:
         Returns:
             Raw text response from the LLM.
         """
-        # Fail fast if no API key is configured
-        if not self.api_key:
-            env_hint = "ANTHROPIC_API_KEY" if self.provider == "anthropic" else "GEMINI_API_KEY"
-            raise RuntimeError(
-                f"No LLM API key configured for provider '{self.provider}'. Set {env_hint} or use --api-key. "
-                "Pipeline will use deterministic fallback."
+        # Enforce Air-Gap Policy: strictly block cloud providers
+        if self.airgap and self.provider in ("gemini", "anthropic", "openai"):
+            raise AirGapViolationError(
+                f"SECURITY POLICY VIOLATION: Provider '{self.provider}' is a public cloud API, "
+                f"which is strictly prohibited under Sovereign Air-Gap policy. "
+                f"Select an on-premise provider ('ollama' or 'local') to guarantee zero cloud RTL leakage."
             )
 
-        if self.provider == "gemini":
-            return self._generate_gemini(prompt, system_prompt)
+        # Anonymize RTL tokens if confidential IP protection is requested
+        anonymizer = None
+        if self.anonymize_rtl:
+            anonymizer = RTLAnonymizer()
+            prompt, _ = anonymizer.anonymize_rtl(prompt)
+
+        # 1. Local / Sovereign On-Premise Inference (Ollama / vLLM)
+        if self.provider in ("ollama", "local", "vllm", "localai", "airgap"):
+            raw_response = self._generate_local(prompt, system_prompt)
+        # 2. Google Gemini Cloud API
+        elif self.provider == "gemini":
+            if not self.api_key:
+                raise RuntimeError("No GEMINI_API_KEY configured. Pipeline will use deterministic fallback.")
+            raw_response = self._generate_gemini(prompt, system_prompt)
+        # 3. Anthropic Claude Cloud API
         elif self.provider == "anthropic":
-            return self._generate_anthropic(prompt, system_prompt)
+            if not self.api_key:
+                raise RuntimeError("No ANTHROPIC_API_KEY configured. Pipeline will use deterministic fallback.")
+            raw_response = self._generate_anthropic(prompt, system_prompt)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
+
+        # Restore original identifiers if anonymized
+        if anonymizer and anonymizer.anon_to_orig:
+            raw_response = anonymizer.de_anonymize(raw_response)
+
+        return raw_response
+
+    def _generate_local(self, prompt: str, system_prompt: str = "") -> str:
+        """Generate using on-premise local inference server (Ollama, vLLM, or LocalAI)."""
+        import requests
+
+        endpoint = (self.local_endpoint or "http://localhost:11434").rstrip("/")
+
+        # Check for Ollama native endpoint
+        if ":11434" in endpoint or "/api" in endpoint:
+            url = f"{endpoint}/api/generate" if not endpoint.endswith("/generate") else endpoint
+            payload = {
+                "model": self.model_name or "deepseek-coder:33b",
+                "prompt": f"{system_prompt}\n\n{prompt}" if system_prompt else prompt,
+                "stream": False,
+                "options": {
+                    "temperature": self.temperature,
+                    "num_predict": self.max_output_tokens,
+                }
+            }
+            try:
+                logger.info(f"Executing Sovereign On-Prem inference via Ollama: {url} ({self.model_name})")
+                resp = requests.post(url, json=payload, timeout=120)
+                resp.raise_for_status()
+                return resp.json().get("response", "")
+            except Exception as e:
+                logger.warning(f"Ollama native endpoint failed ({e}), attempting OpenAI-compatible route...")
+
+        # OpenAI-compatible local endpoint (vLLM, LocalAI, LM Studio)
+        url = f"{endpoint}/v1/chat/completions" if not endpoint.endswith("/completions") else endpoint
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": self.model_name or "deepseek-coder:33b",
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_output_tokens,
+        }
+        try:
+            logger.info(f"Executing Sovereign On-Prem inference via OpenAI-compatible endpoint: {url} ({self.model_name})")
+            resp = requests.post(url, json=payload, timeout=120)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error(
+                f"Sovereign local inference server at '{endpoint}' is unreachable: {e}. "
+                f"Please ensure your local LLM engine is running (e.g. 'ollama run deepseek-coder:33b')."
+            )
+            raise
 
     def _generate_gemini(self, prompt: str, system_prompt: str = "") -> str:
         """Generate using Gemini API."""

@@ -26,13 +26,34 @@ class LLMConfig:
     temperature: float = 0.1
     max_output_tokens: int = 16000
     max_retries: int = 3
+    airgap: bool = False
+    local_endpoint: str = ""
+    anonymize_rtl: bool = False
 
     def __post_init__(self):
-        # Resolve provider: explicit arg > env var > auto-detect > default
+        # Resolve Air-Gap policy
+        env_airgap = os.getenv("VERISIGHT_AIRGAP")
+        if env_airgap is not None:
+            self.airgap = env_airgap.lower() in ("1", "true", "yes", "on")
+
+        # Resolve local endpoint (for Ollama, vLLM, or on-premise inference servers)
+        if not self.local_endpoint:
+            self.local_endpoint = os.getenv(
+                "VERISIGHT_LOCAL_ENDPOINT", "http://localhost:11434"
+            )
+
+        # Resolve RTL anonymization flag
+        env_anon = os.getenv("VERISIGHT_ANONYMIZE_RTL")
+        if env_anon is not None:
+            self.anonymize_rtl = env_anon.lower() in ("1", "true", "yes", "on")
+
+        # Resolve provider: explicit arg > env var > airgap policy > auto-detect > default
         if not self.provider:
             env_provider = os.getenv("VERISIGHT_PROVIDER")
             if env_provider:
                 self.provider = env_provider.lower()
+            elif self.airgap:
+                self.provider = "ollama"
             else:
                 self.provider = "gemini"
         else:
@@ -51,19 +72,23 @@ class LLMConfig:
         elif self.provider == "gemini" and not os.getenv("GEMINI_API_KEY") and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")):
             self.provider = "anthropic"
 
-        # Normalize "claude" alias to "anthropic" for consistent downstream checks
-        if self.provider == "claude":
+        # Normalize aliases
+        if self.provider in ("claude",):
             self.provider = "anthropic"
+        elif self.provider in ("local", "vllm", "localai", "airgap"):
+            pass
 
         # Set default model name if not provided
         if not self.model_name:
-            if self.provider == "anthropic":
+            if self.provider in ("ollama", "local", "vllm", "localai", "airgap"):
+                self.model_name = "deepseek-coder:33b"
+            elif self.provider == "anthropic":
                 self.model_name = "claude-sonnet-5"
             else:
                 self.model_name = "gemini-2.0-flash"
 
         # Resolve API key based on provider
-        if not self.api_key:
+        if not self.api_key and self.provider not in ("ollama", "local", "vllm", "localai", "airgap"):
             if self.provider == "anthropic":
                 self.api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY", "")
             else:
