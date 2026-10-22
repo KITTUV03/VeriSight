@@ -82,7 +82,13 @@ class KnowledgeBase:
             try:
                 self._collections[name] = self.client.get_or_create_collection(
                     name=name,
-                    metadata={"description": f"VeriSight {name} knowledge"}
+                    # Use cosine space so `similarity = 1 - distance` is actually
+                    # meaningful (the default L2 space makes that transform wrong
+                    # and lets "similarity" go negative/unbounded).
+                    metadata={
+                        "description": f"VeriSight {name} knowledge",
+                        "hnsw:space": "cosine",
+                    },
                 )
             except Exception as e:
                 logger.error(f"Failed to get/create collection '{name}': {e}")
@@ -109,9 +115,14 @@ class KnowledgeBase:
         classification: str,
         files: List[str],
         metadata: Dict[str, str],
+        verified: bool = False,
     ) -> bool:
         """
         Store a complete debugging session in the knowledge base.
+
+        `verified` records whether this conclusion was human/expert-confirmed.
+        Model-generated conclusions are stored with verified=False so retrieval
+        can distinguish confirmed knowledge from unverified self-output.
 
         Args:
             session_id: Unique session identifier.
@@ -144,6 +155,7 @@ class KnowledgeBase:
                     "session_id": session_id,
                     "classification": classification,
                     "timestamp": timestamp,
+                    "verified": str(bool(verified)),
                     "cause": cause[:500],
                     "files": json.dumps(files[:10]),
                     **{k: str(v)[:200] for k, v in metadata.items()},

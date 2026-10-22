@@ -85,7 +85,7 @@ class LLMConfig:
             elif self.provider == "anthropic":
                 self.model_name = "claude-sonnet-5"
             else:
-                self.model_name = "gemini-2.0-flash"
+                self.model_name = "gemini-3.8-flash"
 
         # Resolve API key based on provider
         if not self.api_key and self.provider not in ("ollama", "local", "vllm", "localai", "airgap"):
@@ -115,6 +115,14 @@ class PipelineConfig:
     save_intermediates: bool = True
     enable_rag: bool = True
     rag_n_results: int = 5
+    # Minimum cosine similarity (0-1) for a retrieved RAG document to be used.
+    # Below this, a "similar" neighbour is too dissimilar to be relevant and is
+    # dropped (the old code returned top-k regardless of distance).
+    rag_min_similarity: float = 0.25
+    # A run's conclusion is only written back to the knowledge base when its
+    # confidence is at least this (0-100) AND it is not 'Unknown'. Prevents
+    # low-confidence / abstained / fabricated conclusions from self-reinforcing.
+    rag_writeback_min_confidence: int = 70
     verbose: bool = False
     output_dir: str = "output"
 

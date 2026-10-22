@@ -1,0 +1,18 @@
+{
+  "id": "insufficient_evidence",
+  "title": "Single scoreboard mismatch, no RTL/TB/spec supplied -> must abstain",
+  "category_tag": "insufficient_evidence_negative",
+  "source": "Synthetic (eval/synthetic/insufficient_evidence). Exercises Phase-5/6 insufficient-evidence detection.",
+  "ground_truth_confidence": "high",
+  "inputs": {
+    "log": "eval/synthetic/insufficient_evidence/sim.log"
+  },
+  "ground_truth": {
+    "expect_insufficient_evidence": true,
+    "max_confidence_if_abstain": 60,
+    "notes": "Only a log is given: one mismatch (expected=4 actual=5, no X). Without the scoreboard prediction logic, RTL, or spec it is impossible to know whether the DUT or the reference model is wrong. Correct behaviour: classify Unknown and list missing artifacts (RTL, scoreboard, spec). A confident TB/RTL verdict here is an unsupported guess."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["apb_slave", "alu.sv", "X Propagation"]
+  }
+}

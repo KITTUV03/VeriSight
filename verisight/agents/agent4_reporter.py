@@ -314,7 +314,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"|-------|-------|",
             f"| **Classification** | {report.classification} |",
             f"| **Module** | {report.module} |",
-            f"| **Confidence** | {report.confidence}% |",
             f"| **Category** | {report.category} |",
             f"| **Severity** | {report.severity} |",
             f"",
@@ -625,7 +624,7 @@ class ReportGeneratorAgent(BaseAgent):
             sec_guard_status = "MONITORED"
             sec_shield = "🔒"
         sec_provider = (cfg.llm.provider or "gemini").upper()
-        sec_model = cfg.llm.model_name or "gemini-2.0-flash"
+        sec_model = cfg.llm.model_name or "gemini-3.8-flash"
 
         # Determine failure timestamp for waveform studio
         failure_ts = 65.0
@@ -1606,11 +1605,6 @@ class ReportGeneratorAgent(BaseAgent):
                 <div class="kpi-val" style="color: {class_color}">{report.classification}</div>
                 <div class="kpi-sub">Root failure attribution</div>
             </div>
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">Diagnostic Confidence</div>
-                <div class="kpi-val" style="color: #34d399;">{report.confidence}%</div>
-                <div class="kpi-sub">Multi-agent consensus</div>
-            </div>
             <div class="kpi-card">
                 <div class="kpi-label">Primary Module</div>
                 <div class="kpi-val" style="font-size: 18px; word-break: break-all;">{report.module or 'apb_slave.sv'}</div>
@@ -1815,7 +1809,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"Simulation:     {context['simulation_status']} ({context['simulation_time']})",
             "",
             f"Classification: {report.classification}",
-            f"Confidence:     {report.confidence}%",
             f"Module:         {report.module}",
             f"Category:       {report.category}",
             f"Severity:       {report.severity}",
@@ -1892,8 +1885,28 @@ class ReportGeneratorAgent(BaseAgent):
         knowledge: UnifiedKnowledge,
         session_id: str,
     ) -> None:
-        """Store the debugging session in ChromaDB for future RAG."""
+        """Store the debugging session in ChromaDB for future RAG.
+
+        Writeback is GATED: only confident, non-'Unknown' conclusions are stored,
+        and always as verified=False (model-generated, not expert-confirmed). This
+        prevents the self-reinforcement loop where a low-confidence or abstained —
+        possibly wrong — conclusion is written back and then retrieved as
+        "evidence" on the next run.
+        """
         try:
+            from verisight.config import get_config
+            min_conf = get_config().pipeline.rag_writeback_min_confidence
+
+            if report.classification == "Unknown":
+                self.logger.info("RAG writeback skipped: classification is 'Unknown' (not stored to avoid reinforcing an abstention).")
+                return
+            if int(getattr(report, "confidence", 0) or 0) < min_conf:
+                self.logger.info(
+                    f"RAG writeback skipped: confidence {report.confidence} < "
+                    f"{min_conf} threshold (avoids reinforcing an unverified low-confidence conclusion)."
+                )
+                return
+
             # Build problem description from log errors
             error_msgs = [e.message for e in knowledge.logs.errors[:5]]
             problem = "; ".join(error_msgs) if error_msgs else report.root_cause
@@ -1914,8 +1927,9 @@ class ReportGeneratorAgent(BaseAgent):
                     "confidence": str(report.confidence),
                     "severity": report.severity,
                 },
+                verified=False,
             )
-            self.logger.info(f"Session stored in RAG knowledge base: {session_id}")
+            self.logger.info(f"Session stored in RAG knowledge base (verified=False): {session_id}")
 
         except Exception as e:
             self.logger.warning(f"Failed to store session in RAG: {e}")
