@@ -1,0 +1,426 @@
+----------------------------------------------------------------
+UVM-1.2.Synopsys
+(C) 2007-2014 Mentor Graphics Corporation
+(C) 2007-2014 Cadence Design Systems, Inc.
+(C) 2006-2014 Synopsys, Inc.
+(C) 2011-2013 Cypress Semiconductor Corp.
+(C) 2013-2014 NVIDIA Corporation
+----------------------------------------------------------------
+
+  ***********       IMPORTANT RELEASE NOTES         ************
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_NO_DEPRECATED undefined.
+  See http://www.eda.org/svdb/view.php?id=3313 for more details.
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_OBJECT_DO_NOT_NEED_CONSTRUCTOR undefined.
+  See http://www.eda.org/svdb/view.php?id=3770 for more details.
+
+      (Specify +UVM_NO_RELNOTES to turn off this notice)
+
+UVM_INFO @ 0: reporter [RNTST] Running test ram_test...
+UVM_INFO ram_reset.sv(9) @ 0: uvm_test_top.env.agt.sqr@@reset_seq [ram_reset] Enter in reset task Body
+-------------------------------------------------------------------------------------
+Name                           Type          Size  Value                             
+-------------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @608                              
+  we                           integral      1     'd0                               
+  addr                         integral      4     'd2                               
+  wdata                        integral      8     157                               
+  rdata                        integral      8     'd0                               
+  begin_time                   time          64    0                                 
+  depth                        int           32    'd2                               
+  parent sequence (name)       string        9     reset_seq                         
+  parent sequence (full name)  string        34    uvm_test_top.env.agt.sqr.reset_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr          
+-------------------------------------------------------------------------------------
+UVM_INFO ram_reset.sv(9) @ 5: uvm_test_top.env.agt.sqr@@reset_seq [ram_reset] Enter in reset task Body
+-------------------------------------------------------------------------------------
+Name                           Type          Size  Value                             
+-------------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @644                              
+  we                           integral      1     1                                 
+  addr                         integral      4     'd0                               
+  wdata                        integral      8     'd95                              
+  rdata                        integral      8     'd0                               
+  begin_time                   time          64    5                                 
+  depth                        int           32    'd2                               
+  parent sequence (name)       string        9     reset_seq                         
+  parent sequence (full name)  string        34    uvm_test_top.env.agt.sqr.reset_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr          
+-------------------------------------------------------------------------------------
+UVM_WARNING ram_scoeboard.sv(32) @ 15: uvm_test_top.env.scb [RAM_SB] Read from uninitialized addr 0
+UVM_INFO ram_reset.sv(9) @ 15: uvm_test_top.env.agt.sqr@@reset_seq [ram_reset] Enter in reset task Body
+-------------------------------------------------------------------------------------
+Name                           Type          Size  Value                             
+-------------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @652                              
+  we                           integral      1     1                                 
+  addr                         integral      4     'd0                               
+  wdata                        integral      8     225                               
+  rdata                        integral      8     'd0                               
+  begin_time                   time          64    15                                
+  depth                        int           32    'd2                               
+  parent sequence (name)       string        9     reset_seq                         
+  parent sequence (full name)  string        34    uvm_test_top.env.agt.sqr.reset_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr          
+-------------------------------------------------------------------------------------
+UVM_INFO ram_reset.sv(9) @ 25: uvm_test_top.env.agt.sqr@@reset_seq [ram_reset] Enter in reset task Body
+-------------------------------------------------------------------------------------
+Name                           Type          Size  Value                             
+-------------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @658                              
+  we                           integral      1     1                                 
+  addr                         integral      4     'd0                               
+  wdata                        integral      8     'd92                              
+  rdata                        integral      8     'd0                               
+  begin_time                   time          64    25                                
+  depth                        int           32    'd2                               
+  parent sequence (name)       string        9     reset_seq                         
+  parent sequence (full name)  string        34    uvm_test_top.env.agt.sqr.reset_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr          
+-------------------------------------------------------------------------------------
+UVM_INFO ram_reset.sv(9) @ 35: uvm_test_top.env.agt.sqr@@reset_seq [ram_reset] Enter in reset task Body
+-------------------------------------------------------------------------------------
+Name                           Type          Size  Value                             
+-------------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @664                              
+  we                           integral      1     'd0                               
+  addr                         integral      4     'd0                               
+  wdata                        integral      8     221                               
+  rdata                        integral      8     'd0                               
+  begin_time                   time          64    35                                
+  depth                        int           32    'd2                               
+  parent sequence (name)       string        9     reset_seq                         
+  parent sequence (full name)  string        34    uvm_test_top.env.agt.sqr.reset_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr          
+-------------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 45: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @688                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     'd9                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    45                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 55: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @694                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd0                           
+  wdata                        integral      8     'd24                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    55                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 65: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @704                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     145                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    65                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 75: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @714                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd0                           
+  wdata                        integral      8     'd42                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    75                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 85: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @724                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     'd44                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    85                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 95: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @734                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     'd92                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    95                            
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 105: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @744                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd0                           
+  wdata                        integral      8     233                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    105                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 115: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @754                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     'd85                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    115                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 125: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @764                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     'd110                         
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    125                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO write_sequence.sv(8) @ 135: uvm_test_top.env.agt.sqr@@w_seq [ram_write_seq] Enter in write_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @774                          
+  we                           integral      1     1                             
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     201                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    135                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     w_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.w_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 145: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @786                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     'd95                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    145                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 155: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @796                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     237                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    155                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 165: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @806                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     246                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    165                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_ERROR ram_scoeboard.sv(22) @ 175: uvm_test_top.env.scb [RAM_SB] Mismatch @addr 1 EXP=201 ACT=110
+UVM_INFO read_seq.sv(9) @ 175: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @814                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     232                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    175                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 185: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @824                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     134                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    185                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_ERROR ram_scoeboard.sv(22) @ 195: uvm_test_top.env.scb [RAM_SB] Mismatch @addr 2 EXP=110 ACT=0
+UVM_INFO read_seq.sv(9) @ 195: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @832                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd0                           
+  wdata                        integral      8     'd90                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    195                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 205: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @842                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     'd80                          
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    205                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_ERROR ram_scoeboard.sv(22) @ 215: uvm_test_top.env.scb [RAM_SB] Mismatch @addr 2 EXP=110 ACT=0
+UVM_INFO read_seq.sv(9) @ 215: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @850                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     254                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    215                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO read_seq.sv(9) @ 225: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @860                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd2                           
+  wdata                        integral      8     249                           
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    225                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_ERROR ram_scoeboard.sv(22) @ 235: uvm_test_top.env.scb [RAM_SB] Mismatch @addr 1 EXP=201 ACT=110
+UVM_INFO read_seq.sv(9) @ 235: uvm_test_top.env.agt.sqr@@r_seq [ram_read_seq] Enter in read_seq task Body
+---------------------------------------------------------------------------------
+Name                           Type          Size  Value                         
+---------------------------------------------------------------------------------
+ram_tx                         ram_seq_item  -     @868                          
+  we                           integral      1     'd0                           
+  addr                         integral      4     'd1                           
+  wdata                        integral      8     'd118                         
+  rdata                        integral      8     'd0                           
+  begin_time                   time          64    235                           
+  depth                        int           32    'd2                           
+  parent sequence (name)       string        5     r_seq                         
+  parent sequence (full name)  string        30    uvm_test_top.env.agt.sqr.r_seq
+  sequencer                    string        24    uvm_test_top.env.agt.sqr      
+---------------------------------------------------------------------------------
+UVM_INFO /apps/vcsmx/vcs/X-2025.06-SP1//etc/uvm-1.2/src/base/uvm_objection.svh(1276) @ 245: reporter [TEST_DONE] 'run' phase is ready to proceed to the 'extract' phase
+UVM_INFO /apps/vcsmx/vcs/X-2025.06-SP1//etc/uvm-1.2/src/base/uvm_report_server.svh(904) @ 245: reporter [UVM/REPORT/SERVER] 
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   28
+UVM_WARNING :    1
+UVM_ERROR :    4
+UVM_FATAL :    0
+** Report counts by id
+[RAM_SB]     5
+[RNTST]     1
+[TEST_DONE]     1
+[UVM/RELNOTES]     1
+[ram_read_seq]    10
+[ram_reset]     5
+[ram_write_seq]    10
+
+$finish called from file "/apps/vcsmx/vcs/X-2025.06-SP1//etc/uvm-1.2/src/base/uvm_root.svh", line 532.
+$finish at simulation time                  245
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 245 ns
+CPU Time:      0.740 seconds;       Data structure size:   0.4Mb
+Tue Oct 20 16:16:31 2026

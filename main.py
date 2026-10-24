@@ -55,7 +55,7 @@ Examples:
         "command",
         nargs="?",
         default=None,
-        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
+        help="Optional command: 'start' (guided wizard), 'train' (train & ground RAG knowledge base on 100+ verification scenarios), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
     )
     parser.add_argument(
         "--interactive", "-i",
@@ -242,7 +242,7 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (e.g. gemini-2.0-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
+        help="LLM model name (e.g. gemini-3.5-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
     )
     parser.add_argument(
         "--airgap",
@@ -392,6 +392,12 @@ def main():
         planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
         return
 
+    # Handle 'train' command: Knowledge Base Training & Dataset Population
+    if args.command in ("train", "train-kb", "learn"):
+        from verisight.rag.train_knowledge_base import train_knowledge_base
+        train_knowledge_base()
+        return
+
     # Handle 'sim' / 'simulate' command: One-Click Closed-Loop Runner
     if args.command in ("sim", "simulate"):
         if not args.rtl or not args.tb:
@@ -430,8 +436,7 @@ def main():
         console.print("=" * 62)
         console.print(f"  [bold]Simulator Backend:[/]   {sim_res.simulator} (Exit Code: {sim_res.returncode})")
         console.print(f"  [bold]Simulation Time:[/]     {sim_res.duration_s}s")
-        console.print(f"  [bold]Errors Caught:[/]       {sim_res.error_count}")
-        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification} (Confidence: {int(dbg.confidence*100)}%)")
+        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification}")
         console.print(f"  [bold]Root Cause:[/]          {dbg.root_cause[:70]}...")
         console.print()
         console.print("  [bold cyan]Interactive HTML Dashboards:[/bold cyan]")
@@ -577,7 +582,6 @@ def main():
         console.print("[bold green]Pipeline completed successfully![/]")
         console.print()
         console.print(f"  [bold]Classification:[/] {report.classification}")
-        console.print(f"  [bold]Confidence:[/]     {report.confidence}%")
         console.print(f"  [bold]Root Cause:[/]     {report.root_cause[:80]}")
         console.print(f"  [bold]Module:[/]         {report.module}")
         console.print(f"  [bold]Category:[/]       {report.category}")

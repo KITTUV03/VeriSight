@@ -42,7 +42,7 @@ class SimRequest(BaseModel):
     airgap: bool = True
     provider: Optional[str] = "gemini"
     api_key: Optional[str] = None
-    model_name: Optional[str] = "gemini-2.0-flash"
+    model_name: Optional[str] = "gemini-3.5-flash"
 
 
 class ApplyFixRequest(BaseModel):

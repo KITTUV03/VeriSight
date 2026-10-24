@@ -242,7 +242,6 @@ class VeriSightPipeline:
         logger.info("║              VeriSight Pipeline Complete                   ║")
         logger.info("╚" + "═" * 58 + "╝")
         logger.info(f"  Classification: {self.report.classification}")
-        logger.info(f"  Confidence:     {self.report.confidence}%")
         logger.info(f"  Root Cause:     {self.report.root_cause[:80]}")
         logger.info(f"  Output:         {output_dir}/")
         logger.info("")

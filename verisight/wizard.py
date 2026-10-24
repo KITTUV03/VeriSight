@@ -116,16 +116,25 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     Returns:
         (provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint)
     """
+    from dotenv import load_dotenv
     from verisight.utils.key_validator import (
         probe_gemini_key,
         probe_anthropic_key,
         probe_local_engine,
     )
 
-    gemini_env = os.getenv("GEMINI_API_KEY", "").strip()
-    anthropic_env = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    # Ensure .env is freshly loaded with override=True so changes in .env are picked up
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(dotenv_path=env_file, override=True)
+    elif Path(".env").exists():
+        load_dotenv(dotenv_path=Path(".env"), override=True)
 
-    # Fast non-blocking health probe (<0.5s)
+    gemini_env = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    anthropic_env = (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY") or "").strip()
+    configured_provider = (os.getenv("VERISIGHT_PROVIDER") or "").strip().lower()
+
+    # Fast non-blocking health probe
     with console.status("[dim]Probing AI execution environments & credentials...[/dim]"):
         g_valid, g_status = probe_gemini_key(gemini_env)
         a_valid, a_status = probe_anthropic_key(anthropic_env)
@@ -139,7 +148,7 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     if g_valid:
         g_cell = f"[bold green]✓ Valid & Active[/bold green] ({g_status})"
     elif gemini_env:
-        g_cell = f"[bold red]✗ Invalid Key[/bold red] ({g_status})"
+        g_cell = f"[yellow]⚠ Probe Warning[/yellow] ({g_status})"
     else:
         g_cell = "[yellow]Not configured in .env[/yellow]"
     table.add_row("Google Gemini (Cloud)", g_cell)
@@ -148,7 +157,7 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     if a_valid:
         a_cell = f"[bold green]✓ Valid & Active[/bold green] ({a_status})"
     elif anthropic_env:
-        a_cell = f"[bold red]✗ Invalid Key[/bold red] ({a_status})"
+        a_cell = f"[yellow]⚠ Probe Warning[/yellow] ({a_status})"
     else:
         a_cell = "[yellow]Not configured in .env[/yellow]"
     table.add_row("Anthropic Claude (Cloud)", a_cell)
@@ -173,25 +182,26 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     choice_map[str(idx)] = "airgap"
     idx += 1
 
-    # 2. Anthropic Claude (Prioritize if verified active!)
-    if anthropic_env:
-        if a_valid:
-            choices.append(f"{idx}. (Recommended) Use detected Claude API key [bold green]✓ ACTIVE[/bold green] (claude-sonnet-5)")
-            recommended_idx = str(idx)
+    # 2. Google Gemini
+    gemini_choice_idx = None
+    if gemini_env:
+        gemini_choice_idx = str(idx)
+        if g_valid:
+            choices.append(f"{idx}. Use detected Gemini Cloud key [bold green]✓ ACTIVE[/bold green] (gemini-3.5-flash)")
         else:
-            choices.append(f"{idx}. Use detected Claude Cloud key [bold red]✗ INVALID[/bold red] ({a_status})")
-        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5", False, False, "", a_valid, a_status)
+            choices.append(f"{idx}. Use detected Gemini Cloud key [yellow]⚠ UNVERIFIED[/yellow] ({g_status})")
+        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-3.5-flash", False, False, "", g_valid, g_status)
         idx += 1
 
-    # 3. Google Gemini
-    if gemini_env:
-        if g_valid:
-            choices.append(f"{idx}. Use detected Gemini Cloud key [bold green]✓ ACTIVE[/bold green] (gemini-2.0-flash)")
-            if not a_valid:
-                recommended_idx = str(idx)
+    # 3. Anthropic Claude
+    claude_choice_idx = None
+    if anthropic_env:
+        claude_choice_idx = str(idx)
+        if a_valid:
+            choices.append(f"{idx}. Use detected Claude API key [bold green]✓ ACTIVE[/bold green] (claude-sonnet-5)")
         else:
-            choices.append(f"{idx}. Use detected Gemini Cloud key [bold red]✗ INVALID[/bold red] ({g_status})")
-        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-2.0-flash", False, False, "", g_valid, g_status)
+            choices.append(f"{idx}. Use detected Claude Cloud key [yellow]⚠ UNVERIFIED[/yellow] ({a_status})")
+        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5", False, False, "", a_valid, a_status)
         idx += 1
 
     # 4. Custom keys
@@ -206,6 +216,27 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     # 5. Deterministic Offline
     choices.append(f"{idx}. Run in Offline / Deterministic Mode (pure rule-based analysis, no LLM)")
     choice_map[str(idx)] = "offline"
+
+    # Determine recommended index based on provider preference & health
+    if configured_provider in ("gemini", "google") and gemini_choice_idx:
+        recommended_idx = gemini_choice_idx
+    elif configured_provider in ("anthropic", "claude") and claude_choice_idx:
+        recommended_idx = claude_choice_idx
+    elif gemini_choice_idx and g_valid:
+        recommended_idx = gemini_choice_idx
+    elif claude_choice_idx and a_valid:
+        recommended_idx = claude_choice_idx
+    elif gemini_choice_idx:
+        recommended_idx = gemini_choice_idx
+    elif claude_choice_idx:
+        recommended_idx = claude_choice_idx
+
+    # Annotate recommended choice
+    for i, c in enumerate(choices):
+        prefix = f"{recommended_idx}."
+        if c.startswith(prefix):
+            choices[i] = c.replace(prefix, f"{prefix} (Recommended)", 1)
+            break
 
     console.print("[bold]Select AI Execution & Security Mode:[/bold]")
     for c in choices:
@@ -244,23 +275,35 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     if isinstance(action, tuple):
         provider, key, model, airgap, anon, endpoint, is_healthy, health_msg = action
         
-        # If the user explicitly selected a key that is invalid, offer graceful diagnostic
+        # If the user selected a key that reported a health warning, ask if they want to proceed anyway
         if not is_healthy:
-            console.print(f"\n[bold red]⚠️ Selected {provider.capitalize()} API key failed health probe:[/bold red]")
-            console.print(f"   [yellow]Reason:[/] {health_msg}")
+            console.print(f"\n[bold yellow]⚠️ Selected {provider.capitalize()} API key reported a health warning:[/bold yellow]")
+            console.print(f"   [yellow]Probe Message:[/] {health_msg}")
             
+            proceed_anyway = Confirm.ask(
+                f"[bold]Would you like to proceed using this existing {provider.capitalize()} API key anyway?[/bold]",
+                default=True,
+            )
+            if proceed_anyway:
+                console.print(f"[green]✓ Proceeding with existing {provider.capitalize()} API key.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = provider
+                return provider, key, model, airgap, anon, endpoint
+
             remedy_choices = []
             remedy_map = {}
             r_idx = 1
             
-            # If Anthropic is active, offer 1-click switch
-            if provider != "anthropic" and a_valid:
-                remedy_choices.append(f"{r_idx}. Switch to Anthropic Claude (✓ Verified Active in environment)")
-                remedy_map[str(r_idx)] = "switch_anthropic"
-                r_idx += 1
-            elif provider != "gemini" and g_valid:
-                remedy_choices.append(f"{r_idx}. Switch to Google Gemini (✓ Verified Active in environment)")
+            remedy_choices.append(f"{r_idx}. Proceed anyway with detected {provider.capitalize()} key (bypass probe check)")
+            remedy_map[str(r_idx)] = "proceed_anyway"
+            r_idx += 1
+
+            if provider != "gemini" and gemini_env:
+                remedy_choices.append(f"{r_idx}. Switch to Google Gemini (Detected in environment)")
                 remedy_map[str(r_idx)] = "switch_gemini"
+                r_idx += 1
+            elif provider != "anthropic" and anthropic_env:
+                remedy_choices.append(f"{r_idx}. Switch to Anthropic Claude (Detected in environment)")
+                remedy_map[str(r_idx)] = "switch_anthropic"
                 r_idx += 1
                 
             remedy_choices.append(f"{r_idx}. Enter a new, working {provider.capitalize()} API key")
@@ -281,21 +324,28 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
             rem_sel = Prompt.ask("\n[bold]Your choice[/bold]", choices=[str(i) for i in range(1, r_idx + 1)], default="1")
             rem_action = remedy_map[rem_sel]
 
-            if rem_action == "switch_anthropic":
+            if rem_action == "proceed_anyway":
+                console.print(f"[green]✓ Proceeding with existing {provider.capitalize()} API key.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = provider
+                return provider, key, model, airgap, anon, endpoint
+            elif rem_action == "switch_anthropic":
                 console.print("[green]✓ Switched to Anthropic Claude.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = "anthropic"
                 return "anthropic", anthropic_env, "claude-sonnet-5", False, False, ""
             elif rem_action == "switch_gemini":
                 console.print("[green]✓ Switched to Google Gemini.[/green]")
-                return "gemini", gemini_env, "gemini-2.0-flash", False, False, ""
+                os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                return "gemini", gemini_env, "gemini-3.5-flash", False, False, ""
             elif rem_action == f"enter_{provider}":
                 action = f"custom_{provider}"
             elif rem_action == "airgap":
                 return "ollama", "sovereign_local_key", "deepseek-coder:33b", True, False, "http://localhost:11434"
             else:
-                return "gemini", None, "gemini-2.0-flash", True, False, ""
+                return "gemini", None, "gemini-3.5-flash", True, False, ""
 
         if isinstance(action, tuple):
             console.print(f"[green]✓[/green] Using verified {provider.capitalize()} API key.")
+            os.environ["VERISIGHT_PROVIDER"] = provider
             return provider, key, model, airgap, anon, endpoint
 
     if action == "custom_gemini":
@@ -312,13 +362,20 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
                 console.print(f"[bold green]✓ Key validated successfully![/bold green] ({msg})")
                 _offer_save_key("GEMINI_API_KEY", key)
                 anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Google Cloud?", default=False)
-                return "gemini", key, "gemini-2.0-flash", False, anon, ""
+                os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                return "gemini", key, "gemini-3.5-flash", False, anon, ""
             else:
-                console.print(f"[bold red]✗ Key validation failed:[/] {msg}")
+                console.print(f"[bold yellow]⚠️ Key probe warning:[/] {msg}")
+                use_anyway = Confirm.ask("Would you like to use this Gemini key anyway without validation?", default=True)
+                if use_anyway:
+                    _offer_save_key("GEMINI_API_KEY", key)
+                    anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Google Cloud?", default=False)
+                    os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                    return "gemini", key, "gemini-3.5-flash", False, anon, ""
                 retry = Confirm.ask("Would you like to try entering the key again?", default=True)
                 if not retry:
                     console.print("[yellow]Falling back to offline deterministic mode.[/yellow]")
-                    return "gemini", None, "gemini-2.0-flash", True, False, ""
+                    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
     if action == "custom_claude":
         while True:
@@ -334,21 +391,29 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
                 console.print(f"[bold green]✓ Key validated successfully![/bold green] ({msg})")
                 _offer_save_key("ANTHROPIC_API_KEY", key)
                 anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Anthropic Cloud?", default=False)
+                os.environ["VERISIGHT_PROVIDER"] = "anthropic"
                 return "anthropic", key, "claude-sonnet-5", False, anon, ""
             else:
-                console.print(f"[bold red]✗ Key validation failed:[/] {msg}")
+                console.print(f"[bold yellow]⚠️ Key probe warning:[/] {msg}")
+                use_anyway = Confirm.ask("Would you like to use this Claude key anyway without validation?", default=True)
+                if use_anyway:
+                    _offer_save_key("ANTHROPIC_API_KEY", key)
+                    anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Anthropic Cloud?", default=False)
+                    os.environ["VERISIGHT_PROVIDER"] = "anthropic"
+                    return "anthropic", key, "claude-sonnet-5", False, anon, ""
                 retry = Confirm.ask("Would you like to try entering the key again?", default=True)
                 if not retry:
                     console.print("[yellow]Falling back to offline deterministic mode.[/yellow]")
-                    return "gemini", None, "gemini-2.0-flash", True, False, ""
+                    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
     # Offline mode
     console.print("[yellow]! Running in offline deterministic mode (no LLM will be queried).[/yellow]")
-    return "gemini", None, "gemini-2.0-flash", True, False, ""
+    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
 
 def _offer_save_key(var_name: str, key_val: str):
     """Prompt user if they want to persist their key to .env for future convenience."""
+    os.environ[var_name] = key_val  # Instantly update current process environment
     save = Confirm.ask("Would you like to save this key to your local .env file for future runs?", default=True)
     if save:
         env_path = Path(".env")
@@ -627,7 +692,6 @@ def run_debug_flow(
         console.print("[bold green]🎉 Analysis Completed Successfully![/bold green]")
         console.print("=" * 62)
         console.print(f"  [bold]Classification:[/]  {report.classification}")
-        console.print(f"  [bold]Confidence:[/]      {report.confidence}%")
         console.print(f"  [bold]Root Cause:[/]      {report.root_cause}")
         console.print(f"  [bold]Category:[/]        {report.category}")
         console.print(f"  [bold]Module:[/]          {report.module}")
@@ -725,7 +789,7 @@ def run_sim_flow(
 
         rca_res = results.get("rca")
         if rca_res:
-            console.print(f"\n  [bold cyan]RCA Diagnosis:[/]   {rca_res.classification} ({rca_res.confidence}% conf)")
+            console.print(f"\n  [bold cyan]RCA Diagnosis:[/]   {rca_res.classification}")
             console.print(f"  [bold]Root Cause:[/]      {rca_res.root_cause}")
 
         dashboards = results.get("dashboards", {})

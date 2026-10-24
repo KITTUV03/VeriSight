@@ -197,6 +197,20 @@ class LLMAdapter:
             )
             return response.text
         except Exception as e:
+            err_str = str(e).lower()
+            if self.model_name != "gemini-3.5-flash" and any(k in err_str for k in ("404", "504", "deadline", "timed out", "not found", "no longer available")):
+                logger.warning(f"Gemini model '{self.model_name}' failed ({e}). Falling back to 'gemini-3.5-flash'...")
+                import google.generativeai as genai
+                self.model_name = "gemini-3.5-flash"
+                self._model = genai.GenerativeModel(self.model_name)
+                response = self._model.generate_content(
+                    full_prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=self.temperature,
+                        max_output_tokens=self.max_output_tokens,
+                    )
+                )
+                return response.text
             logger.error(f"Gemini API call failed: {e}")
             raise
 

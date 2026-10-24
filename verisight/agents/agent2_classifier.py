@@ -416,6 +416,9 @@ class RootCauseClassifierAgent(BaseAgent):
                     f"  - {block.block_type} block @ line {block.line_start}: "
                     f"writes {block.signals_written}, {reset_info}\n"
                 )
+                if block.raw_code:
+                    code_snippet = "\n".join("      " + line for line in block.raw_code.splitlines()[:30])
+                    rtl_summary += f"    Implementation:\n{code_snippet}\n"
                 for issue in block.issues:
                     rtl_summary += f"    ⚠ {issue}\n"
 
@@ -441,19 +444,27 @@ class RootCauseClassifierAgent(BaseAgent):
         # Pre-analysis findings
         pre_findings = "\n".join(pre_analysis.get("evidence", [])) or "No deterministic findings"
 
-        # RAG context — explicitly framed as *similar prior cases*, NOT proof.
-        # A similar past case does not establish that THIS failure has the same
-        # cause; the model must verify independently against the evidence above.
+        # RAG context — explicitly framed as *similar prior cases* and *verified bug patterns*.
         rag_summary = ""
-        if knowledge.rag_context and knowledge.rag_context.similar_failures:
-            rag_summary = (
-                "SIMILAR PRIOR CASES (reference only — NOT proof of this cause; "
-                "verify independently before relying on them):\n"
-            )
-            for f in knowledge.rag_context.similar_failures[:3]:
-                sim = f.get("similarity")
-                sim_str = f" (similarity={sim:.2f})" if isinstance(sim, (int, float)) else ""
-                rag_summary += f"- {f.get('document', '')[:200]}{sim_str}\n"
+        if knowledge.rag_context:
+            parts = []
+            if knowledge.rag_context.similar_failures:
+                parts.append(
+                    "SIMILAR PRIOR CASES (reference only — NOT proof of this cause; "
+                    "verify independently before relying on them):"
+                )
+                for f in knowledge.rag_context.similar_failures[:3]:
+                    sim = f.get("similarity")
+                    sim_str = f" (similarity={sim:.2f})" if isinstance(sim, (int, float)) else ""
+                    parts.append(f"- {f.get('document', '')[:200]}{sim_str}")
+            if knowledge.rag_context.relevant_patterns:
+                parts.append("VERIFIED BUG PATTERNS & HEURISTICS:")
+                for p in knowledge.rag_context.relevant_patterns[:3]:
+                    sim = p.get("similarity")
+                    sim_str = f" (similarity={sim:.2f})" if isinstance(sim, (int, float)) else ""
+                    parts.append(f"- {p.get('document', '')[:200]}{sim_str}")
+            if parts:
+                rag_summary = "\n".join(parts) + "\n"
 
         prompt = f"""Analyze this simulation failure and classify the root cause.
 

@@ -148,7 +148,7 @@ class KnowledgeBase:
 
         try:
             # Store the error/problem
-            errors_col.add(
+            errors_col.upsert(
                 documents=[problem],
                 ids=[f"{session_id}_error"],
                 metadatas=[{
@@ -163,7 +163,7 @@ class KnowledgeBase:
             )
 
             # Store the fix
-            fixes_col.add(
+            fixes_col.upsert(
                 documents=[fix],
                 ids=[f"{session_id}_fix"],
                 metadatas=[{
@@ -182,7 +182,7 @@ class KnowledgeBase:
                 f"Fix: {fix}\n"
                 f"Files: {', '.join(files[:5])}"
             )
-            lessons_col.add(
+            lessons_col.upsert(
                 documents=[lesson],
                 ids=[f"{session_id}_lesson"],
                 metadatas=[{
@@ -212,7 +212,7 @@ class KnowledgeBase:
             return False
 
         try:
-            patterns_col.add(
+            patterns_col.upsert(
                 documents=[pattern_description],
                 ids=[pattern_id],
                 metadatas=[{
@@ -239,7 +239,7 @@ class KnowledgeBase:
             return False
 
         try:
-            collection.add(
+            collection.upsert(
                 documents=[document],
                 ids=[doc_id],
                 metadatas=[{

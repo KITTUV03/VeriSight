@@ -17,8 +17,8 @@ class TestLLMConfigProvider:
         with patch.dict(os.environ, {}, clear=True):
             config = LLMConfig()
             assert config.provider == "gemini"
-            # Keep in sync with the default in config.py (was stale: gemini-2.0-flash).
-            assert config.model_name == "gemini-3.8-flash"
+            # Keep in sync with the default in config.py.
+            assert config.model_name == "gemini-3.5-flash"
 
     def test_explicit_anthropic_provider(self):
         with patch.dict(os.environ, {}, clear=True):

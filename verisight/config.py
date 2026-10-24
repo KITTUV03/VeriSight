@@ -14,7 +14,11 @@ from typing import List, Optional
 from dotenv import load_dotenv
 
 # Load .env file from project root
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+env_file = Path(__file__).resolve().parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(dotenv_path=env_file, override=True)
+elif Path(".env").exists():
+    load_dotenv(dotenv_path=Path(".env"), override=True)
 
 
 @dataclass
@@ -54,6 +58,10 @@ class LLMConfig:
                 self.provider = env_provider.lower()
             elif self.airgap:
                 self.provider = "ollama"
+            elif os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+                self.provider = "gemini"
+            elif os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY"):
+                self.provider = "anthropic"
             else:
                 self.provider = "gemini"
         else:
@@ -68,8 +76,8 @@ class LLMConfig:
         # Auto-detect provider if model name starts with claude
         if self.model_name and self.model_name.lower().startswith("claude"):
             self.provider = "anthropic"
-        # Auto-switch to anthropic if ANTHROPIC_API_KEY is present and GEMINI_API_KEY is missing
-        elif self.provider == "gemini" and not os.getenv("GEMINI_API_KEY") and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")):
+        # Auto-switch to anthropic only if ANTHROPIC_API_KEY is present and NO Gemini key is configured
+        elif self.provider == "gemini" and not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")) and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")):
             self.provider = "anthropic"
 
         # Normalize aliases
@@ -85,14 +93,14 @@ class LLMConfig:
             elif self.provider == "anthropic":
                 self.model_name = "claude-sonnet-5"
             else:
-                self.model_name = "gemini-3.8-flash"
+                self.model_name = "gemini-3.5-flash"
 
         # Resolve API key based on provider
         if not self.api_key and self.provider not in ("ollama", "local", "vllm", "localai", "airgap"):
             if self.provider == "anthropic":
                 self.api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY", "")
             else:
-                self.api_key = os.getenv("GEMINI_API_KEY", "")
+                self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
 
 
 @dataclass

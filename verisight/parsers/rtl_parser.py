@@ -140,7 +140,7 @@ def _extract_ports(content: str) -> List[Port]:
     port_pattern = re.compile(
         r"(input|output|inout)\s+"
         r"(?:(wire|reg|logic)\s+)?"
-        r"(?:(\[[\d:]+\])\s+)?"
+        r"(?:(\[[^\]]+\])\s+)?"
         r"(\w+)",
         re.MULTILINE
     )

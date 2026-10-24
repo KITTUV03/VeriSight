@@ -1,7 +1,7 @@
 # VeriSight Debugging Report
 
-**Session:** 6c4840cc
-**Generated:** 2026-08-05T16:48:17.272945
+**Session:** a0c08137
+**Generated:** 2026-10-21T04:37:30.341442
 **Simulation Status:** FAIL
 **Simulation Time:** 
 
@@ -11,98 +11,53 @@
 
 | Field | Value |
 |-------|-------|
-| **Classification** | RTL Bug |
-| **Module** | sync_fifo (status flag / count generation logic) |
-| **Confidence** | 78% |
-| **Category** | Functional / Reset Initialization → Status-Flag & Protocol Violation |
-| **Severity** | medium |
+| **Classification** | TB Bug |
+| **Module** | Scoreboard |
+| **Category** | Timing / Latency |
+| **Severity** | high |
 
-**Root Cause:** The dominant failure signature is that the FIFO's status flags do not track the occupancy count as required by the specification: full stays 0 when the FIFO is full (@85 ns), empty stays 1 when data is present (@125 ns), and almost_full stays 0 when the AF_LEVEL threshold is crossed (@210 ns). These stale/late flags then cause the downstream protocol violations (write when full @355 ns, read when empty @420 ns) and the simultaneous read/write data mismatch @350 ns. Structural RTL analysis confirms a reset-coverage defect: 'fifo_count' is written in the sequential block at projects/fifo/rtl/sync_fifo.sv:63 but is not assigned in the reset clause, so occupancy (and hence every flag derived from it) starts from an indeterminate/uninitialized value and remains permanently skewed relative to the actual pointer difference (rd_ptr/wr_ptr are reset at line 43). This is a violation of REQ-007, REQ-008, REQ-009, REQ-011 and REQ-012 by the design → Decision Rule Case 6/7/8 (RTL violates spec, uninitialized state, protocol protection not implemented correctly).
-
-**Affected Signals:** `fifo_count`
+**Root Cause:** The testbench scoreboard does not account for the 1-clock-cycle synchronous read latency specified in REQ-012. The scoreboard immediately compares the current read address against the current rdata in the same cycle, sampling the stale rdata from the previous operation rather than pipelining the check to the following cycle.
 
 ## Error Timeline
 
 | Time | Severity | Message |
 |------|----------|---------|
-| 85 ns | UVM_ERROR | FIFO count mismatch: Expected 15, Got 15 |
-| 85 ns | UVM_ERROR | Full flag mismatch: Expected 1, Got 0 |
-| 125 ns | UVM_ERROR | Empty flag mismatch: Expected 0, Got 1 |
-| 210 ns | UVM_ERROR | Almost full flag mismatch: Expected 1, Got 0 |
-| 350 ns | UVM_ERROR | Data mismatch at simultaneous read/write |
-| 355 ns | UVM_ERROR | Write attempted when FIFO full! |
-| 420 ns | UVM_ERROR | Read attempted when FIFO empty! |
-
-## Scoreboard Mismatches
-
-| Time | Expected | Actual |
-|------|----------|--------|
-|  | 1 | 0 |
-|  | 15 | 15 |
-|  | 1 | 0 |
-|  | 0 | 1 |
-|  | 0 | 1 |
-|  | 1 | 0 |
-|  | 1 | 0 |
+| 175 ns | UVM_ERROR | Mismatch @addr 1 EXP=201 ACT=110 |
+| 195 ns | UVM_ERROR | Mismatch @addr 2 EXP=110 ACT=0 |
+| 215 ns | UVM_ERROR | Mismatch @addr 2 EXP=110 ACT=0 |
+| 235 ns | UVM_ERROR | Mismatch @addr 1 EXP=201 ACT=110 |
+|  | UVM_ERROR | 4 |
 
 ## Evidence Chain
 
-1. **[rtl]** projects/fifo/rtl/sync_fifo.sv:63 — Sequential block drives fifo_count and all status flags but fifo_count is absent from the reset clause, leaving occupancy uninitialized after reset (Case 7 style X/indeterminate state).
-2. **[rtl]** projects/fifo/rtl/sync_fifo.sv:43 — wr_ptr/rd_ptr ARE reset, so pointer-based occupancy and the separately maintained fifo_count can diverge immediately after reset, producing permanently wrong flags.
-3. **[log]** @85 ns, @125 ns, @210 ns — Three independent flag checks (full, empty, almost_full) all fail in the same direction: the flag lags/does not reflect actual occupancy — a systematic count/threshold defect, not a random data corruption.
-4. **[log]** @355 ns, @420 ns — Overflow (write when full) and underflow (read when empty) protection failed, i.e. REQ-011/REQ-012 protection mechanisms are ineffective because they depend on the broken full/empty flags → Case 8 protocol implemented incorrectly in RTL.
-5. **[spec]** REQ-007/008/009/011/012/013 — Spec unambiguously requires full when no space remains, empty when no data available, almost_full at AF_LEVEL, and one-cycle overflow/underflow pulses. No self-contradiction exists in the requirement set, so Case 9 (Spec Bug) is excluded.
-6. **[log]** @350 ns 'Data mismatch at simultaneous read/write' — Concurrent read/write handling corrupts dout/count bookkeeping — a classic symptom of incorrect count update for the simultaneous case in the same block at line 63.
-7. **[tb]** Scoreboard: 'No scoreboard found' in collected artifacts — TB predictor source unavailable, so a scoreboard off-by-one cannot be fully excluded; the '@85 ns Expected 15, Got 15' message is the only TB-side anomaly and affects a single check, not the flag failures.
-8. **[rtl]** projects/fifo/rtl/sync_fifo.sv:63 — Signal 'fifo_count' never reset in module 'sync_fifo'
+1. **[spec]** REQ-012 — Specification defines synchronous read latency of exactly one clock cycle
+2. **[rtl]** projects/ram/rtl/ram_rtl.sv:17 — RTL implements synchronous registered read data conforming to specification
+3. **[tb]** projects/ram/tb/ram_scoreboard.sv — Scoreboard checks read data combinationally/immediately against memory[tr.addr] without 1-cycle delay
+4. **[log]** @175 ns, @235 ns — ACT data corresponds to data from previous read transaction (addr 2 data 110 seen during addr 1 read)
 
 ## Reasoning Chain
 
-**Step 1:** Seven errors: three status-flag mismatches, one data mismatch on simultaneous rd/wr, and two protocol-protection violations (write-when-full, read-when-empty).
-  → *Inference:* Failures cluster around occupancy tracking and flag generation rather than data path storage.
-  → *Source:* simulation log
+**Step 1:** UVM error logs report mismatches during read operations where ACT matches data from a different/earlier transaction (e.g. ACT=110 at addr 1 read, where 110 is the content of addr 2).
+  → *Inference:* The read data observed by the scoreboard is offset by one cycle from the expected address.
+  → *Source:* log
 
-**Step 2:** Spec REQ-007..REQ-013 define full/empty/almost_full/almost_empty/overflow/underflow/count behavior consistently; no contradictory statements.
-  → *Inference:* Spec Bug (Case 9) ruled out.
-  → *Source:* specification
+**Step 2:** REQ-011 and REQ-012 state that the RAM uses synchronous read architecture with exactly 1 clock cycle latency before rdata is valid.
+  → *Inference:* A read initiated at cycle N will present valid data on rdata at cycle N+1.
+  → *Source:* spec
 
-**Step 3:** RTL structural analysis: fifo_count is written in the always block at line 63 but is missing from that block's reset clause; pointers at line 43 are reset.
-  → *Inference:* Post-reset occupancy is indeterminate; all flags derived from fifo_count are wrong from time 0 — an RTL initialization defect (Case 7) and a spec violation (Case 6).
-  → *Source:* projects/fifo/rtl/sync_fifo.sv:43,63
+**Step 3:** RTL analysis shows a sequential block at line 17 driving rdata, confirming registered output behavior adhering to REQ-011 and REQ-012.
+  → *Inference:* RTL correctly implements synchronous read with registered output.
+  → *Source:* rtl
 
-**Step 4:** full=0 at the moment the scoreboard expects full=1, and empty=1 when data should be readable; almost_full never asserts at threshold.
-  → *Inference:* Flags are computed from a stale/registered count instead of the next-state count, so threshold crossings are missed or delayed — consistent with the reset/count defect.
-  → *Source:* log @85/125/210 ns
-
-**Step 5:** Overflow/underflow guard errors occur AFTER the flag errors (355 ns, 420 ns).
-  → *Inference:* Protocol violations are downstream consequences of the broken flags, confirming a single RTL root cause (Case 8) rather than bad stimulus; a driver bug would not also corrupt full/empty flag values reported by the DUT.
-  → *Source:* log timeline
-
-**Step 6:** One log line reports 'FIFO count mismatch: Expected 15, Got 15' where expected == actual, and scoreboard source was not collected.
-  → *Inference:* There is a secondary TB reporting/compare defect worth fixing, but it does not explain the DUT flag values; it lowers confidence modestly rather than changing the classification.
-  → *Source:* log @85 ns / missing scoreboard artifact
-
-**Step 7:** Driver and monitor artifacts show no reported protocol/sampling anomalies, and deterministic pre-analysis independently suggests RTL Bug with a reset-coverage finding.
-  → *Inference:* Cases 1–5 (TB Bug paths) are not supported by evidence; final classification is RTL Bug.
-  → *Source:* deterministic pre-analysis
+**Step 4:** Scoreboard logic in ram_scoreboard.sv evaluates tr.rdata !== memory[tr.addr] synchronously within the same transaction without pipelining or delaying the check.
+  → *Inference:* The testbench scoreboard incorrectly assumes zero-cycle latency read, causing comparison of current address with previous cycle's rdata output (Case 3: Scoreboard prediction incorrect).
+  → *Source:* tb
 
 ## RTL Analysis
 
-### X Propagation
-
-- **fifo_count** in `sync_fifo` (line 63) — Cause: uninitialized
-
-### Lint Issues
-
-- [unused_variable] Input port 'wire' appears unused
-
 ## Recommended Fixes
 
-1. **[high]** 1) In the reset branch of the always block at sync_fifo.sv:63, initialize fifo_count <= '0 (along with full, empty, almost_full, almost_empty, overflow, underflow) so occupancy is deterministic after the asynchronous active-low reset. 2) Derive full/empty/almost_full/almost_empty from the next-state count (fifo_count_next computed from wr_en & ~full and rd_en & ~empty in the same cycle) or make them combinational functions of fifo_count so they assert on the cycle the threshold is reached rather than one cycle late. 3) Ensure the simultaneous read/write case keeps fifo_count unchanged while still forwarding/advancing both pointers, which fixes the @350 ns data mismatch. 4) Gate the write/read strobes with the corrected full/empty flags and pulse overflow/underflow for exactly one cycle per REQ-011/REQ-012. 5) Separately, audit the scoreboard count-compare that reported 'Expected 15, Got 15' (likely wrong field printed or wrong operator) — this is a TB reporting issue layered on top of the RTL defect.
-2. **[critical]** Add reset for signal 'fifo_count' in module
-   ```systemverilog
-   In the reset clause: fifo_count <= '0;
-   ```
+1. **[high]** Modify the scoreboard or monitor to model the 1-cycle read latency. In the scoreboard, buffer or pipeline the expected read transaction (address and expected data) so that it is compared against rdata one clock cycle later when the RTL read data becomes valid.
 
 ## Future Prevention
 
@@ -115,7 +70,169 @@
 
 ## Specification References
 
-- REQ-007 (full), REQ-008 (empty), REQ-009 (almost_full/AF_LEVEL), REQ-011 (overflow), REQ-012 (underflow), REQ-013 (wr_count); Reset Behavior section: 'reset (low, asynchronous) resets ...'
+- REQ-011, REQ-012
 
 ---
 *Report generated by VeriSight v1.0.0*
+
+---
+
+## Recommended Fix (Agent 5 — Automated Fix Generator)
+
+| Field | Value |
+|-------|-------|
+| **Type** | TB |
+| **Fix Kind** | Code Patch |
+| **Confidence** | 91% |
+| **Target File** | `projects/ram/tb/ram_scoreboard.sv` |
+| **Target Module** | `ram_scoreboard` |
+| **Lines** | 7-35 |
+| **Validation** | Specification Validated |
+
+### Root Cause
+
+The scoreboard immediately checked tr.rdata against memory[tr.addr] in the same cycle a read was issued, ignoring the 1-clock-cycle synchronous read latency required by REQ-012.
+
+### Expected Behavior
+
+Per REQ-012, read data appears on rdata one clock cycle after a read operation (we=0) is initiated with addr. The scoreboard must check rdata against the expected memory content of the previous read operation.
+
+### Observed Behavior
+
+In the same cycle that a read is initiated, the scoreboard compares the current cycle's rdata (which holds stale data from the prior operation) against the current read address, resulting in data mismatch errors.
+
+### Why This Fix Works
+
+Adding state variables `read_pending` and `pending_addr` allows the scoreboard to defer the comparison of read data until the following clock transaction arrives. In the next transaction, before updating state or checking new transactions, the scoreboard compares `tr.rdata` against `memory[pending_addr]`.
+
+### Proposed Patch
+
+```diff
+--- a/projects/ram/tb/ram_scoreboard.sv
++++ b/projects/ram/tb/ram_scoreboard.sv
+@@ -6,5 +6,7 @@
+   uvm_analysis_imp #(ram_seq_item, ram_scoreboard) mon_imp;
+   bit [31:0] memory[int];
++  bit read_pending;
++  int pending_addr;
+ 
+   function void build_phase(uvm_phase phase);
+     super.build_phase(phase);
+@@ -13,22 +15,29 @@
+   function void write(ram_seq_item tr);
++    if (read_pending) begin
++      if (memory.exists(pending_addr)) begin
++        if (tr.rdata !== memory[pending_addr])
++          `uvm_error("RAM_SB",
++            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
++                      pending_addr, memory[pending_addr], tr.rdata))
++        else
++          `uvm_info("RAM_SB",
++            $sformatf("Match @addr %0d DATA=%0d",
++                      pending_addr, tr.rdata),
++            UVM_LOW)
++      end
++      else begin
++        `uvm_warning("RAM_SB",
++          $sformatf("Read from uninitialized addr %0d", pending_addr))
++      end
++    end
++
+     if (tr.we) begin
+       // WRITE
+       memory[tr.addr] = tr.wdata;
++      read_pending = 0;
+     end
+     else begin
+       // READ
+-      if (memory.exists(tr.addr)) begin
+-        if (tr.rdata !== memory[tr.addr])
+-          `uvm_error("RAM_SB",
+-            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
+-                      tr.addr, memory[tr.addr], tr.rdata))
+-        else
+-          `uvm_info("RAM_SB",
+-            $sformatf("Match @addr %0d DATA=%0d",
+-                      tr.addr, tr.rdata),
+-            UVM_LOW)
+-      end
+-      else begin
+-        `uvm_warning("RAM_SB",
+-          $sformatf("Read from uninitialized addr %0d", tr.addr))
+-      end
++      read_pending = 1;
++      pending_addr = tr.addr;
+     end
+   endfunction
+```
+
+### Corrected Code Snippet
+
+```systemverilog
+  bit read_pending;
+  int pending_addr;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    mon_imp = new("mon_imp", this);
+  endfunction
+
+  function void write(ram_seq_item tr);
+    if (read_pending) begin
+      if (memory.exists(pending_addr)) begin
+        if (tr.rdata !== memory[pending_addr])
+          `uvm_error("RAM_SB",
+            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
+                      pending_addr, memory[pending_addr], tr.rdata))
+        else
+          `uvm_info("RAM_SB",
+            $sformatf("Match @addr %0d DATA=%0d",
+                      pending_addr, tr.rdata),
+            UVM_LOW)
+      end
+      else begin
+        `uvm_warning("RAM_SB",
+          $sformatf("Read from uninitialized addr %0d", pending_addr))
+      end
+    end
+
+    if (tr.we) begin
+      // WRITE
+      memory[tr.addr] = tr.wdata;
+      read_pending = 0;
+    end
+    else begin
+      // READ
+      read_pending = 1;
+      pending_addr = tr.addr;
+    end
+  endfunction
+```
+
+### Validation Results
+
+| Level | Check | Result | Notes |
+|-------|-------|--------|-------|
+| 1 | Syntax | FAIL | Unbalanced begin/end: 5 begins, 3 plain ends |
+| 2 | Structural | FAIL | Target module 'ram_scoreboard' not found in RTL knowledge (r |
+| 3 | Specification | PASS | Fix reasoning aligns with spec requirements: REQ-005, REQ-00 |
+| 4 | Simulation | NOT_AVAILABLE | |
+| 5 | Regression | NOT_AVAILABLE | |
+
+### Cascading Errors (share this root cause)
+
+- Mismatch @addr 1 EXP=201 ACT=110
+- Mismatch @addr 2 EXP=110 ACT=0
+- [UVM_ERROR] @175 ns: Mismatch @addr 1 EXP=201 ACT=110
+- [UVM_ERROR] @195 ns: Mismatch @addr 2 EXP=110 ACT=0
+- [UVM_ERROR] @215 ns: Mismatch @addr 2 EXP=110 ACT=0
+- [UVM_ERROR] @235 ns: Mismatch @addr 1 EXP=201 ACT=110
+
+### Assumptions
+
+- The monitor publishes one ram_seq_item per clock cycle sampled synchronously at posedge clk.
+- A final transaction or drain cycle is observed by the scoreboard if a read occurs at the very end of simulation.
+
+### Limitations
+
+- If the monitor does not broadcast transactions during write cycles, the pending read verification would be delayed until the next read.

@@ -570,7 +570,7 @@ def execute_closed_loop_flow(
         llm=LLMConfig(
             provider=provider or "gemini",
             api_key=api_key,
-            model_name=model_name or "gemini-2.0-flash",
+            model_name=model_name or "gemini-3.8-flash",
             airgap=airgap,
             anonymize_rtl=anonymize_rtl,
             local_endpoint=local_endpoint,

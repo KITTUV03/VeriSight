@@ -55,7 +55,11 @@ def parse_uvm(path: str) -> TBKnowledge:
     p = Path(path)
 
     if p.is_file():
-        files = [p]
+        sibling_files = discover_files(p.parent, TB_EXTENSIONS) if p.parent.exists() else []
+        if len(sibling_files) > 1:
+            files = [p] + [f for f in sibling_files if f != p]
+        else:
+            files = [p]
     else:
         files = discover_files(p, TB_EXTENSIONS)
 
