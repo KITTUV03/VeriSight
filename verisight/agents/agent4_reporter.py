@@ -760,9 +760,9 @@ class ReportGeneratorAgent(BaseAgent):
                     """
 
                 fix_section_html = f"""
-                    <div class="fix-hero-card">
+                    <div class="fix-hero-card fix-recommendation">
                         <div class="fix-status-banner status-pass">
-                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct}
+                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct} • Fix Recommendation (Agent 5)
                         </div>
                         <div class="grid-2col" style="margin-top:16px;">
                             <div>

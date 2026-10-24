@@ -301,22 +301,18 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.tool_message = str(e)
             return result
 
-        # Step 4: build queries (explicit override, or auto-derived from
-        # sim-log scoreboard mismatches).
-        if config.signal and config.time_ps is not None:
-            queries = [xtracer_runner.XTraceQuery(
-                field_name=config.signal,
-                signal_candidates=[config.signal],
-                time_ps=config.time_ps,
-            )]
-        else:
-            queries = xtracer_runner.derive_queries(knowledge, top_module)
+        # Step 4: build queries (explicit override, or auto-derived with
+        # control signals prioritized before data bus bits).
+        explicit_sigs = getattr(config, "signals", None) or ([config.signal] if config.signal else None)
+        queries = xtracer_runner.derive_queries(
+            knowledge, top_module, explicit_signals=explicit_sigs, explicit_time_ps=config.time_ps
+        )
 
         if not queries:
             result.tool_status = "skipped_no_query"
             result.tool_message = (
                 "Could not derive an X-valued signal/time to trace from the "
-                "sim log. Pass --xtrace-signal and --xtrace-time explicitly."
+                "sim log. Pass --xtrace-signal explicitly."
             )
             return result
 

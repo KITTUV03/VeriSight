@@ -16,7 +16,7 @@ from verisight.parsers.spec_parser import parse_spec
 from verisight.parsers.rtl_parser import parse_rtl
 from verisight.parsers.uvm_parser import parse_uvm
 from verisight.parsers.log_parser import parse_log
-from verisight.parsers.coverage_parser import parse_coverage
+from verisight.parsers.coverage_parser import parse_coverage, CoverageFormatError
 from verisight.parsers.vcd_parser import parse_vcd
 from verisight.schemas.knowledge_schema import UnifiedKnowledge, RAGContext
 from verisight.rag.knowledge_base import KnowledgeBase
@@ -147,8 +147,13 @@ class KnowledgeExtractionAgent(BaseAgent):
         # ─── Step 5: Parse Coverage (Optional) ────────────────────
         if coverage_path:
             self.logger.info(f"Step 5: Parsing coverage: {coverage_path}")
-            knowledge.coverage = parse_coverage(coverage_path)
-            knowledge.input_files["coverage"] = [coverage_path]
+            try:
+                knowledge.coverage = parse_coverage(coverage_path)
+                knowledge.input_files["coverage"] = [coverage_path]
+            except CoverageFormatError as e:
+                self.logger.warning(f"Coverage conversion warning: {e}")
+                knowledge.coverage = CoverageData()
+                knowledge.input_files["coverage"] = [coverage_path]
         else:
             self.logger.info("Step 5: No coverage report provided (optional)")
 
