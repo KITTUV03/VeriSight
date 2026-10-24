@@ -335,6 +335,14 @@ class RTLAnalysis(BaseModel):
         default_factory=MiscResult,
         description="Miscellaneous analysis"
     )
+    traceweave: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="TraceWeave correlated failure-waveform-RTL evidence"
+    )
+    fault_localization: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Spectrum-Based Fault Localization (CirFix SBFL) ranking"
+    )
     primary_root_cause: str = Field(
         default="",
         description="Primary root cause identified across all modules"

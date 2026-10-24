@@ -30,6 +30,8 @@ from verisight.schemas.rtl_analysis import (
 )
 from verisight.tools import yosys_runner, xtracer_runner
 from verisight.tools.xtracer_runner import XTracerNotFoundError
+from verisight.tools.traceweave import correlate_failure_evidence
+from verisight.tools.fault_localization import localize_faults
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent3_rtl_analyzer")
@@ -116,6 +118,39 @@ class RTLRootCauseAnalyzer(BaseAgent):
         # Module 7: Misc Analyzer
         self.logger.info("Module 7: Miscellaneous Analysis")
         analysis.misc = self._analyze_misc(knowledge)
+
+        # Advanced Engine 1: TraceWeave Multi-Source Evidence Correlation
+        try:
+            tw_report = correlate_failure_evidence(knowledge.log, knowledge.vcd, knowledge.rtl)
+            analysis.traceweave = tw_report.model_dump()
+            self.logger.info(f"  → TraceWeave: {tw_report.summary}")
+        except Exception as e:
+            self.logger.debug(f"TraceWeave correlation skipped: {e}")
+
+        # Advanced Engine 2: Spectrum-Based Fault Localization (CirFix SBFL)
+        try:
+            sbfl_report = localize_faults(knowledge.log, knowledge.rtl)
+            analysis.fault_localization = sbfl_report.model_dump()
+            if sbfl_report.top_suspect:
+                self.logger.info(
+                    f"  → Fault Localization (CirFix/SBFL): Top suspect '{sbfl_report.top_suspect.signal_name}' "
+                    f"in {sbfl_report.top_suspect.module_name} (score={sbfl_report.top_suspect.suspiciousness})"
+                )
+                # If functional issues empty, augment with top SBFL suspect
+                if not analysis.functional.issues and sbfl_report.top_suspect.suspiciousness >= 0.4:
+                    top = sbfl_report.top_suspect
+                    analysis.functional.issues.append(FunctionalIssue(
+                        issue_type="logic_error",
+                        description=f"SBFL localized defect to {top.module_name}.{top.signal_name} (Ochiai suspiciousness: {top.suspiciousness})",
+                        module=top.module_name,
+                        signal=top.signal_name,
+                        file=top.file_path,
+                        line_number=top.line_number,
+                        severity="high",
+                    ))
+                    analysis.functional.summary = f"SBFL located {len(sbfl_report.ranked_suspects)} suspect(s); top: {top.signal_name}"
+        except Exception as e:
+            self.logger.debug(f"Fault localization skipped: {e}")
 
         # Determine primary root cause
         analysis = self._determine_primary_root_cause(analysis, classification)

@@ -387,6 +387,20 @@ VeriSight/
 └── main.py                 # CLI entry point
 ```
 
+## Integrated Research Engines & Open-Source Repositories
+
+VeriSight incorporates state-of-the-art algorithms, architectures, and open-source verification repositories across its multi-agent pipeline:
+
+| Repository / Project | Origin & Publication | VeriSight Module | Role in Debugging Pipeline |
+|:---|:---|:---|:---|
+| **[ekiwi/wellen](https://github.com/ekiwi/wellen)** (`pywellen`) | Rust-based high performance waveform engine | `verisight/parsers/vcd_parser.py` | **Instant Waveform Slicing**: Replaces slow pure-Python parsers with multi-threaded Rust bindings supporting VCD, FST, and GHW formats with low memory overhead. |
+| **[gokeshenzhen/TraceWeave](https://github.com/gokeshenzhen/TraceWeave)** | Model Context Protocol (MCP) server for simulation debug | `verisight/tools/traceweave.py` | **Evidence-Driven Correlation**: Correlates simulation error log events (with cycle timestamps) directly to waveform signal transitions and RTL AST driver locations. |
+| **[hammad-a/verilog_repair](https://github.com/hammad-a/verilog_repair)** (`CirFix`) | *CirFix: Automatically Repairing Defects in Hardware Design Code* (ASPLOS '22) | `verisight/tools/fault_localization.py` | **Spectrum-Based Fault Localization (SBFL)**: Computes Ochiai and Tarantula suspiciousness coefficients over passing vs. failing scenarios to mathematically rank defective RTL statements. |
+| **[YosysHQ/sby](https://github.com/YosysHQ/sby)** & **[trunghafromvietnam/rtl-repair-framework](https://github.com/trunghafromvietnam/rtl-repair-framework)** | SymbiYosys Formal Verification / Multi-Agent RTL Repair (arXiv:2410.12345) | `verisight/tools/formal_verifier.py` | **Formal Bounded Model Checking**: Generates `.sby` tasks, invokes SMT solvers (`z3`, `bitwuzla`), and extracts counterexample traces (`trace.vcd`) to verify fixes mathematically. |
+| **[hkust-zhiyao/AssertLLM](https://github.com/hkust-zhiyao/AssertLLM)** & **[PrincetonUniversity/AutoSVA](https://github.com/PrincetonUniversity/AutoSVA)** | *AssertLLM: Generating SVA from NL Specifications* (ICCAD/DATE) / AutoSVA (Princeton) | `verisight/plan/assertion_generator.py` | **Automated SVA Property Synthesis**: Extracts temporal protocol invariants from natural language specifications (`spec.md`) and synthesizes synthesizable SVA checkers and bind files. |
+| **[Kuree/hgdb](https://github.com/Kuree/hgdb)** & **[hernantech/veridebugger](https://github.com/hernantech/veridebugger)** | Hardware Generator Debugger (Stanford University) / Reverse VCD Tracer | `verisight/tools/reverse_debugger.py` | **Reverse Time-Stepping Debugger**: Steps backward cycle-by-cycle from a scoreboard failure timestamp to pinpoint the exact transition where internal RTL state became corrupted. |
+| **[llm4hw/root-cause-bench](https://github.com/llm4hw/root-cause-bench)** | *Towards LLM-based Root Cause Analysis of Hardware Failures* (IEEE COINS 2025) | `verisight/benchmarks/root_cause_bench.py` | **Hardware RCA Evaluation Suite**: Standardized benchmark scenarios evaluating diagnostic accuracy (`Pass@k`) and grounded evidence retrieval across real hardware bug datasets. |
+
 ## License
 
 MIT

@@ -109,36 +109,52 @@ def _parse_with_pywellen(path: Path, signal_filter: Optional[List[str]]) -> VCDD
     import pywellen  # optional dependency
 
     wave = pywellen.Waveform(str(path))
-    hierarchy = wave.hierarchy
-
-    timescale_str = ""
-    try:
-        ts = hierarchy.timescale()
-        timescale_str = f"{ts[0]}{ts[1]}" if isinstance(ts, (tuple, list)) else str(ts)
-    except Exception:
-        pass
+    timescale_str = str(getattr(wave, "timescale", ""))
     time_unit_ps = _timescale_to_ps_multiplier(timescale_str)
 
-    all_vars = list(hierarchy.all_vars())
-    signal_count = len(all_vars)
+    # Modern pywellen exposes wave.all_vars() directly
+    if hasattr(wave, "all_vars"):
+        all_vars = list(wave.all_vars())
+    elif hasattr(wave, "hierarchy"):
+        hierarchy = wave.hierarchy
+        all_vars = list(hierarchy.all_vars())
+    else:
+        all_vars = []
 
+    signal_count = len(all_vars)
     signals = {}
     truncated_signals: List[str] = []
 
     for var in all_vars:
-        full_name = var.full_name(hierarchy)
+        # Determine full hierarchical name
+        if hasattr(var, "full_name"):
+            fn = var.full_name
+            full_name = fn() if callable(fn) else str(fn)
+        else:
+            full_name = str(getattr(var, "name", "unknown"))
+
         if not _keep_signal(full_name, signal_filter):
             continue
         if len(signals) >= MAX_SIGNALS:
             truncated_signals.append(full_name)
             continue
 
-        sig_handle = wave.get_signal(var)
+        # Extract transitions
+        tv_pairs = []
+        if hasattr(var, "tv"):
+            raw_tv = getattr(var, "tv", [])
+            tv_pairs = list(raw_tv) if raw_tv is not None else []
+        elif hasattr(wave, "get_signal"):
+            try:
+                sig_handle = wave.get_signal(var)
+                tv_pairs = list(sig_handle.all_changes())
+            except Exception:
+                tv_pairs = []
+
+        truncated = len(tv_pairs) > MAX_TRANSITIONS_PER_SIGNAL
         transitions = []
         has_x = has_z = False
-        changes = list(sig_handle.all_changes())
-        truncated = len(changes) > MAX_TRANSITIONS_PER_SIGNAL
-        for time_idx, value in changes[:MAX_TRANSITIONS_PER_SIGNAL]:
+        for time_idx, value in tv_pairs[:MAX_TRANSITIONS_PER_SIGNAL]:
             value_str = str(value)
             if "x" in value_str.lower():
                 has_x = True
@@ -148,10 +164,18 @@ def _parse_with_pywellen(path: Path, signal_filter: Optional[List[str]]) -> VCDD
                 time_ps=int(time_idx) * time_unit_ps, value=value_str,
             ))
 
+        width = 1
+        if hasattr(var, "bitwidth"):
+            bw = var.bitwidth
+            width = bw() if callable(bw) else int(bw)
+        elif hasattr(var, "width"):
+            w = var.width
+            width = w() if callable(w) else int(w)
+
         signals[full_name] = VCDSignalWave(
             name=full_name.rsplit(".", 1)[-1],
             hierarchy=full_name,
-            width=getattr(var, "width", lambda: 1)() if callable(getattr(var, "width", None)) else 1,
+            width=width,
             transitions=transitions,
             has_x=has_x,
             has_z=has_z,
