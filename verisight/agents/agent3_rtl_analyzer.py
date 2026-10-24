@@ -134,6 +134,32 @@ class RTLRootCauseAnalyzer(BaseAgent):
         """Analyze X value origins and propagation paths."""
         result = XTraceResult()
 
+        # Surface how the RTL was parsed so downstream consumers never mistake
+        # degraded/partial parsing for a complete AST.
+        pstatus = getattr(knowledge.rtl, "parser_status", None)
+        if pstatus is not None:
+            result.parser_backend = pstatus.backend
+            result.parser_degraded = pstatus.degraded
+            if pstatus.degraded:
+                result.limitations.append(
+                    f"RTL parse was degraded (backend={pstatus.backend}): "
+                    + "; ".join(pstatus.notes[:2]) if pstatus.notes
+                    else f"RTL parse was degraded (backend={pstatus.backend})."
+                )
+        # This module is STATIC analysis of the source AST. It flags registers
+        # that lack a reset assignment — a necessary but not sufficient
+        # condition for a runtime X. Establishing the actual runtime
+        # propagation path of an unknown value requires simulation (a VCD +
+        # the real x-tracer, see _augment_with_real_xtracer), because it
+        # depends on dynamic scheduling, conditional execution and stimulus
+        # that a source-only AST cannot resolve.
+        result.limitations.append(
+            "Static source analysis: identifies potential X origins "
+            "(registers/memories without reset). It does NOT establish the "
+            "runtime propagation path of an unknown value — that requires "
+            "simulation-based tracing (VCD + x-tracer)."
+        )
+
         for module in knowledge.rtl.modules:
             # Find registers without reset (X origins)
             for block in module.always_blocks:

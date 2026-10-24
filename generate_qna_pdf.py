@@ -268,8 +268,8 @@ def build_qna_pdf(output_path: str):
         ("4. X-Tracer Engine & Waveform Analysis", [
             (
                 "Q16. What is the X-Tracer algorithm and how does it find uninitialized signals?",
-                "In digital design, an uninitialized flip-flop outputs an unknown state `X`, which quickly propagates through logic gates and corrupts the whole chip. Our X-Tracer uses PyVerilog to build a directed acyclic graph of the RTL netlist. When a failure occurs at cycle T, X-Tracer steps back one cycle to T-1 and recursively traverses the driving logic cone backwards until it hits the exact flip-flop that was missing an initialization or reset condition.",
-                "Describe the backward traversal simply: 'finds the root flop at T-1'."
+                "In digital design, an uninitialized flip-flop outputs an unknown state `X`, which quickly propagates through logic gates and corrupts the whole chip. X-Tracer works in two layers. (1) Static source analysis: we parse the RTL with pyslang (the Python bindings for the Slang IEEE-1800 SystemVerilog frontend) into a real elaborated AST, then flag sequential registers that are written but never assigned in their reset branch — these are the candidate X origins. (2) Simulation-based tracing (optional): when a VCD waveform is supplied, we drive the external x-tracer tool against a gate-level netlist; it steps back from the failing (signal, cycle) through the driving logic cone to the exact flop. The static layer identifies *candidate* origins from source alone; establishing the actual runtime propagation path requires the simulation layer, because propagation depends on dynamic scheduling and stimulus that source analysis cannot resolve.",
+                "Two layers: pyslang static AST finds reset-less registers; the VCD-backed x-tracer confirms the runtime path. Static ≠ simulation."
             ),
             (
                 "Q17. Waveform dumps can be 10 to 50 Gigabytes. How do you handle them without running out of memory?",

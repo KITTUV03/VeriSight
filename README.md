@@ -324,13 +324,59 @@ the report clearly states why real analysis was skipped
 silently doing nothing — the static heuristic result is always still
 included either way.
 
+## SystemVerilog Parsing (pyslang)
+
+VeriSight parses RTL and UVM source with **pyslang**, the Python bindings for
+the [Slang](https://github.com/MikePopoloski/slang) SystemVerilog compiler
+frontend (IEEE 1800). This replaced an earlier regex approach and the
+PyVerilog/Verilog-2005 story in older docs — Slang parses modern
+SystemVerilog and UVM (always_ff/comb/latch, logic/enum/`struct packed`,
+interfaces/modports/clocking, packages/typedefs, generate blocks, SVA
+properties with `|->`/`|=>`, classes, parameterized types).
+
+- **Install:** `pyslang` is a core dependency (`pip install -e .` pulls it in),
+  shipped as a prebuilt wheel — no compiler toolchain required.
+- **Centralized frontend:** `verisight/parsers/sv_frontend.py` exposes
+  `compile_files()` / `compile_text()` returning structured, **categorized**
+  diagnostics (syntax vs missing-dependency vs semantic/elaboration vs style)
+  with file/line/column. Include dirs (`-I`) and defines (`-D`) are supported.
+- **Explicit degradation:** if pyslang is unavailable or a file fails, parsing
+  does **not** silently fall back to regex. Any fallback is logged and the
+  result is flagged `parser_status.degraded = True` with the original
+  diagnostics preserved, so downstream consumers never treat partial analysis
+  as a complete AST.
+- **Syntax vs elaboration:** a standalone UVM file without `uvm_pkg` is reported
+  with *missing-dependency* diagnostics (unknown macro/class/interface), **not**
+  as a syntax error — valid modern SV is never rejected merely for missing
+  includes.
+
+### Pre-commit syntax validation
+
+```bash
+# Validate files (exit 0 = OK, 1 = genuine syntax error, 2 = tool error)
+python -m verisight.tools.sv_validate examples/rtl/alu.sv
+
+# With include dirs / defines, and stricter checking (also fails on
+# semantic/elaboration errors — needs full design context):
+python -m verisight.tools.sv_validate -I rtl/inc -D SYNTH --strict rtl/*.sv
+```
+
+In the default (syntax-only) mode, missing-dependency diagnostics are reported
+but do **not** fail the check; files whose syntax is masked by missing
+dependencies are reported as `UNVERIFIED` rather than failed. A genuine syntax
+error always returns a non-zero exit. A frontend crash is a non-zero exit too
+— the validator never passes a file because an exception was swallowed.
+
 ## Project Structure
 
 ```
 VeriSight/
 ├── verisight/              # Core Python package
 │   ├── schemas/            # Pydantic data models
-│   ├── parsers/            # Deterministic parsers
+│   ├── parsers/            # SystemVerilog frontend (pyslang) + deterministic parsers
+│   │   ├── sv_frontend.py  #   centralized pyslang parse/elaborate + diagnostics
+│   │   ├── pyslang_rtl.py  #   RTL knowledge builder (AST-based)
+│   │   └── pyslang_uvm.py  #   UVM knowledge builder (syntax-tree based)
 │   ├── agents/             # AI Agent implementations
 │   ├── rag/                # ChromaDB RAG system
 │   ├── orchestrator.py     # Pipeline orchestration

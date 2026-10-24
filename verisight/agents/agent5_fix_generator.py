@@ -533,16 +533,26 @@ class FixGeneratorAgent(BaseAgent):
         return val
 
     def _validate_syntax(self, code: str) -> Tuple[bool, str]:
-        """Level 1: Basic structural syntax checks for SystemVerilog/Verilog."""
+        """
+        Level 1 syntax pre-check for a generated fix.
+
+        Two layers:
+          1. Fast structural heuristics (empty / placeholder / balanced
+             begin-end / balanced parens) — catch obviously broken fragments
+             without needing a syntactic context.
+          2. pyslang syntax check — when available, parse the snippet (wrapped
+             in a module/always context as needed) and fail only on *genuine*
+             syntax errors. Undeclared signals or UVM macros in a fix snippet
+             are missing-dependency, NOT syntax, and must not fail the check.
+        """
         if not code or not code.strip():
             return False, "Corrected code is empty."
 
         issues = []
 
-        # Check balanced begin/end
+        # ── Layer 1: structural heuristics ──────────────────────────────
         begins = len(re.findall(r"\bbegin\b", code, re.IGNORECASE))
         ends = len(re.findall(r"\bend\b", code, re.IGNORECASE))
-        # Subtract 'endmodule', 'endcase', etc. from 'end' count
         compound_ends = len(re.findall(
             r"\bend(?:module|function|task|case|generate|clocking|interface)\b",
             code, re.IGNORECASE
@@ -553,19 +563,76 @@ class FixGeneratorAgent(BaseAgent):
                 f"Unbalanced begin/end: {begins} begins, {plain_ends} plain ends"
             )
 
-        # Check for obvious hallucinated constructs
         if re.search(r"\b(TODO|FIXME|PLACEHOLDER|your_signal_here)\b", code, re.IGNORECASE):
             issues.append("Corrected code contains placeholder text.")
 
-        # Warn on unclosed parentheses
         opens = code.count("(")
         closes = code.count(")")
         if opens != closes:
             issues.append(f"Unbalanced parentheses: {opens} open, {closes} close")
 
+        # ── Layer 2: pyslang syntax check ───────────────────────────────
+        slang_errs = self._pyslang_syntax_errors(code)
+        for msg in slang_errs[:4]:
+            issues.append(f"syntax: {msg}")
+
         if issues:
             return False, "; ".join(issues)
-        return True, "begin/end balanced, no placeholders detected."
+
+        note = "begin/end balanced, no placeholders detected."
+        if slang_errs is not None and not slang_errs:
+            note = "pyslang: no syntax errors; begin/end + parens balanced."
+        return True, note
+
+    def _pyslang_syntax_errors(self, code: str) -> list:
+        """
+        Return genuine syntax-error messages for a fix snippet via pyslang.
+
+        A fix snippet has no syntactic context, so we try a few plausible
+        wrappings (as-is, inside a module, inside an always block). If *any*
+        wrapping parses with no syntax errors, the snippet is syntactically
+        fine and we return []. Only when every wrapping has syntax errors do
+        we report them. Missing-dependency / semantic diagnostics (undeclared
+        signals, unknown UVM macros) are ignored here — they are expected in a
+        decontextualised fragment. Returns [] if pyslang is unavailable (the
+        heuristics above still apply).
+        """
+        try:
+            from verisight.parsers import sv_frontend
+        except Exception:
+            return []
+        if not sv_frontend.is_available():
+            return []
+
+        has_unit = re.search(
+            r"\b(module|package|interface|program|class|primitive)\b", code
+        )
+        candidates = []
+        if has_unit:
+            candidates.append(code)
+        candidates.append(f"module __vs_chk__;\n{code}\nendmodule\n")
+        # statement/expression fragments: put them in a procedural context
+        candidates.append(
+            f"module __vs_chk__;\n  always_comb begin\n{code}\n  end\nendmodule\n"
+        )
+
+        best_errors = None
+        for cand in candidates:
+            try:
+                res = sv_frontend.compile_text(cand, name="fix_candidate")
+            except Exception:
+                continue
+            syn = [
+                f"{d.message} (line {max(d.line - 1, 0)})"
+                for d in res.diagnostics
+                if d.category == "syntax" and d.is_error()
+            ]
+            if not syn:
+                return []  # a clean parse in some context → no syntax error
+            if best_errors is None or len(syn) < len(best_errors):
+                best_errors = syn
+
+        return best_errors or []
 
     def _validate_structural(
         self, result: FixResult, knowledge: UnifiedKnowledge
