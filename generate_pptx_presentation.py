@@ -321,7 +321,7 @@ def create_presentation():
     
     innovations = [
         ("9 Deterministic Decision Rules", "Mathematical rules strictly categorize bugs as TB vs RTL vs Spec vs Unknown."),
-        ("Static AST X-Tracer", "Traverses PyVerilog abstract syntax trees backwards from failing flop to isolate origin."),
+        ("Static AST X-Tracer", "Parses RTL with pyslang (Slang SystemVerilog frontend) to flag reset-less registers; VCD-backed x-tracer confirms the runtime path."),
         ("Multi-Modal Waveform Slicing", "Extracts +/- 20 cycles around assertion failure timestamp for sub-cycle precision."),
         ("Closed-Loop Sandbox Validation", "Every patch is re-compiled in an isolated sandbox with zero human intervention.")
     ]
@@ -418,10 +418,10 @@ def create_presentation():
     r = p.add_run(); r.text = "The X-Tracer DAG Algorithm\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_BLUE
     
     steps = [
-        ("1. AST Parser Graph", "Extracts full netlist DAG and always_ff / assign logic cones using PyVerilog."),
-        ("2. Temporal VCD Slicing", "Identifies exact simulation cycle T_fail where signal transitions to X."),
-        ("3. Backward Cone Traversal", "Recursively traverses driving inputs at cycle T_fail - 1."),
-        ("4. Origin Isolation", "Pinpoints uninitialized flip-flop missing from asynchronous reset block with 100% precision.")
+        ("1. AST Parse & Elaborate", "pyslang (Slang SystemVerilog frontend) parses the RTL into a real elaborated AST — always_ff / assign / reset logic, with types and source locations."),
+        ("2. Static X-Origin Scan", "Flags sequential registers written but not assigned in their reset branch (candidate X origins) — source-only, no simulation."),
+        ("3. Temporal VCD Slicing (optional)", "When a VCD is supplied, identifies the cycle T_fail where a signal goes X."),
+        ("4. Simulation-Based Trace (optional)", "The external x-tracer tool (itself built on pyslang) traverses the gate-level netlist backward from T_fail to the origin flop. Static analysis alone cannot prove the runtime path.")
     ]
     for stitle, sdesc in steps:
         p = tf8_r.add_paragraph()
@@ -441,7 +441,7 @@ def create_presentation():
          "• Synopsys VCS:\n  - Native testbench & UVM 1.2\n• Siemens QuestaSim:\n  - UCDB functional coverage\n• Cadence Xcelium:\n  - Parallel multi-core compile\n• Verilator (C++):\n  - Ultra-fast cycle-accurate sim\n• Icarus Verilog (iverilog):\n  - Open-source zero-license triage\n• GTKWave & Verdi:\n  - VCD / FSDB trace analysis",
          C_BLUE),
         ("Infrastructure & Web GUI",
-         "• PyVerilog AST Engine:\n  - Syntactic & netlist analysis\n• FastAPI Asynchronous Server:\n  - Sub-millisecond latency\n• WebSockets Bridge:\n  - Bi-directional event stream\n• Modern Vanilla Web Studio:\n  - Live Coverage Cockpit\n  - Waveform Studio\n  - Root Cause Inspector\n• Docker Containerization:\n  - 1-click reproducible sandbox",
+         "• pyslang / Slang Frontend:\n  - IEEE-1800 SystemVerilog parse\n  - elaboration & diagnostics\n• FastAPI Asynchronous Server:\n  - Sub-millisecond latency\n• WebSockets Bridge:\n  - Bi-directional event stream\n• Modern Vanilla Web Studio:\n  - Live Coverage Cockpit\n  - Waveform Studio\n  - Root Cause Inspector\n• Docker Containerization:\n  - 1-click reproducible sandbox",
          C_AMBER)
     ]
     
@@ -685,7 +685,7 @@ def create_presentation():
     
     patch_steps = [
         ("1. Minimal Git Diff", "Synthesizes surgical diff altering only the root-cause bug line without side effects."),
-        ("2. AST Syntax Pre-Check", "Parses modified HDL with PyVerilog to guarantee syntax validity before saving."),
+        ("2. AST Syntax Pre-Check", "Parses modified HDL with pyslang (Slang frontend) to catch genuine syntax errors before saving — distinguishing them from missing-include / unresolved-dependency diagnostics."),
         ("3. Isolated Sandbox Simulation", "Copies patched design into /tmp sandbox and re-executes original simulation."),
         ("4. Regression Clean Sign-Off", "Confirms failing assertion is eliminated and all existing tests continue to pass.")
     ]
@@ -702,7 +702,7 @@ def create_presentation():
     token_cards = [
         ("Cloud API Cost per Run", "$0.02 - $0.05", "Using Gemini 2.5 Flash or Claude 3.5 Sonnet: Average 12k tokens per complete debug run. An entire 1,000-test regression costs under $35.", C_PRIMARY),
         ("Sovereign Offline Cost", "$0.00 Marginal Cost", "Using local Ollama or vLLM running DeepSeek-Coder / Llama-3 on on-premise GPUs. Air-gapped zero external data transfer.", C_BLUE),
-        ("AST Token Optimization", "84% Token Reduction", "PyVerilog AST pruning and targeted log slicing strips out 84% of irrelevant tokens before reaching LLM context.", C_AMBER)
+        ("AST Token Optimization", "Targeted Context", "pyslang AST pruning and targeted log slicing strip irrelevant modules/comments, feeding only the relevant logic cone to the LLM context.", C_AMBER)
     ]
     for i, (ttitle, tval, tdesc, tcol) in enumerate(token_cards):
         c_left = Inches(0.8) + i * Inches(3.95)

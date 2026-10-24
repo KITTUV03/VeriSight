@@ -618,10 +618,10 @@ def generate_html_deck():
                     <div class="card-title" style="color: var(--blue);">X-Tracer Backward Cone Traversal</div>
                     <p style="margin-bottom: 12px;">Solves the notorious "X-state mystery" in 4-state simulation:</p>
                     <ol style="padding-left: 20px; font-size: 12px; line-height: 1.6;">
-                        <li>Parses netlist AST graph using PyVerilog.</li>
-                        <li>Identifies cycle <i>T</i> where signal transitions to X in VCD trace.</li>
-                        <li>Traverses backward fan-in cone across continuous assignments and gates.</li>
-                        <li>Isolates the exact uninitialized sequential flop missing from reset block.</li>
+                        <li>Parses & elaborates the RTL into a real AST using pyslang (Slang SystemVerilog frontend).</li>
+                        <li>Statically flags sequential registers written but not assigned in their reset branch (candidate X origins).</li>
+                        <li>Optionally, when a VCD is supplied, the external x-tracer tool traverses the gate-level fan-in cone back from cycle <i>T</i> to the origin flop.</li>
+                        <li>Static source analysis finds candidates; the simulation layer confirms the runtime propagation path.</li>
                     </ol>
                 </div>
             </div>
@@ -658,7 +658,7 @@ def generate_html_deck():
                     <div class="card amber-border">
                         <div class="card-title" style="color: var(--amber);">Telemetry & Web GUI</div>
                         <ul style="font-size: 12px;">
-                            <li><b>PyVerilog:</b> Lexical parsing and AST traversal.</li>
+                            <li><b>pyslang (Slang):</b> IEEE-1800 SystemVerilog parsing, elaboration & structured diagnostics.</li>
                             <li><b>FastAPI:</b> Asynchronous REST and WebSocket hub.</li>
                             <li><b>Vanilla Web Studio:</b> Zero-dependency browser dashboard with Live Coverage Cockpit & Waveform Studio.</li>
                             <li><b>Docker:</b> Hermetic multi-simulator sandboxing.</li>
@@ -885,7 +885,7 @@ def generate_html_deck():
                     <div class="card-title">The Zero-Touch Self-Healing Loop</div>
                     <ol style="font-size: 12px; line-height: 1.6; padding-left: 18px;">
                         <li><b>Minimal Unified Diff:</b> Synthesizes clean git patch modifying only the defective logic lines.</li>
-                        <li><b>PyVerilog AST Validation:</b> Verifies syntax and synthesizability prior to disk write.</li>
+                        <li><b>pyslang AST Validation:</b> Verifies genuine syntax validity prior to disk write, distinguishing syntax errors from missing-dependency/elaboration diagnostics.</li>
                         <li><b>Isolated Sandbox Re-Sim:</b> Copies design to temporary sandbox and executes regression tests.</li>
                         <li><b>Regression Clean Sign-Off:</b> Guarantees failing assertion is resolved with zero side effects.</li>
                     </ol>
@@ -915,8 +915,8 @@ def generate_html_deck():
                     </div>
                     <div class="card amber-border">
                         <div class="card-title" style="color: var(--amber);">AST Token Pruning</div>
-                        <div class="metric-big" style="color: var(--amber); margin: 8px 0;">84% Less Tokens</div>
-                        <p style="font-size: 12px;">PyVerilog AST extraction strips out irrelevant code comments and unrelated modules, feeding only critical fan-in logic cones to the AI context.</p>
+                        <div class="metric-big" style="color: var(--amber); margin: 8px 0;">Targeted Context</div>
+                        <p style="font-size: 12px;">pyslang AST extraction strips out irrelevant code comments and unrelated modules, feeding only critical fan-in logic cones to the AI context.</p>
                     </div>
                 </div>
             </div>

@@ -22,7 +22,7 @@ from verisight.tools.sim_runner import SimulatorNotFoundError, SimulationError
 from verisight.utils.logger import setup_logging, console
 
 
-def parse_args():
+def parse_args(args=None):
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="verisight",
@@ -55,7 +55,11 @@ Examples:
         "command",
         nargs="?",
         default=None,
-        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
+        choices=[
+            "start", "wizard", "train", "train-kb", "learn", "plan",
+            "sim", "simulate", "serve", "server", "web", "cockpit", "ui",
+        ],
+        help="Optional command: 'start' (guided wizard), 'train' (train & ground RAG knowledge base on 100+ verification scenarios), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
     )
     parser.add_argument(
         "--interactive", "-i",
@@ -145,6 +149,11 @@ Examples:
             "emits a fix. Default: 0.70. Fixes below this threshold are declined."
         ),
     )
+    parser.add_argument(
+        "--allow-tb-fix",
+        action="store_true",
+        help="Allow automated fixes to testbench code (default: false, RTL only)",
+    )
 
     # Simulation (--simulate) — all optional
     sim_group = parser.add_argument_group("Simulation")
@@ -157,10 +166,9 @@ Examples:
     sim_group.add_argument(
         "--simulator",
         type=str,
-        choices=["iverilog", "verilator"],
-        default="iverilog",
-        help="Simulator backend for --simulate (default: iverilog — best UVM-lite "
-             "compatibility, size, and ease of use; verilator is experimental)",
+        choices=["auto", "verilator", "iverilog", "xsim", "dsim", "vcs", "questa", "xcelium"],
+        default="auto",
+        help="Simulator backend for --simulate (default: auto; choices: auto, verilator, iverilog, xsim, dsim, vcs, questa, xcelium)",
     )
     sim_group.add_argument(
         "--sim-top",
@@ -206,14 +214,13 @@ Examples:
     xtrace_group.add_argument(
         "--xtrace-signal",
         type=str,
-        help="Explicit signal path to trace (e.g. tb.dut.y[0]), overrides "
-             "auto-derivation from the sim log. Must be given with --xtrace-time",
+        help="Explicit signal path(s) to trace (comma-separated, e.g. tb.dut.valid,tb.dut.ready), overrides "
+             "auto-derivation from the sim log",
     )
     xtrace_group.add_argument(
         "--xtrace-time",
         type=int,
-        help="Explicit query time in picoseconds, overrides auto-derivation. "
-             "Must be given with --xtrace-signal",
+        help="Explicit query time in picoseconds, overrides auto-derivation",
     )
     xtrace_group.add_argument(
         "--xtracer-path",
@@ -242,7 +249,7 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (e.g. gemini-2.0-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
+        help="LLM model name (e.g. gemini-3.5-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
     )
     parser.add_argument(
         "--airgap",
@@ -261,7 +268,7 @@ Examples:
         help="Sanitize and mask proprietary module and signal identifiers before model ingestion for confidential IP protection.",
     )
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def validate_inputs(args) -> bool:
@@ -290,14 +297,13 @@ def validate_inputs(args) -> bool:
             valid = False
 
     if args.vcd and not Path(args.vcd).exists():
-        console.print(f"[red]Error:[/red] VCD file not found: {args.vcd}")
-        valid = False
-
-    if bool(args.xtrace_signal) != bool(args.xtrace_time is not None):
-        console.print(
-            "[red]Error:[/red] --xtrace-signal and --xtrace-time must be given together"
-        )
-        valid = False
+        if args.simulate:
+            pass
+        elif args.xtrace:
+            console.print(f"[red]Error:[/red] VCD file not found for X-Tracer: {args.vcd}")
+            valid = False
+        else:
+            console.print(f"[yellow]Warning:[/yellow] VCD file not found: {args.vcd}. Proceeding without waveform evidence.")
 
     if args.simulate:
         if not (args.rtl and args.tb):
@@ -392,6 +398,12 @@ def main():
         planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
         return
 
+    # Handle 'train' command: Knowledge Base Training & Dataset Population
+    if args.command in ("train", "train-kb", "learn"):
+        from verisight.rag.train_knowledge_base import train_knowledge_base
+        train_knowledge_base()
+        return
+
     # Handle 'sim' / 'simulate' command: One-Click Closed-Loop Runner
     if args.command in ("sim", "simulate"):
         if not args.rtl or not args.tb:
@@ -430,8 +442,7 @@ def main():
         console.print("=" * 62)
         console.print(f"  [bold]Simulator Backend:[/]   {sim_res.simulator} (Exit Code: {sim_res.returncode})")
         console.print(f"  [bold]Simulation Time:[/]     {sim_res.duration_s}s")
-        console.print(f"  [bold]Errors Caught:[/]       {sim_res.error_count}")
-        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification} (Confidence: {int(dbg.confidence*100)}%)")
+        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification}")
         console.print(f"  [bold]Root Cause:[/]          {dbg.root_cause[:70]}...")
         console.print()
         console.print("  [bold cyan]Interactive HTML Dashboards:[/bold cyan]")
@@ -479,9 +490,13 @@ def main():
             sys.exit(1)
 
         args.log = str(sim_result.log_path)
-        vcd_for_knowledge = args.vcd or str(sim_result.vcd_path)
+        if sim_result.vcd_path and (Path(sim_result.vcd_path).exists() or str(sim_result.vcd_path)):
+            vcd_for_knowledge = str(sim_result.vcd_path)
+        elif args.vcd:
+            vcd_for_knowledge = args.vcd
+
         if args.xtrace or args.netlist:
-            args.vcd = args.vcd or str(sim_result.vcd_path)
+            args.vcd = vcd_for_knowledge
         if not args.top and not args.sim_top:
             args.top = sim_result.top_module
 
@@ -509,12 +524,14 @@ def main():
 
     llm_config = LLMConfig(**kwargs)
 
+    xtrace_signals = [s.strip() for s in (args.xtrace_signal or "").split(",") if s.strip()]
     xtracer_config = XTracerConfig(
-        enabled=bool(args.xtrace or args.vcd or args.netlist),
+        enabled=bool(args.xtrace or args.netlist),
         netlist_paths=args.netlist or [],
         top_module=args.top or "",
-        vcd_path=args.vcd or "",
-        signal=args.xtrace_signal or "",
+        vcd_path=vcd_for_knowledge or args.vcd or "",
+        signal=xtrace_signals[0] if xtrace_signals else (args.xtrace_signal or ""),
+        signals=xtrace_signals,
         time_ps=args.xtrace_time,
         xtracer_path=args.xtracer_path or "",
         max_depth=args.xtrace_max_depth,
@@ -537,6 +554,7 @@ def main():
                 if args.min_confidence is not None
                 else 0.70
             ),
+            allow_tb_fix=bool(getattr(args, "allow_tb_fix", False)),
         ),
         log_level=log_level,
     )
@@ -569,7 +587,7 @@ def main():
             tb_path=args.tb,
             log_path=args.log,
             coverage_path=args.coverage,
-            vcd_path=vcd_for_knowledge,
+            vcd_path=vcd_for_knowledge or "",
         )
 
         # Print final summary
@@ -577,7 +595,6 @@ def main():
         console.print("[bold green]Pipeline completed successfully![/]")
         console.print()
         console.print(f"  [bold]Classification:[/] {report.classification}")
-        console.print(f"  [bold]Confidence:[/]     {report.confidence}%")
         console.print(f"  [bold]Root Cause:[/]     {report.root_cause[:80]}")
         console.print(f"  [bold]Module:[/]         {report.module}")
         console.print(f"  [bold]Category:[/]       {report.category}")

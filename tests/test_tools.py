@@ -16,6 +16,9 @@ class TestYosysRunner:
     """Tests for verisight.tools.yosys_runner."""
 
     def test_synthesize_netlist_produces_gate_level_verilog(self, tmp_path):
+        import shutil
+        if not shutil.which("yosys"):
+            pytest.skip("yosys not installed on PATH")
         from verisight.tools.yosys_runner import synthesize_netlist
 
         output_path = tmp_path / "netlist.v"

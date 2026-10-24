@@ -1,0 +1,26 @@
+{
+  "id": "fifo_tb_reset",
+  "title": "FIFO failures caused by out-of-band 2nd testbench reset (TB bug, RTL is spec-compliant)",
+  "category_tag": "tb_bug_reset_desync",
+  "source": "VeriSight projects/fifo. RTL+spec annotated 'v1.1 corrected'; defect is in the environment. Ground truth cross-verified from fifo_tb.sv:57-61, fifo_scoreboard.sv:96, fifo_trans.sv:40.",
+  "ground_truth_confidence": "high_on_label_soft_on_single_line",
+  "inputs": {
+    "spec": "projects/fifo/specs/spec.md",
+    "rtl": "projects/fifo/rtl/",
+    "tb": "projects/fifo/tb/",
+    "log": "projects/fifo/logs/sim.log"
+  },
+  "ground_truth": {
+    "classification": "TB Bug",
+    "category_keywords": ["reset", "testbench", "environment", "stimulus", "scoreboard", "reference model", "sequence"],
+    "root_cause_keywords_any": ["reset", "fifo_tb", "second reset", "re-assert", "reasserted", "mid-test", "mid-simulation", "out-of-band", "scoreboard", "reference model", "desync"],
+    "responsible_files": ["fifo_tb.sv", "fifo_scoreboard.sv"],
+    "responsible_lines": {"fifo_tb.sv": [47, 61], "fifo_scoreboard.sv": [90, 180]},
+    "first_causal_error_substring": "EMPTY FLAG FAIL | Expected=0 Actual=1 COUNT=1",
+    "expect_insufficient_evidence": false,
+    "notes": "The UVM reset sequence never drives RST (fifo_trans.sv:40 constrains only enables). The only real DUT resets are two hardcoded top-level pulses (fifo_tb.sv:57-61); the SECOND fires ~t=50-70 during the active write phase, holding the DUT in reset while the scoreboard (which models reset off live inf.RST, fifo_scoreboard.sv:96) keeps predicting. RTL matches spec sections 4-7. The tempting WRONG answer is 'RTL reset bug'. Correct label: TB Bug."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["apb_slave", "alu.sv"]
+  }
+}

@@ -23,9 +23,11 @@ verisight_knowledge_db/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
 # OS
 .DS_Store
 Thumbs.db
+

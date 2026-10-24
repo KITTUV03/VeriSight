@@ -136,17 +136,134 @@ def derive_instance_path(tb_files: List[str], top_module: str) -> Optional[str]:
     return None
 
 
-def derive_queries(knowledge: UnifiedKnowledge, top_module: str) -> List[XTraceQuery]:
+def signal_priority_score(name: str) -> int:
     """
-    Auto-derive x-tracer queries from scoreboard mismatches whose actual
-    value contains an X, e.g. ScoreboardMismatch(field="result",
-    actual="xx", timestamp="20 ns") -> a query for signal "result" @ 20000ps.
-
-    Caps at MAX_DERIVED_QUERIES distinct fields to bound runtime.
+    Score signal importance for root cause tracing:
+    Prioritize control/enable/handshake signals before data-bus bits.
     """
-    instance = derive_instance_path(knowledge.tb.file_list, top_module)
+    score = 0
+    clean = name.lower().rsplit(".", 1)[-1]
+    # Control keywords get higher priority
+    ctrl_re = re.compile(
+        r"(?:^|_)(valid|ready|enable|en|rst|reset|req|ack|wr|rd|write|read|cmd|ctrl|start|done|state|grant|sel|select|load|we|re)(?:$|_|\d+)"
+    )
+    if ctrl_re.search(clean):
+        score += 100
+    # Data bus keywords get lower priority
+    data_re = re.compile(
+        r"(?:^|_)(data|din|dout|wdata|rdata|addr|address|payload|bus|val|value|result)(?:$|_|\d+)"
+    )
+    if data_re.search(clean):
+        score -= 50
+    # Bit slice pattern like [0] or [31]
+    if "[" in name:
+        score -= 10
+    return score
 
+
+def _clean_signal_name(sig: str) -> str:
+    """Strip Verilog escaped identifier markers (leading backslash, trailing whitespace)."""
+    s = sig.strip()
+    if s.startswith("\\"):
+        s = s[1:].strip()
+    return s.replace("/", ".")
+
+
+def resolve_and_validate_signals(
+    signal_name: str, knowledge: UnifiedKnowledge, top_module: str
+) -> List[str]:
+    """
+    Validate requested signal against available design or waveform data,
+    producing prioritized hierarchical candidates (handling prefixes, escaped IDs,
+    hierarchy delimiters, and bit slices).
+    Preserves explicitly requested signals verbatim while adding validated aliases.
+    """
+    candidates = [signal_name]
+    clean_sig = _clean_signal_name(signal_name)
+    if clean_sig != signal_name:
+        candidates.append(clean_sig)
+
+    leaf = clean_sig.rsplit(".", 1)[-1]
+    # Also base name without bit indexing (e.g. "data[3]" -> "data")
+    base_leaf = re.sub(r"\[\d+(?::\d+)?\]$", "", leaf)
+
+    instance = derive_instance_path(knowledge.tb.file_list, top_module) if knowledge.tb else None
+    for s in [clean_sig, leaf]:
+        if instance and not s.startswith(instance + "."):
+            candidates.append(f"{instance}.{s}")
+        if top_module and not s.startswith(top_module + "."):
+            candidates.append(f"{top_module}.{s}")
+
+    # Check VCD signals if available to validate and add exact matches / aliases
+    if knowledge.vcd and knowledge.vcd.signals:
+        vcd_keys = list(knowledge.vcd.signals.keys())
+        for vpath in vcd_keys:
+            clean_vpath = _clean_signal_name(vpath)
+            vleaf = clean_vpath.rsplit(".", 1)[-1]
+            vbase = re.sub(r"\[\d+(?::\d+)?\]$", "", vleaf)
+
+            if (
+                clean_vpath == clean_sig
+                or clean_vpath.endswith(f".{leaf}")
+                or vleaf == leaf
+                or vbase == base_leaf
+                or vpath == signal_name
+            ):
+                candidates.append(vpath)
+                if clean_vpath != vpath:
+                    candidates.append(clean_vpath)
+
+    # Check RTL module ports/signals
+    if knowledge.rtl and knowledge.rtl.modules:
+        for mod in knowledge.rtl.modules:
+            for port in mod.ports:
+                clean_port = _clean_signal_name(port.name)
+                if clean_port in (clean_sig, leaf, base_leaf):
+                    if instance:
+                        candidates.append(f"{instance}.{clean_port}")
+                    if top_module:
+                        candidates.append(f"{top_module}.{clean_port}")
+
+    # Deduplicate while preserving insertion order
+    return list(dict.fromkeys(candidates))
+
+
+def derive_queries(
+    knowledge: UnifiedKnowledge,
+    top_module: str,
+    explicit_signals: Optional[List[str]] = None,
+    explicit_time_ps: Optional[int] = None,
+) -> List[XTraceQuery]:
+    """
+    Derive x-tracer queries:
+    - If explicit_signals provided, validates and preserves them.
+    - Otherwise auto-selects signals, prioritizing control/enable signals before data-bus bits.
+    """
     queries: List[XTraceQuery] = []
+
+    # 1. Handle explicit signals
+    if explicit_signals:
+        default_time = explicit_time_ps
+        if default_time is None:
+            if knowledge.logs.errors:
+                default_time = timestamp_to_ps(knowledge.logs.errors[0].timestamp)
+            elif knowledge.logs.scoreboard_mismatches:
+                default_time = timestamp_to_ps(knowledge.logs.scoreboard_mismatches[0].timestamp)
+            if default_time is None:
+                default_time = 0
+
+        for sig in explicit_signals:
+            candidates = resolve_and_validate_signals(sig, knowledge, top_module)
+            queries.append(XTraceQuery(
+                field_name=sig,
+                signal_candidates=candidates,
+                time_ps=default_time,
+                context=f"Explicitly requested signal: {sig}",
+            ))
+        return queries
+
+    # 2. Automatic signal selection
+    candidate_items: List[Dict[str, Any]] = []
     seen_fields = set()
 
     for mismatch in knowledge.logs.scoreboard_mismatches:
@@ -154,30 +271,44 @@ def derive_queries(knowledge: UnifiedKnowledge, top_module: str) -> List[XTraceQ
             continue
         if mismatch.field in seen_fields:
             continue
-
         time_ps = timestamp_to_ps(mismatch.timestamp)
         if time_ps is None:
             continue
-
-        candidates = []
-        if instance:
-            candidates.append(f"{instance}.{mismatch.field}")
-        if top_module:
-            candidates.append(f"{top_module}.{mismatch.field}")
-        candidates.append(mismatch.field)
-        # Dedup while preserving order.
-        candidates = list(dict.fromkeys(candidates))
-
-        queries.append(XTraceQuery(
-            field_name=mismatch.field,
-            signal_candidates=candidates,
-            time_ps=time_ps,
-            context=mismatch.message,
-        ))
+        candidate_items.append({
+            "field": mismatch.field,
+            "time_ps": time_ps,
+            "context": mismatch.message,
+            "priority": signal_priority_score(mismatch.field),
+        })
         seen_fields.add(mismatch.field)
 
-        if len(queries) >= MAX_DERIVED_QUERIES:
-            break
+    if knowledge.vcd and knowledge.vcd.signals:
+        for full_path, sig_wave in knowledge.vcd.signals.items():
+            if sig_wave.has_x and sig_wave.name not in seen_fields:
+                first_x_time = 0
+                for tr in sig_wave.transitions:
+                    if "x" in tr.value.lower():
+                        first_x_time = tr.time_ps
+                        break
+                candidate_items.append({
+                    "field": full_path,
+                    "time_ps": first_x_time,
+                    "context": f"VCD waveform X detected on {full_path}",
+                    "priority": signal_priority_score(full_path),
+                })
+                seen_fields.add(sig_wave.name)
+
+    # Sort by priority: control/enable signals before data-bus bits!
+    candidate_items.sort(key=lambda item: item["priority"], reverse=True)
+
+    for item in candidate_items[:MAX_DERIVED_QUERIES]:
+        candidates = resolve_and_validate_signals(item["field"], knowledge, top_module)
+        queries.append(XTraceQuery(
+            field_name=item["field"],
+            signal_candidates=candidates,
+            time_ps=item["time_ps"],
+            context=item["context"],
+        ))
 
     return queries
 

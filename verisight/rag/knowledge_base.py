@@ -82,7 +82,13 @@ class KnowledgeBase:
             try:
                 self._collections[name] = self.client.get_or_create_collection(
                     name=name,
-                    metadata={"description": f"VeriSight {name} knowledge"}
+                    # Use cosine space so `similarity = 1 - distance` is actually
+                    # meaningful (the default L2 space makes that transform wrong
+                    # and lets "similarity" go negative/unbounded).
+                    metadata={
+                        "description": f"VeriSight {name} knowledge",
+                        "hnsw:space": "cosine",
+                    },
                 )
             except Exception as e:
                 logger.error(f"Failed to get/create collection '{name}': {e}")
@@ -109,9 +115,14 @@ class KnowledgeBase:
         classification: str,
         files: List[str],
         metadata: Dict[str, str],
+        verified: bool = False,
     ) -> bool:
         """
         Store a complete debugging session in the knowledge base.
+
+        `verified` records whether this conclusion was human/expert-confirmed.
+        Model-generated conclusions are stored with verified=False so retrieval
+        can distinguish confirmed knowledge from unverified self-output.
 
         Args:
             session_id: Unique session identifier.
@@ -137,13 +148,14 @@ class KnowledgeBase:
 
         try:
             # Store the error/problem
-            errors_col.add(
+            errors_col.upsert(
                 documents=[problem],
                 ids=[f"{session_id}_error"],
                 metadatas=[{
                     "session_id": session_id,
                     "classification": classification,
                     "timestamp": timestamp,
+                    "verified": str(bool(verified)),
                     "cause": cause[:500],
                     "files": json.dumps(files[:10]),
                     **{k: str(v)[:200] for k, v in metadata.items()},
@@ -151,7 +163,7 @@ class KnowledgeBase:
             )
 
             # Store the fix
-            fixes_col.add(
+            fixes_col.upsert(
                 documents=[fix],
                 ids=[f"{session_id}_fix"],
                 metadatas=[{
@@ -170,7 +182,7 @@ class KnowledgeBase:
                 f"Fix: {fix}\n"
                 f"Files: {', '.join(files[:5])}"
             )
-            lessons_col.add(
+            lessons_col.upsert(
                 documents=[lesson],
                 ids=[f"{session_id}_lesson"],
                 metadatas=[{
@@ -200,7 +212,7 @@ class KnowledgeBase:
             return False
 
         try:
-            patterns_col.add(
+            patterns_col.upsert(
                 documents=[pattern_description],
                 ids=[pattern_id],
                 metadatas=[{
@@ -227,7 +239,7 @@ class KnowledgeBase:
             return False
 
         try:
-            collection.add(
+            collection.upsert(
                 documents=[document],
                 ids=[doc_id],
                 metadatas=[{

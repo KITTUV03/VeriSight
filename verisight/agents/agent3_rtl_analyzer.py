@@ -30,6 +30,8 @@ from verisight.schemas.rtl_analysis import (
 )
 from verisight.tools import yosys_runner, xtracer_runner
 from verisight.tools.xtracer_runner import XTracerNotFoundError
+from verisight.tools.traceweave import correlate_failure_evidence
+from verisight.tools.fault_localization import localize_faults
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent3_rtl_analyzer")
@@ -117,6 +119,39 @@ class RTLRootCauseAnalyzer(BaseAgent):
         self.logger.info("Module 7: Miscellaneous Analysis")
         analysis.misc = self._analyze_misc(knowledge)
 
+        # Advanced Engine 1: TraceWeave Multi-Source Evidence Correlation
+        try:
+            tw_report = correlate_failure_evidence(knowledge.log, knowledge.vcd, knowledge.rtl)
+            analysis.traceweave = tw_report.model_dump()
+            self.logger.info(f"  → TraceWeave: {tw_report.summary}")
+        except Exception as e:
+            self.logger.debug(f"TraceWeave correlation skipped: {e}")
+
+        # Advanced Engine 2: Spectrum-Based Fault Localization (CirFix SBFL)
+        try:
+            sbfl_report = localize_faults(knowledge.log, knowledge.rtl)
+            analysis.fault_localization = sbfl_report.model_dump()
+            if sbfl_report.top_suspect:
+                self.logger.info(
+                    f"  → Fault Localization (CirFix/SBFL): Top suspect '{sbfl_report.top_suspect.signal_name}' "
+                    f"in {sbfl_report.top_suspect.module_name} (score={sbfl_report.top_suspect.suspiciousness})"
+                )
+                # If functional issues empty, augment with top SBFL suspect
+                if not analysis.functional.issues and sbfl_report.top_suspect.suspiciousness >= 0.4:
+                    top = sbfl_report.top_suspect
+                    analysis.functional.issues.append(FunctionalIssue(
+                        issue_type="logic_error",
+                        description=f"SBFL localized defect to {top.module_name}.{top.signal_name} (Ochiai suspiciousness: {top.suspiciousness})",
+                        module=top.module_name,
+                        signal=top.signal_name,
+                        file=top.file_path,
+                        line_number=top.line_number,
+                        severity="high",
+                    ))
+                    analysis.functional.summary = f"SBFL located {len(sbfl_report.ranked_suspects)} suspect(s); top: {top.signal_name}"
+        except Exception as e:
+            self.logger.debug(f"Fault localization skipped: {e}")
+
         # Determine primary root cause
         analysis = self._determine_primary_root_cause(analysis, classification)
 
@@ -133,6 +168,32 @@ class RTLRootCauseAnalyzer(BaseAgent):
     def _analyze_x_propagation(self, knowledge: UnifiedKnowledge) -> XTraceResult:
         """Analyze X value origins and propagation paths."""
         result = XTraceResult()
+
+        # Surface how the RTL was parsed so downstream consumers never mistake
+        # degraded/partial parsing for a complete AST.
+        pstatus = getattr(knowledge.rtl, "parser_status", None)
+        if pstatus is not None:
+            result.parser_backend = pstatus.backend
+            result.parser_degraded = pstatus.degraded
+            if pstatus.degraded:
+                result.limitations.append(
+                    f"RTL parse was degraded (backend={pstatus.backend}): "
+                    + "; ".join(pstatus.notes[:2]) if pstatus.notes
+                    else f"RTL parse was degraded (backend={pstatus.backend})."
+                )
+        # This module is STATIC analysis of the source AST. It flags registers
+        # that lack a reset assignment — a necessary but not sufficient
+        # condition for a runtime X. Establishing the actual runtime
+        # propagation path of an unknown value requires simulation (a VCD +
+        # the real x-tracer, see _augment_with_real_xtracer), because it
+        # depends on dynamic scheduling, conditional execution and stimulus
+        # that a source-only AST cannot resolve.
+        result.limitations.append(
+            "Static source analysis: identifies potential X origins "
+            "(registers/memories without reset). It does NOT establish the "
+            "runtime propagation path of an unknown value — that requires "
+            "simulation-based tracing (VCD + x-tracer)."
+        )
 
         for module in knowledge.rtl.modules:
             # Find registers without reset (X origins)
@@ -275,22 +336,18 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.tool_message = str(e)
             return result
 
-        # Step 4: build queries (explicit override, or auto-derived from
-        # sim-log scoreboard mismatches).
-        if config.signal and config.time_ps is not None:
-            queries = [xtracer_runner.XTraceQuery(
-                field_name=config.signal,
-                signal_candidates=[config.signal],
-                time_ps=config.time_ps,
-            )]
-        else:
-            queries = xtracer_runner.derive_queries(knowledge, top_module)
+        # Step 4: build queries (explicit override, or auto-derived with
+        # control signals prioritized before data bus bits).
+        explicit_sigs = getattr(config, "signals", None) or ([config.signal] if config.signal else None)
+        queries = xtracer_runner.derive_queries(
+            knowledge, top_module, explicit_signals=explicit_sigs, explicit_time_ps=config.time_ps
+        )
 
         if not queries:
             result.tool_status = "skipped_no_query"
             result.tool_message = (
                 "Could not derive an X-valued signal/time to trace from the "
-                "sim log. Pass --xtrace-signal and --xtrace-time explicitly."
+                "sim log. Pass --xtrace-signal explicitly."
             )
             return result
 
