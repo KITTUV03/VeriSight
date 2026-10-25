@@ -32,6 +32,13 @@ from verisight.tools import yosys_runner, xtracer_runner
 from verisight.tools.xtracer_runner import XTracerNotFoundError
 from verisight.tools.traceweave import correlate_failure_evidence
 from verisight.tools.fault_localization import localize_faults
+from verisight.analysis.extended_checks import (
+    run_extended_cdc_checks,
+    run_extended_lint_checks,
+    run_extended_structural_checks,
+    run_extended_protocol_checks,
+    run_extended_security_misc_checks,
+)
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent3_rtl_analyzer")
@@ -513,6 +520,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                 if block.reset_signal and "negedge" in block.sensitivity_list:
                     result.async_resets.append(block.reset_signal)
 
+            # Extended CDC checks (multi-bit crossing, raw clock gating, glitch before sync)
+            try:
+                ext_cdc = run_extended_cdc_checks(module, knowledge.rtl.modules)
+                result.crossings.extend(ext_cdc)
+            except Exception as e:
+                self.logger.debug(f"Extended CDC checks skipped for {module.name}: {e}")
+
         result.summary = (
             f"Found {len(result.crossings)} CDC issue(s), "
             f"{len(result.async_resets)} async reset(s)"
@@ -564,6 +578,15 @@ class RTLRootCauseAnalyzer(BaseAgent):
                         ))
                         counts["unused_variable"] = counts.get("unused_variable", 0) + 1
 
+            # Extended Lint checks (casex, arithmetic shift, signed/unsigned, logical/bitwise, clock edge, implicit net)
+            try:
+                ext_lint = run_extended_lint_checks(module)
+                for iss in ext_lint:
+                    result.issues.append(iss)
+                    counts[iss.issue_type] = counts.get(iss.issue_type, 0) + 1
+            except Exception as e:
+                self.logger.debug(f"Extended lint checks skipped for {module.name}: {e}")
+
         result.issue_counts = counts
         result.summary = f"Found {len(result.issues)} lint issue(s)"
         self.logger.info(f"  → Lint: {len(result.issues)} issues")
@@ -613,6 +636,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                     "has_default": fsm.has_default,
                 })
 
+            # Extended Structural checks (FSM deadlock, counter terminal check, dual-port collision, port swaps)
+            try:
+                ext_struct = run_extended_structural_checks(module, knowledge.rtl.modules)
+                result.issues.extend(ext_struct)
+            except Exception as e:
+                self.logger.debug(f"Extended structural checks skipped for {module.name}: {e}")
+
         result.summary = f"Found {len(result.issues)} structural issue(s)"
         self.logger.info(f"  → Structural: {len(result.issues)} issues")
         return result
@@ -644,8 +674,17 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.detected_protocols.append(rule.protocol)
 
         result.detected_protocols = list(set(result.detected_protocols))
-        result.summary = f"Detected protocols: {', '.join(result.detected_protocols) or 'none'}"
-        self.logger.info(f"  → Protocol: {len(result.detected_protocols)} detected")
+
+        # Extended Protocol checks (AXI4 valid stability, AHB HREADY wait-state, APB setup phase)
+        for module in knowledge.rtl.modules:
+            try:
+                ext_proto = run_extended_protocol_checks(module, result.detected_protocols)
+                result.issues.extend(ext_proto)
+            except Exception as e:
+                self.logger.debug(f"Extended protocol checks skipped for {module.name}: {e}")
+
+        result.summary = f"Detected protocols: {', '.join(result.detected_protocols) or 'none'} ({len(result.issues)} protocol issue(s) identified)"
+        self.logger.info(f"  → Protocol: {len(result.detected_protocols)} detected, {len(result.issues)} issues")
         return result
 
     # ─── Module 7: Misc Analyzer ───────────────────────────────────
@@ -676,6 +715,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                     file=module.file,
                     severity="medium",
                 ))
+
+            # Extended Security & Misc checks (key zeroization, sync reset + clock gating deadlock)
+            try:
+                ext_misc = run_extended_security_misc_checks(module)
+                result.issues.extend(ext_misc)
+            except Exception as e:
+                self.logger.debug(f"Extended misc checks skipped for {module.name}: {e}")
 
         result.summary = f"Found {len(result.issues)} miscellaneous issue(s)"
         self.logger.info(f"  → Misc: {len(result.issues)} issues")
