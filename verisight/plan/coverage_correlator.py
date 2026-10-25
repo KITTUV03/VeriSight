@@ -55,22 +55,28 @@ class CoverageCorrelator:
         if not coverage_db or coverage_db.total_bins == 0:
             logger.info("No external simulator DB provided; generating baseline planned closure model.")
             coverage_db = self._generate_simulated_coverage_run(report)
-
-        report.coverage_db_source = coverage_db.source_path or "Simulator UCDB/vDB Ingest"
+            report.coverage_db_source = "Pending Simulation (Baseline Demonstration)"
+        else:
+            report.coverage_db_source = coverage_db.source_path or "Simulator UCDB/vDB Ingest"
 
         # Build lookup table for ingested coverpoints and bins
-        # Normalize keys: lowercase, alphanumeric
+        # Normalize keys: lowercase, alphanumeric, with hierarchical leaf stripping
         ingested_cp_map: Dict[str, Any] = {}
         ingested_bin_map: Dict[str, Any] = {}
 
         for cg_name, cg in coverage_db.covergroups.items():
             for cp_name, cp in cg.coverpoints.items():
                 norm_cp = self._norm(cp_name)
+                norm_cp_raw = re.sub(r"[^a-zA-Z0-9]", "", cp_name).lower()
                 ingested_cp_map[norm_cp] = cp
+                ingested_cp_map[norm_cp_raw] = cp
                 for b_name, b in cp.bins.items():
                     norm_b = self._norm(b_name)
+                    norm_b_raw = re.sub(r"[^a-zA-Z0-9]", "", b_name).lower()
                     ingested_bin_map[f"{norm_cp}::{norm_b}"] = b
+                    ingested_bin_map[f"{norm_cp_raw}::{norm_b_raw}"] = b
                     ingested_bin_map[norm_b] = b
+                    ingested_bin_map[norm_b_raw] = b
 
         total_planned_bins = 0
         total_hit_bins = 0
@@ -439,7 +445,10 @@ endclass
         )
 
     def _norm(self, s: Optional[str]) -> str:
-        """Normalize identifier for robust matching."""
+        """Normalize identifier for robust matching, stripping hierarchical scopes."""
         if not s:
             return ""
-        return re.sub(r"[^a-zA-Z0-9]", "", s).lower()
+        # Strip path or instance hierarchy e.g. /tb/dut_inst/cp_op or tb.dut.cp_op
+        leaf = s.strip().split(".")[-1].split("/")[-1]
+        return re.sub(r"[^a-zA-Z0-9]", "", leaf).lower()
+

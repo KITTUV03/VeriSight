@@ -86,10 +86,13 @@ class FeatureExtractor(BaseAgent):
             except Exception as e:
                 logger.warning(f"RTL parsing error during feature extraction: {e}")
 
+        # Increase prompt context window (support full specs up to 80k chars)
+        prompt_spec = spec_text if len(spec_text) <= 80000 else spec_text[:80000]
+
         prompt = f"""Deconstruct the following hardware specification into a complete Feature Plan.
 
 ═══ SPECIFICATION DOCUMENT ═══
-{spec_text[:12000]}
+{prompt_spec}
 
 ═══ RTL HARDWARE IMPLEMENTATION (for cross-correlation) ═══
 {rtl_summary or "No RTL provided (spec-only extraction)."}
@@ -123,30 +126,134 @@ Provide the output as a JSON object with a single "features" list of objects wit
         return self._deterministic_extract(spec_text, rtl_data)
 
     def _deterministic_extract(self, spec_text: str, rtl_data: Any) -> List[FeatureItem]:
-        """Deterministic fallback feature extractor."""
-        features = []
+        """Deterministic fallback feature extractor supporting tables, lists, and RTL cross-correlation."""
+        features: List[FeatureItem] = []
         feat_idx = 1
+        seen_titles = set()
 
-        # Extract markdown headers or requirements
+        # Collect RTL port/signal names for cross-check
+        rtl_port_names = set()
+        if rtl_data and hasattr(rtl_data, "modules"):
+            for mod in rtl_data.modules:
+                for p in getattr(mod, "ports", []):
+                    rtl_port_names.add(p.name.lower())
+
         lines = spec_text.splitlines()
         current_section = "General"
+        in_table = False
+        table_headers = []
 
         for line in lines:
             line_str = line.strip()
+            if not line_str:
+                in_table = False
+                continue
+
+            # Header tracking
             if line_str.startswith("#"):
                 current_section = line_str.lstrip("#").strip()
-            elif line_str.startswith("- ") or line_str.startswith("* ") or (len(line_str) > 10 and ":" in line_str):
-                text = line_str.lstrip("-* ").strip()
-                if len(text) > 12:
+                in_table = False
+                continue
+
+            # Table row parsing (e.g. | Opcode | Mnemonic | Description |)
+            if line_str.startswith("|") and line_str.endswith("|"):
+                cells = [c.strip() for c in line_str.strip("|").split("|")]
+                if all(set(c) <= {"-", ":", " "} for c in cells):
+                    in_table = True
+                    continue
+                if not in_table:
+                    table_headers = [c.lower() for c in cells]
+                    in_table = True
+                    continue
+                else:
+                    # Valid data row in table
+                    if len(cells) >= 2:
+                        title = f"{cells[0]}: {cells[1]}"[:45]
+                        desc = " — ".join(cells)
+                        if title not in seen_titles and len(desc) > 8:
+                            seen_titles.add(title)
+                            cat = "Register" if any(k in current_section.lower() or k in title.lower() for k in ["reg", "offset", "csr"]) else "Functional"
+                            features.append(
+                                FeatureItem(
+                                    feature_id=f"FEAT-{feat_idx:03d}",
+                                    title=title,
+                                    description=desc,
+                                    category=cat,
+                                    source_section=current_section,
+                                    priority="High" if "reset" in desc.lower() or "error" in desc.lower() else "Medium",
+                                    rtl_cross_check="Confirmed" if any(p in desc.lower() for p in rtl_port_names) else ("Confirmed" if rtl_data else "N/A"),
+                                )
+                            )
+                            feat_idx += 1
+                    continue
+
+            # Bullet points or numbered lists
+            is_bullet = line_str.startswith(("- ", "* ", "+ "))
+            is_numbered = bool(re.match(r"^\d+\.\s+", line_str))
+            has_kv = len(line_str) > 12 and ":" in line_str and not line_str.startswith("//")
+
+            if is_bullet or is_numbered or has_kv:
+                text = re.sub(r"^[-*+\d.]+\s*", "", line_str).strip()
+                if len(text) > 10:
+                    raw_title = text.split(":")[0].strip()[:45] if ":" in text else text[:45]
+                    if raw_title in seen_titles:
+                        continue
+                    seen_titles.add(raw_title)
+
+                    # Categorization heuristics
+                    low_text = text.lower()
+                    if any(k in low_text for k in ["reset", "power-on", "clock", "pin", "pad"]):
+                        cat = "Interface"
+                        prio = "Critical"
+                    elif any(k in low_text for k in ["reg", "offset", "address", "csr", "read-only", "w1c"]):
+                        cat = "Register"
+                        prio = "High"
+                    elif any(k in low_text for k in ["apb", "ahb", "axi", "handshake", "valid", "ready", "protocol"]):
+                        cat = "Protocol"
+                        prio = "Critical"
+                    elif any(k in low_text for k in ["overflow", "underflow", "illegal", "corner", "error", "fault", "violation"]):
+                        cat = "CornerCase"
+                        prio = "High"
+                    elif any(k in low_text for k in ["latency", "throughput", "bandwidth", "frequency", "performance"]):
+                        cat = "Performance"
+                        prio = "Medium"
+                    else:
+                        cat = "Functional"
+                        prio = "High" if feat_idx <= 4 else "Medium"
+
+                    # Cross check with RTL ports
+                    cross = "N/A"
+                    if rtl_port_names:
+                        matched = any(p in low_text for p in rtl_port_names)
+                        cross = "Confirmed" if matched else "Missing_In_RTL"
+
                     features.append(
                         FeatureItem(
                             feature_id=f"FEAT-{feat_idx:03d}",
-                            title=text.split(":")[0][:40],
+                            title=raw_title,
                             description=text,
-                            category="Functional" if "func" in text.lower() or "op" in text.lower() else "Interface",
+                            category=cat,
                             source_section=current_section,
-                            priority="High" if feat_idx <= 3 else "Medium",
-                            rtl_cross_check="Confirmed" if rtl_data else "N/A",
+                            priority=prio,
+                            rtl_cross_check=cross,
+                        )
+                    )
+                    feat_idx += 1
+
+        # Check for Undocumented RTL features (ports in RTL not present in spec text)
+        if rtl_port_names:
+            spec_lower = spec_text.lower()
+            for port in sorted(rtl_port_names):
+                if port not in ("clk", "rst_n", "rst", "clock", "reset") and port not in spec_lower:
+                    features.append(
+                        FeatureItem(
+                            feature_id=f"FEAT-{feat_idx:03d}",
+                            title=f"Undocumented RTL Port: {port}",
+                            description=f"RTL defines port '{port}' which is not explicitly documented in the specification.",
+                            category="Interface",
+                            source_section="RTL Discovery",
+                            priority="Medium",
+                            rtl_cross_check="Undocumented_In_Spec",
                         )
                     )
                     feat_idx += 1
@@ -165,3 +272,4 @@ Provide the output as a JSON object with a single "features" list of objects wit
             )
 
         return features
+

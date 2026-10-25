@@ -61,11 +61,23 @@ def build_traceability_matrix(
         s_ids = feat_to_sva.get(feat.feature_id, [])
 
         if t_ids and (c_ids or s_ids):
+            plan_status = "Planned"
             status = "Covered"
         elif t_ids or c_ids or s_ids:
+            plan_status = "Partial_Plan"
             status = "Partial"
         else:
+            plan_status = "Unplanned"
             status = "Uncovered"
+
+        # If actual coverage has been ingested from a simulator run
+        if feat.actual_coverage is not None:
+            if feat.actual_coverage >= 100.0:
+                status = "Closed"
+            elif feat.actual_coverage > 0.0:
+                status = "In_Progress"
+            else:
+                status = "Untested"
 
         rows.append(
             TraceabilityRow(
@@ -74,11 +86,14 @@ def build_traceability_matrix(
                 test_ids=t_ids,
                 coverage_ids=c_ids,
                 assertion_ids=s_ids,
+                plan_status=plan_status,
                 status=status,
+                actual_coverage=feat.actual_coverage,
             )
         )
 
     return rows
+
 
 
 def export_csv(matrix: List[TraceabilityRow], output_path: Path):
