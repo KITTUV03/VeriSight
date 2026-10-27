@@ -873,6 +873,59 @@ def run_edaplayground_export_flow(
         console.print(f"\n[bold red]EDA Playground Export failed:[/] {e}")
 
 
+def run_uvm_flow(
+    rtl_path: Optional[str] = None,
+    spec_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Run autonomous UVM Testbench Environment Generator (XcelUVM Architect)."""
+    console.print("\n[bold cyan]══════════════════════════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]      XcelUVM Architect — Autonomous UVM Testbench Generator[/bold cyan]")
+    console.print("[bold cyan]══════════════════════════════════════════════════════════[/bold cyan]\n")
+
+    if not rtl_path:
+        rtl_path = _prompt_path(
+            "Path to RTL source file or directory (.sv, .v)",
+            default="projects/apb/rtl/apb_slave.sv" if Path("projects/apb/rtl/apb_slave.sv").exists() else "examples/rtl/alu.sv",
+            file_types=[".sv", ".v"],
+        )
+
+    if not spec_path:
+        spec_path = _prompt_path(
+            "Path to specification file (optional, press Enter to infer from RTL)",
+            default="projects/apb/specs/apb_spec.md" if Path("projects/apb/specs/apb_spec.md").exists() else "",
+            file_types=[".md", ".txt"],
+            allow_empty=True,
+        )
+
+    if not output_dir:
+        output_dir = Prompt.ask(
+            "[bold]Output directory for generated UVM environment[/bold]",
+            default="output/uvm_environment",
+        ).strip()
+
+    from verisight.uvm.uvm_architect import UVMArchitect
+
+    with console.status("[bold green]Synthesizing complete UVM 1.2 Testbench Environment...[/bold green]"):
+        architect = UVMArchitect(output_dir=output_dir)
+        res = architect.generate(
+            rtl_path=str(rtl_path) if rtl_path else None,
+            spec_path=str(spec_path) if spec_path else None,
+            output_dir=output_dir,
+        )
+
+    console.print("\n[bold green]✓ Full UVM Testbench Environment Synthesized Successfully![/bold green]")
+    console.print(f"  Target Design:      [cyan]{res.design_name.upper()}[/cyan]")
+    console.print(f"  Detected Protocol:  [cyan]{res.protocol_detected.upper()}[/cyan]")
+    console.print(f"  DUT Ports Mapped:   [cyan]{res.inputs_count} inputs, {res.outputs_count} outputs[/cyan]")
+    console.print(f"  Output Directory:   [cyan]{res.output_dir}[/cyan]\n")
+
+    console.print("[bold]Generated UVM Components:[/bold]")
+    for f in res.files_generated:
+        console.print(f"  • [cyan]{f}[/cyan]")
+    console.print()
+
+
 def run_wizard():
     """Execute the unified interactive guided setup wizard."""
     _print_welcome_banner()
@@ -884,18 +937,23 @@ def run_wizard():
     console.print("  [4] [bold cyan]🌐 Live Web Cockpit[/bold cyan] — Launch Interactive Browser Studio (Sim/Waveforms/RCA)")
     console.print("  [5] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
     console.print("  [6] [bold magenta]📦 Export for EDA Playground[/bold magenta] — Package RTL+TB for Cloud Questa / VCS")
-    console.print("  [7] [bold red]🚪 Exit[/bold red]")
+    console.print("  [7] [bold blue]🏗️  XcelUVM Testbench Architect[/bold blue] — Generate Full Production UVM Testbench")
+    console.print("  [8] [bold red]🚪 Exit[/bold red]")
     console.print()
 
     workflow = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5", "6", "7"],
+        choices=["1", "2", "3", "4", "5", "6", "7", "8"],
         default="1",
     )
 
-    if workflow == "7":
+    if workflow == "8":
         console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
         sys.exit(0)
+
+    if workflow == "7":
+        run_uvm_flow()
+        return
 
     if workflow == "6":
         run_edaplayground_export_flow()
