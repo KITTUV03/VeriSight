@@ -811,6 +811,59 @@ def run_sim_flow(
         console.print(f"\n[bold red]Closed-Loop Execution failed:[/] {e}")
 
 
+def run_edaplayground_export_flow(
+    rtl_path: Optional[str] = None,
+    tb_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Interactive guided flow to export RTL and Testbench to EDA Playground."""
+    from verisight.tools.eda_playground_exporter import export_to_edaplayground
+
+    console.print("\n[bold cyan]📦 VeriSight — EDA Playground Cloud Bundle Exporter[/bold cyan]")
+    console.print("[dim]Package RTL and Testbench for 1-click cloud simulation with Siemens Questa, Synopsys VCS, or Riviera-PRO.[/dim]\n")
+
+    if not rtl_path:
+        rtl_path = _prompt_path("RTL Source file or directory (.sv, .v)", required=True, default="examples/rtl/alu.sv")
+    if not tb_path:
+        tb_path = _prompt_path("Testbench file or directory (.sv, .v)", required=True, default="examples/tb/alu_tb.sv")
+    if not output_dir:
+        output_dir = Prompt.ask("[bold]Output bundle directory[/bold]", default="output/edaplayground").strip()
+
+    preferred_sim = Prompt.ask(
+        "[bold]Target Simulator for preconfigured flags[/bold]",
+        choices=["questa", "vcs", "riviera", "xcelium", "verilator"],
+        default="questa",
+    )
+    anonymize = Confirm.ask(
+        "[bold]Enable RTL Token Masking (scrub proprietary identifiers before cloud upload)?[/bold]",
+        default=False,
+    )
+
+    try:
+        res = export_to_edaplayground(
+            rtl_path=rtl_path,
+            tb_path=tb_path,
+            output_dir=output_dir,
+            preferred_simulator=preferred_sim,
+            anonymize_rtl=anonymize,
+        )
+
+        console.print("\n[bold green]✓ EDA Playground bundle created successfully![/bold green]")
+        console.print(f"  • [cyan]design.sv:[/]             {res['design_sv']}")
+        console.print(f"  • [cyan]testbench.sv:[/]          {res['testbench_sv']}")
+        console.print(f"  • [cyan]Launch Studio (HTML):[/] {res['launch_html']}")
+        console.print(f"  • [cyan]Configuration (JSON):[/] {res['config_json']}")
+        console.print(f"  • [cyan]User Guide (MD):[/]      {res['readme_md']}\n")
+
+        open_dash = Confirm.ask("[bold]Open EDA Playground Launch Studio in browser now?[/bold]", default=True)
+        if open_dash:
+            _open_html_in_browser(Path(res["launch_html"]))
+            console.print(f"[green]✓ Opened: file://{Path(res['launch_html']).resolve()}[/green]")
+
+    except Exception as e:
+        console.print(f"\n[bold red]EDA Playground Export failed:[/] {e}")
+
+
 def run_wizard():
     """Execute the unified interactive guided setup wizard."""
     _print_welcome_banner()
@@ -821,18 +874,23 @@ def run_wizard():
     console.print("  [3] [bold green]🚀 Closed-Loop Sim[/bold green]  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit")
     console.print("  [4] [bold cyan]🌐 Live Web Cockpit[/bold cyan] — Launch Interactive Browser Studio (Sim/Waveforms/RCA)")
     console.print("  [5] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
-    console.print("  [6] [bold red]🚪 Exit[/bold red]")
+    console.print("  [6] [bold magenta]📦 Export for EDA Playground[/bold magenta] — Package RTL+TB for Cloud Questa / VCS")
+    console.print("  [7] [bold red]🚪 Exit[/bold red]")
     console.print()
 
     workflow = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5", "6"],
+        choices=["1", "2", "3", "4", "5", "6", "7"],
         default="1",
     )
 
-    if workflow == "6":
+    if workflow == "7":
         console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
         sys.exit(0)
+
+    if workflow == "6":
+        run_edaplayground_export_flow()
+        return
 
     if workflow == "4":
         from verisight.server.app import start_server
@@ -868,8 +926,9 @@ def run_wizard():
         console.print("  [3] ALU Plan Demo    (Generate Full Test Plan, SV Coverage & SVA for ALU)")
         console.print("  [4] FIFO Plan Demo   (Generate Full Test Plan, SV Coverage & SVA for FIFO)")
         console.print("  [5] ALU Closed-Loop  (Simulate ALU RTL+TB -> Waveform RCA -> Coverage)")
+        console.print("  [6] ALU Cloud Export (Generate EDA Playground Questa/VCS Bundle)")
 
-        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4", "5"], default="1")
+        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4", "5", "6"], default="1")
 
         if demo_sel == "1":
             run_debug_flow(
@@ -915,4 +974,10 @@ def run_wizard():
                 spec_path="examples/specs/alu_spec.md",
                 output_dir="output/demo_alu_closed_loop",
                 airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+        elif demo_sel == "6":
+            run_edaplayground_export_flow(
+                rtl_path="examples/rtl/alu.sv",
+                tb_path="examples/tb/alu_tb.sv",
+                output_dir="output/demo_alu_edaplayground",
             )

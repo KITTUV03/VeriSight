@@ -58,8 +58,14 @@ Examples:
         choices=[
             "start", "wizard", "train", "train-kb", "learn", "plan",
             "sim", "simulate", "serve", "server", "web", "cockpit", "ui",
+            "export-edaplayground", "edaplayground", "edaplay",
         ],
-        help="Optional command: 'start' (guided wizard), 'train' (train & ground RAG knowledge base on 100+ verification scenarios), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
+        help="Optional command: 'start' (guided wizard), 'train' (train & ground RAG knowledge base on 100+ verification scenarios), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), 'serve' (live interactive web cockpit), or 'export-edaplayground' (bundle for EDA Playground cloud simulation)",
+    )
+    parser.add_argument(
+        "--export-edaplayground",
+        action="store_true",
+        help="Export RTL and testbench into an EDA Playground cloud simulation bundle (design.sv, testbench.sv, and launch dashboard)",
     )
     parser.add_argument(
         "--interactive", "-i",
@@ -321,7 +327,7 @@ def validate_inputs(args) -> bool:
         console.print("  Use --spec, --rtl, --tb, or --log")
         valid = False
 
-    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
+    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui", "export-edaplayground", "edaplayground", "edaplay") or getattr(args, "export_edaplayground", False):
         return True
 
     if getattr(args, "command", None) == "plan":
@@ -341,6 +347,41 @@ def main():
         return
 
     args = parse_args()
+
+    # Handle 'export-edaplayground' / 'edaplayground'
+    if getattr(args, "command", None) in ("export-edaplayground", "edaplayground", "edaplay") or getattr(args, "export_edaplayground", False):
+        from verisight.tools.eda_playground_exporter import export_to_edaplayground
+        from verisight.wizard import _open_html_in_browser
+
+        rtl_in = args.rtl or "examples/rtl/alu.sv"
+        tb_in = args.tb or "examples/tb/alu_tb.sv"
+        out_dir = args.output if args.output != "output" else "output/edaplayground"
+
+        console.print("\n[bold cyan]📦 VeriSight — EDA Playground Cloud Bundle Exporter[/bold cyan]")
+        console.print(f"  [dim]RTL Source:[/]       {rtl_in}")
+        console.print(f"  [dim]Testbench:[/]        {tb_in}")
+        console.print(f"  [dim]Output Directory:[/] {out_dir}\n")
+
+        res = export_to_edaplayground(
+            rtl_path=rtl_in,
+            tb_path=tb_in,
+            output_dir=out_dir,
+            preferred_simulator=args.simulator if args.simulator != "auto" else "questa",
+            anonymize_rtl=bool(args.anonymize_rtl),
+        )
+
+        console.print("[bold green]✓ EDA Playground bundle created successfully![/bold green]\n")
+        console.print(f"  • [bold]design.sv:[/]             {res['design_sv']}")
+        console.print(f"  • [bold]testbench.sv:[/]          {res['testbench_sv']}")
+        console.print(f"  • [bold]Launch Studio (HTML):[/] {res['launch_html']}")
+        console.print(f"  • [bold]Configuration (JSON):[/] {res['config_json']}")
+        console.print(f"  • [bold]Guide (Markdown):[/]     {res['readme_md']}\n")
+        console.print("[bold white]To run in the cloud with Questa / VCS:[/bold white]")
+        console.print(f"  Open [bold cyan]{res['launch_html']}[/bold cyan] or visit [bold cyan]https://www.edaplayground.com[/bold cyan]\n")
+
+        if not args.no_browser:
+            _open_html_in_browser(Path(res["launch_html"]))
+        return
 
     if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
         from verisight.server.app import start_server
