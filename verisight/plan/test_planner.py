@@ -139,7 +139,19 @@ Return a JSON object with a single "test_scenarios" list of objects with fields:
         design_name: str,
         rtl_info: Optional[Dict[str, Any]] = None,
     ) -> List[TestScenario]:
-        """Deterministic, grounded fallback test scenario generator."""
+        """Deterministic, grounded test scenario generator with protocol-specific dispatch."""
+        from verisight.plan.protocol_architect import detect_design_protocol, generate_grounded_protocol_plan
+        proto = detect_design_protocol("", rtl_info)
+        if proto in ("pcie", "chi", "ddr", "axi"):
+            logger.info(f"Synthesizing enterprise protocol test scenarios for {proto.upper()}...")
+            _, _, p_tests = generate_grounded_protocol_plan(
+                design_name=design_name,
+                features=features,
+                rtl_info=rtl_info,
+            )
+            if p_tests:
+                return p_tests
+
         tests: List[TestScenario] = []
         test_idx = 1
 

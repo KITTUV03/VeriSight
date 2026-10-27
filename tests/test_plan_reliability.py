@@ -154,23 +154,27 @@ class TestPlanReliability(unittest.TestCase):
 
     def test_planner_orchestrator_end_to_end(self):
         """Verify full VeriSightPlanner execution on example spec and RTL."""
+        from unittest.mock import patch
+        from verisight.agents.base_agent import BaseAgent
+
         spec_path = "examples/specs/alu_spec.md"
         rtl_path = "examples/rtl/"
-        with tempfile.TemporaryDirectory() as td:
-            planner = VeriSightPlanner(output_dir=td)
-            report = planner.run(spec_path=spec_path, rtl_path=rtl_path, design_name="ALU")
+        with patch.object(BaseAgent, "reason", side_effect=RuntimeError("Offline test fallback")):
+            with tempfile.TemporaryDirectory() as td:
+                planner = VeriSightPlanner(output_dir=td)
+                report = planner.run(spec_path=spec_path, rtl_path=rtl_path, design_name="ALU")
 
-            self.assertGreater(report.total_features, 10)
-            self.assertGreaterEqual(report.total_tests, 20)
-            self.assertGreater(report.total_coverage_points, 5)
-            self.assertGreater(report.total_assertions, 5)
-            self.assertTrue(report.sv_coverage_syntax_ok)
-            self.assertTrue(report.sv_assertions_syntax_ok)
+                self.assertGreater(report.total_features, 10)
+                self.assertGreaterEqual(report.total_tests, 20)
+                self.assertGreater(report.total_coverage_points, 5)
+                self.assertGreater(report.total_assertions, 5)
+                self.assertTrue(report.sv_coverage_syntax_ok)
+                self.assertTrue(report.sv_assertions_syntax_ok)
 
-            cov_file = Path(td) / "coverage_model.sv"
-            sva_file = Path(td) / "dut_assertions.sv"
-            self.assertTrue(cov_file.exists())
-            self.assertTrue(sva_file.exists())
+                cov_file = Path(td) / "coverage_model.sv"
+                sva_file = Path(td) / "dut_assertions.sv"
+                self.assertTrue(cov_file.exists())
+                self.assertTrue(sva_file.exists())
 
 
 if __name__ == "__main__":

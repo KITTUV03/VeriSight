@@ -273,7 +273,115 @@ def synthesize_sva_from_spec(
             target_rule="FIFO Underflow Prevention",
         ))
 
-    # ─── 5. General Reset Invariant ──────────────────────────────────────────
+    # ─── 5. Protocol: PCIe Verification ──────────────────────────────────────
+    if "pcie" in spec_lower or "tlp" in spec_lower or "ltssm" in spec_lower:
+        sva_pcie_4kb = (
+            f"property p_pcie_4kb_boundary;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    (tlp_valid && (tlp_type inside {{3'b000, 3'b001, 3'b010, 3'b011}})) |-> ((tlp_addr[11:0] + (tlp_len << 2)) <= 12'd4096);\n"
+            f"endproperty\n"
+            f"assert property (p_pcie_4kb_boundary)\n"
+            f"    else $error(\"PCIE_ERR: Memory TLP crosses 4KB boundary (Spec Sec 2.2.4.1)!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_PCIE_4KB_BOUNDARY",
+            description="Enforces PCIe 4KB address boundary constraint for Memory TLPs",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_pcie_4kb,
+            target_rule="PCIe 4KB Boundary Invariant",
+        ))
+
+        sva_pcie_stability = (
+            f"property p_pcie_tlp_stability;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    (tlp_valid && !tlp_ready) |=> (tlp_valid && $stable(tlp_type) && $stable(tlp_len) && $stable(tlp_addr));\n"
+            f"endproperty\n"
+            f"assert property (p_pcie_tlp_stability)\n"
+            f"    else $error(\"PCIE_ERR: TLP header/data changed during unacknowledged wait cycle!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_PCIE_TLP_STABILITY",
+            description="Validates TLP header stability until acknowledged by tlp_ready",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_pcie_stability,
+            target_rule="PCIe Handshake Stability Rule",
+        ))
+
+    # ─── 6. Protocol: AMBA CHI (Coherent Hub Interface) ──────────────────────
+    if "chi" in spec_lower or "flit" in spec_lower or "readshared" in spec_lower or "readunique" in spec_lower:
+        sva_chi_flit = (
+            f"property p_chi_txreq_stable;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    (txreqvalid && !txreqrdy) |=> (txreqvalid && $stable(txreqflit));\n"
+            f"endproperty\n"
+            f"assert property (p_chi_txreq_stable)\n"
+            f"    else $error(\"CHI_ERR: TxReqFlit modified while TxReqValid is high without TxReqRdy!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_CHI_TXREQ_STABILITY",
+            description="Enforces AMBA CHI TxReqFlit invariance during backpressure",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_chi_flit,
+            target_rule="AMBA CHI Flit Handshake Stability",
+        ))
+
+        sva_chi_snp = (
+            f"property p_chi_snoop_nonblocking;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    rxsnpvalid |-> ##[0:16] rxsnprdy;\n"
+            f"endproperty\n"
+            f"assert property (p_chi_snoop_nonblocking)\n"
+            f"    else $error(\"CHI_ERR: Snoop channel deadlocked or held unacknowledged over 16 cycles!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_CHI_SNOOP_FORWARD_PROGRESS",
+            description="Ensures peer snoop channels accept requests without causing deadlock",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_chi_snp,
+            target_rule="AMBA CHI Snoop Forward Progress Rule",
+        ))
+
+    # ─── 7. Protocol: DDR4 / DDR5 SDRAM Memory Subsystem ─────────────────────
+    if "ddr" in spec_lower or "sdram" in spec_lower or "trcd" in spec_lower or "tras" in spec_lower:
+        sva_ddr_trcd = (
+            f"property p_ddr_trcd_enforce;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    (cmd == 4'h1) |-> ##[1:4] !(cmd inside {{4'h4, 4'h5}});\n"
+            f"endproperty\n"
+            f"assert property (p_ddr_trcd_enforce)\n"
+            f"    else $error(\"DDR_ERR: Read/Write command issued before tRCD (Row-to-Column) delay satisfied!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_DDR_TRCD_TIMING",
+            description="Guarantees JEDEC tRCD minimum delay between Activate and Read/Write",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_ddr_trcd,
+            target_rule="JEDEC DDR tRCD Timing Rule",
+        ))
+
+        sva_ddr_tras = (
+            f"property p_ddr_tras_enforce;\n"
+            f"    @(posedge {clk}) disable iff (!{rst})\n"
+            f"    (cmd == 4'h1) |-> ##[1:8] !(cmd inside {{4'h2, 4'h3}});\n"
+            f"endproperty\n"
+            f"assert property (p_ddr_tras_enforce)\n"
+            f"    else $error(\"DDR_ERR: Precharge issued before minimum tRAS row active duration satisfied!\");"
+        )
+        assertions.append(SynthesizedAssertion(
+            name="SVA_DDR_TRAS_TIMING",
+            description="Guarantees JEDEC tRAS minimum active pulse duration before Precharge",
+            clock=clk,
+            reset=rst,
+            sva_code=sva_ddr_tras,
+            target_rule="JEDEC DDR tRAS Timing Rule",
+        ))
+
+    # ─── 8. General Reset Invariant ──────────────────────────────────────────
     sva_reset_state = (
         f"property p_reset_quiescent;\n"
         f"    @(posedge {clk})\n"

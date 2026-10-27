@@ -275,160 +275,17 @@ Return a JSON object with a single "assertions" list of objects with fields:
         rtl_info: Optional[Dict[str, Any]] = None,
         spec_text: str = "",
     ) -> List[SVAProperty]:
-        """Deterministic, grounded SVA generator with protocol and functional synthesis."""
-        props: List[SVAProperty] = []
-        idx = 1
-
-        # 1. First, check if spec matches protocol rules in assertion_generator.py
-        from verisight.plan.assertion_generator import synthesize_sva_from_spec
-        spec_full = spec_text or "\n".join([f"{f.title}: {f.description}" for f in features])
-        proto_suite = synthesize_sva_from_spec(spec_full, module_name=design_name)
-
-        if proto_suite and proto_suite.assertions:
-            for pa in proto_suite.assertions:
-                # Extract inner expression from synthesized sva_code
-                m_expr = re.search(r"disable iff \([^)]+\)\s*([^;]+);", pa.sva_code, re.DOTALL)
-                clean_expr = m_expr.group(1).strip() if m_expr else "1'b1"
-                props.append(
-                    SVAProperty(
-                        assertion_id=f"SVA-{idx:03d}",
-                        feature_ids=[features[0].feature_id] if features else ["FEAT-001"],
-                        name=_sanitize_sv_id(pa.name),
-                        property_type=pa.property_type,
-                        clock_expr=f"posedge {pa.clock}",
-                        disable_expr=f"!{pa.reset}",
-                        expression=clean_expr,
-                        failure_message=f"Protocol rule violation: {pa.name}",
-                        description=pa.description,
-                    )
-                )
-                idx += 1
-
-        # 2. Extract port details from rtl_info
-        ports_dict = {}
-        out_ports = []
-        in_ports = []
-        if rtl_info and "ports" in rtl_info:
-            for p in rtl_info["ports"]:
-                p_name = p.get("name", "").lower()
-                ports_dict[p_name] = p
-                if p.get("dir") in ("output", "out"):
-                    out_ports.append(p_name)
-                elif p.get("dir") in ("input", "in"):
-                    in_ports.append(p_name)
-
-        # 3. Reset Initialization Property
-        rst_expr = "!rst_n"
-        if out_ports:
-            # Check outputs are 0 during reset
-            checks = " && ".join([f"({out_p} == '0)" for out_p in out_ports[:3]])
-            rst_sva_expr = f"{rst_expr} |-> ({checks})"
-        else:
-            rst_sva_expr = f"{rst_expr} |-> 1'b1"
-
-        props.append(
-            SVAProperty(
-                assertion_id=f"SVA-{idx:03d}",
-                feature_ids=[features[0].feature_id] if features else ["FEAT-001"],
-                name=f"prop_{design_name.lower()}_reset_initialization",
-                property_type="assert",
-                clock_expr="posedge clk",
-                disable_expr="",
-                expression=rst_sva_expr,
-                failure_message=f"{design_name} outputs not cleanly driven to default during active reset.",
-                description="Verify internal state and outputs are held at specified defaults during reset.",
-            )
+        """
+        Deterministic, protocol-aware SVA property generator.
+        Delegates to ProtocolArchitect for PCIe, CHI, DDR, AXI, or strictly-grounded custom RTL.
+        """
+        logger.info(f"Using ProtocolArchitect to synthesize grounded SVA properties for {design_name}...")
+        from verisight.plan.protocol_architect import generate_grounded_protocol_plan
+        _, sva, _ = generate_grounded_protocol_plan(
+            design_name=design_name,
+            features=features,
+            rtl_info=rtl_info,
+            spec_text=spec_text,
         )
-        idx += 1
-
-        # 4. Handshake stability properties if valid/ready exist
-        has_valid = any(k in ports_dict for k in ["valid", "vld", "req", "req_i"])
-        has_ready = any(k in ports_dict for k in ["ready", "rdy", "ack", "ack_o"])
-        if has_valid and has_ready:
-            v_sig = [k for k in ["valid", "vld", "req", "req_i"] if k in ports_dict][0]
-            r_sig = [k for k in ["ready", "rdy", "ack", "ack_o"] if k in ports_dict][0]
-            props.append(
-                SVAProperty(
-                    assertion_id=f"SVA-{idx:03d}",
-                    feature_ids=[features[0].feature_id] if features else ["FEAT-001"],
-                    name=f"prop_{design_name.lower()}_handshake_stability",
-                    property_type="assert",
-                    clock_expr="posedge clk",
-                    disable_expr="!rst_n",
-                    expression=f"({v_sig} && !{r_sig}) |=> {v_sig}",
-                    failure_message=f"Handshake violation: {v_sig} dropped before receiving {r_sig} assertion.",
-                    description=f"Validate that {v_sig} remains asserted until acknowledged by {r_sig}.",
-                )
-            )
-            idx += 1
-
-        # 5. Arithmetic flag properties (Carry, Zero, Overflow)
-        if "zero" in ports_dict and "result" in ports_dict:
-            props.append(
-                SVAProperty(
-                    assertion_id=f"SVA-{idx:03d}",
-                    feature_ids=[features[0].feature_id] if features else ["FEAT-001"],
-                    name=f"prop_zero_flag_soundness",
-                    property_type="assert",
-                    clock_expr="posedge clk",
-                    disable_expr="!rst_n",
-                    expression="(result == '0) |-> zero",
-                    failure_message="Zero flag failed to assert when ALU output is zero.",
-                    description="Formal check: zero flag must assert if and only if result is zero.",
-                )
-            )
-            idx += 1
-
-        if "carry" in ports_dict and "a" in ports_dict and "b" in ports_dict:
-            props.append(
-                SVAProperty(
-                    assertion_id=f"SVA-{idx:03d}",
-                    feature_ids=[features[0].feature_id] if features else ["FEAT-001"],
-                    name=f"prop_carry_flag_generation",
-                    property_type="cover",
-                    clock_expr="posedge clk",
-                    disable_expr="!rst_n",
-                    expression="carry == 1'b1",
-                    failure_message="Carry flag generation never reached in simulation.",
-                    description="Coverage property: verify that carry flag is exercised during verification.",
-                )
-            )
-            idx += 1
-
-        # 6. Feature-level grounded assertions for remaining features
-        for feat in features:
-            f_title_low = feat.title.lower()
-            safe_name = _sanitize_sv_id(feat.title)[:24]
-
-            # Choose sensible property based on feature category and text
-            if "reset" in f_title_low:
-                continue  # already covered by reset prop
-            elif "overflow" in f_title_low or "underflow" in f_title_low:
-                expr = "!$isunknown(result)" if "result" in ports_dict else "!$isunknown(rst_n)"
-                desc = f"Corner case overflow stability check for {feat.title}"
-            elif "error" in f_title_low or "illegal" in f_title_low:
-                expr = "1'b1 |-> ##[1:2] 1'b1"
-                desc = f"Error response validation for {feat.title}"
-            else:
-                # Default functional validity
-                sig_target = "result" if "result" in ports_dict else ("clk" if "clk" in ports_dict else "rst_n")
-                expr = f"!$isunknown({sig_target})"
-                desc = f"Formal signal integrity check for {feat.title}"
-
-            props.append(
-                SVAProperty(
-                    assertion_id=f"SVA-{idx:03d}",
-                    feature_ids=[feat.feature_id],
-                    name=f"prop_{safe_name}_check",
-                    property_type="assert",
-                    clock_expr="posedge clk",
-                    disable_expr="!rst_n",
-                    expression=expr,
-                    failure_message=f"Assertion failed for feature requirement: {feat.title}",
-                    description=desc,
-                )
-            )
-            idx += 1
-
-        return props
+        return sva
 

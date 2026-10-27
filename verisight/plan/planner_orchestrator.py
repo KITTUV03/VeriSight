@@ -160,10 +160,12 @@ class VeriSightPlanner:
             features=features,
             design_name=design_name,
             rtl_info=rtl_info,
+            spec_text=spec_text,
         )
         sv_coverage_code = self.coverage_architect.generate_sv_code(
             covergroups=covergroups,
             design_name=design_name,
+            rtl_info=rtl_info,
         )
 
         # 4. SVA Assertion Suite & SystemVerilog Code Generation
