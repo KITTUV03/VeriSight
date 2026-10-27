@@ -282,7 +282,10 @@ Requirements:
         # Scan coverpoints for any signals used in expressions not yet declared
         for cg in covergroups:
             for cp in cg.coverpoints:
-                tokens = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", cp.target_signal)
+                clean_expr = re.sub(r"\d*'[sS]?[bBoOdDhH][0-9a-fA-F_xXzZ]+", " ", cp.target_signal)
+                clean_expr = re.sub(r'"[^"]*"', " ", clean_expr)
+                clean_expr = re.sub(r'\$[a-zA-Z0-9_]+', " ", clean_expr)
+                tokens = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", clean_expr)
                 for t in tokens:
                     t_low = t.lower()
                     if t_low not in declared_signals and t_low not in SV_KEYWORDS and not t.isdigit():

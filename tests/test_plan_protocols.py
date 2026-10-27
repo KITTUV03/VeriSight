@@ -18,6 +18,8 @@ from verisight.plan.protocol_architect import (
     generate_chi_plan,
     generate_ddr_plan,
     generate_axi_plan,
+    generate_apb_plan,
+    generate_ahb_plan,
     generate_strict_custom_plan,
 )
 from verisight.plan.coverage_architect import CoverageArchitect
@@ -210,6 +212,96 @@ class TestPlanProtocols(unittest.TestCase):
         compile_sva = compile_text(sv_sva, name="axi_assertions.sv")
         self.assertTrue(compile_sva.syntax_ok, f"Slang syntax errors in AXI assertion SV:\n{compile_sva.status.notes}")
 
+    def test_amba_apb_protocol_plan_generation_and_sv_syntax(self):
+        """Test AMBA APB protocol plan: SETUP/ACCESS phases, PREADY wait states, PSLVERR error injection, and SV compilation."""
+        features = [
+            FeatureItem(feature_id="FEAT-APB-01", title="APB Write and Read Transfer Cycles", description="Execute two-phase SETUP and ACCESS transfers"),
+            FeatureItem(feature_id="FEAT-APB-02", title="Slave Wait State Insertion via PREADY", description="Extend ACCESS phase with PREADY low"),
+            FeatureItem(feature_id="FEAT-APB-03", title="Unmapped Register Space PSLVERR", description="Return error for addresses above 0x10"),
+        ]
+        rtl_info = {
+            "ports": [
+                {"name": "pclk", "dir": "input", "width": 1},
+                {"name": "presetn", "dir": "input", "width": 1},
+                {"name": "paddr", "dir": "input", "width": 32},
+                {"name": "psel", "dir": "input", "width": 1},
+                {"name": "penable", "dir": "input", "width": 1},
+                {"name": "pwrite", "dir": "input", "width": 1},
+                {"name": "pwdata", "dir": "input", "width": 32},
+                {"name": "pready", "dir": "output", "width": 1},
+                {"name": "prdata", "dir": "output", "width": 32},
+                {"name": "pslverr", "dir": "output", "width": 1},
+            ]
+        }
+
+        # 1. Detection
+        proto = detect_design_protocol("AMBA APB Slave Peripheral", rtl_info)
+        self.assertEqual(proto, "apb")
+
+        # 2. Plan Generation
+        cgs, sva, tests = generate_grounded_protocol_plan("apb_slave", features, rtl_info, spec_text="apb psel penable pwrite")
+        self.assertGreaterEqual(len(cgs), 1)
+        self.assertGreaterEqual(len(cgs[0].coverpoints), 5)
+        self.assertGreaterEqual(len(sva), 5)
+        self.assertGreaterEqual(len(tests), 4)
+
+        # 3. SystemVerilog Compilation
+        cov_arch = CoverageArchitect()
+        sv_cov = cov_arch.generate_sv_code(cgs, design_name="apb_slave", rtl_info=rtl_info)
+        compile_cov = compile_text(sv_cov, name="apb_coverage.sv")
+        self.assertTrue(compile_cov.syntax_ok, f"Slang syntax errors in APB coverage SV:\n{compile_cov.status.notes}")
+
+        sva_arch = AssertionArchitect()
+        sv_sva = sva_arch.generate_sv_code(sva, design_name="apb_slave", rtl_info=rtl_info)
+        compile_sva = compile_text(sv_sva, name="apb_assertions.sv")
+        self.assertTrue(compile_sva.syntax_ok, f"Slang syntax errors in APB assertion SV:\n{compile_sva.status.notes}")
+
+    def test_amba_ahb_protocol_plan_generation_and_sv_syntax(self):
+        """Test AMBA AHB protocol plan: HTRANS, HBURST, HSIZE, HREADY wait states, HRESP error, and SV compilation."""
+        features = [
+            FeatureItem(feature_id="FEAT-AHB-01", title="AHB Pipelined Address and Data Phases", description="Nonsequential and sequential transfers"),
+            FeatureItem(feature_id="FEAT-AHB-02", title="Burst Types and Size Encoding", description="WRAP4, INCR4, SINGLE bursts with byte/halfword/word widths"),
+        ]
+        rtl_info = {
+            "ports": [
+                {"name": "hclk", "dir": "input", "width": 1},
+                {"name": "hresetn", "dir": "input", "width": 1},
+                {"name": "hsel", "dir": "input", "width": 1},
+                {"name": "haddr", "dir": "input", "width": 32},
+                {"name": "htrans", "dir": "input", "width": 2},
+                {"name": "hwrite", "dir": "input", "width": 1},
+                {"name": "hsize", "dir": "input", "width": 3},
+                {"name": "hburst", "dir": "input", "width": 3},
+                {"name": "hwdata", "dir": "input", "width": 32},
+                {"name": "hrdata", "dir": "output", "width": 32},
+                {"name": "hready", "dir": "output", "width": 1},
+                {"name": "hresp", "dir": "output", "width": 1},
+            ]
+        }
+
+        # 1. Detection
+        proto = detect_design_protocol("AMBA AHB SRAM Controller", rtl_info)
+        self.assertEqual(proto, "ahb")
+
+        # 2. Plan Generation
+        cgs, sva, tests = generate_grounded_protocol_plan("ahb_sram", features, rtl_info, spec_text="ahb htrans hburst hready")
+        self.assertGreaterEqual(len(cgs), 1)
+        self.assertGreaterEqual(len(cgs[0].coverpoints), 5)
+        self.assertGreaterEqual(len(sva), 4)
+        self.assertGreaterEqual(len(tests), 4)
+
+        # 3. SystemVerilog Compilation
+        cov_arch = CoverageArchitect()
+        sv_cov = cov_arch.generate_sv_code(cgs, design_name="ahb_sram", rtl_info=rtl_info)
+        compile_cov = compile_text(sv_cov, name="ahb_coverage.sv")
+        self.assertTrue(compile_cov.syntax_ok, f"Slang syntax errors in AHB coverage SV:\n{compile_cov.status.notes}")
+
+        sva_arch = AssertionArchitect()
+        sv_sva = sva_arch.generate_sv_code(sva, design_name="ahb_sram", rtl_info=rtl_info)
+        compile_sva = compile_text(sv_sva, name="ahb_assertions.sv")
+        self.assertTrue(compile_sva.syntax_ok, f"Slang syntax errors in AHB assertion SV:\n{compile_sva.status.notes}")
+
 
 if __name__ == "__main__":
     unittest.main()
+

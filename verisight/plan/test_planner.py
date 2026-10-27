@@ -14,6 +14,7 @@ from typing import List, Optional, Dict, Any
 
 from verisight.agents.base_agent import BaseAgent
 from verisight.plan.schemas import FeatureItem, TestScenario
+from verisight.plan.protocol_architect import detect_design_protocol, generate_grounded_protocol_plan
 from verisight.utils.logger import get_logger
 
 logger = get_logger("plan.test_planner")
@@ -140,14 +141,15 @@ Return a JSON object with a single "test_scenarios" list of objects with fields:
         rtl_info: Optional[Dict[str, Any]] = None,
     ) -> List[TestScenario]:
         """Deterministic, grounded test scenario generator with protocol-specific dispatch."""
-        from verisight.plan.protocol_architect import detect_design_protocol, generate_grounded_protocol_plan
-        proto = detect_design_protocol("", rtl_info)
-        if proto in ("pcie", "chi", "ddr", "axi"):
+        combined_text = design_name + " " + " ".join([f.title for f in features])
+        proto = detect_design_protocol(combined_text, rtl_info)
+        if proto in ("pcie", "chi", "ddr", "axi", "apb", "ahb"):
             logger.info(f"Synthesizing enterprise protocol test scenarios for {proto.upper()}...")
             _, _, p_tests = generate_grounded_protocol_plan(
                 design_name=design_name,
                 features=features,
                 rtl_info=rtl_info,
+                spec_text=combined_text,
             )
             if p_tests:
                 return p_tests

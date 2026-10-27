@@ -113,6 +113,22 @@ class VeriSightPlanner:
             "resets": [],
             "fsms": [],
         }
+
+        # Auto-discover RTL source file in adjacent project directories if not provided
+        if not rtl_path:
+            cand_dirs = [
+                spec_file.parent.parent / "rtl",
+                spec_file.parent / "rtl",
+                spec_file.parent,
+            ]
+            for cd in cand_dirs:
+                if cd.exists() and cd.is_dir():
+                    rtl_cands = list(cd.glob("*.sv")) + list(cd.glob("*.v"))
+                    if rtl_cands:
+                        rtl_path = str(rtl_cands[0])
+                        logger.info(f"Auto-discovered RTL source file for {design_name}: {rtl_path}")
+                        break
+
         if rtl_path and Path(rtl_path).exists():
             try:
                 from verisight.parsers.rtl_parser import parse_rtl

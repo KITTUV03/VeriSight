@@ -200,7 +200,11 @@ Return a JSON object with a single "assertions" list of objects with fields:
         # In addition, extract identifier tokens from property expressions to avoid undeclared identifiers
         for sva in assertions:
             full_expr = f"{sva.expression} {sva.disable_expr or ''} {sva.clock_expr or ''}"
-            tokens = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", full_expr)
+            # Strip SV based literals (e.g. 32'h10, 1'b1), strings ("..."), and system functions ($error, $stable)
+            clean_expr = re.sub(r"\d*'[sS]?[bBoOdDhH][0-9a-fA-F_xXzZ]+", " ", full_expr)
+            clean_expr = re.sub(r'"[^"]*"', " ", clean_expr)
+            clean_expr = re.sub(r'\$[a-zA-Z0-9_]+', " ", clean_expr)
+            tokens = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", clean_expr)
             for t in tokens:
                 t_low = t.lower()
                 if t_low not in declared_signals and t_low not in SV_KEYWORDS and not t.isdigit():

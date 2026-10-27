@@ -550,7 +550,16 @@ def run_plan_flow(
     if not spec_path:
         spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default="")
     if not rtl_path:
-        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
+        default_rtl = ""
+        if spec_path:
+            sp = Path(spec_path)
+            for cd in [sp.parent.parent / "rtl", sp.parent / "rtl"]:
+                if cd.exists() and cd.is_dir():
+                    rtl_cands = list(cd.glob("*.sv")) + list(cd.glob("*.v"))
+                    if rtl_cands:
+                        default_rtl = str(rtl_cands[0])
+                        break
+        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
     if coverage_path is None:
         coverage_path = _prompt_path("Simulator Coverage Database / Report (optional .ucdb, .vdb, .txt, .json)", required=False, default="")
     if not output_dir:

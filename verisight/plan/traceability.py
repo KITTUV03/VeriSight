@@ -269,6 +269,10 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         proto_label = "DDR4 / DDR5 MEMORY CONTROLLER"
     elif any(k in spec_text_low or k in design_low for k in ["axi", "awvalid", "wvalid"]):
         proto_label = "AMBA AXI4 / AXI5 5-CHANNEL PROTOCOL"
+    elif any(k in spec_text_low or k in design_low for k in ["apb", "psel", "pwrite", "pready"]):
+        proto_label = "AMBA APB4 ON-CHIP BUS ARCHITECTURE"
+    elif any(k in spec_text_low or k in design_low for k in ["ahb", "hsel", "htrans", "hready"]):
+        proto_label = "AMBA AHB5 ADVANCED HIGH-PERFORMANCE BUS"
 
     # Pre-build client-side cockpit JSON
     features_cockpit_json = []
