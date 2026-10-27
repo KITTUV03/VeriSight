@@ -82,8 +82,8 @@
   function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚡';
-    toast.innerHTML = `<span style="color:var(--cyan-bright);">${icon}</span> <span>${message}</span>`;
+    const icon = type === 'success' ? '[OK]' : type === 'error' ? '[ERR]' : '[INFO]';
+    toast.innerHTML = `<span style="color:var(--cyan-bright);font-weight:700;margin-right:6px;">${icon}</span> <span>${message}</span>`;
     els.toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -183,11 +183,11 @@
     els.simSpinner.style.display = 'inline-block';
     els.btnSimText.textContent = 'Simulating & Diagnosing...';
 
-    logTerminal(`\n[${new Date().toLocaleTimeString()}] 🚀 Launching Closed-Loop Simulation...`, 'prompt');
+    logTerminal(`\n[${new Date().toLocaleTimeString()}] [RUN] Launching Closed-Loop Simulation...`, 'prompt');
     logTerminal(`[INFO] RTL Source: ${rtl}`);
     logTerminal(`[INFO] Testbench:  ${tb}`);
     logTerminal(`[INFO] Simulator:  ${simulator.toUpperCase()}`);
-    logTerminal(`[INFO] Security:   ${sec === 'airgap' ? '🛡️ Sovereign Air-Gap (Local)' : 'Cloud API'}`);
+    logTerminal(`[INFO] Security:   ${sec === 'airgap' ? '[AIR-GAP] Sovereign Air-Gap (Local)' : 'Cloud API'}`);
 
     try {
       const res = await fetch('/api/sim', {
@@ -274,7 +274,7 @@
     } finally {
       els.btnLaunchSim.disabled = false;
       els.simSpinner.style.display = 'none';
-      els.btnSimText.textContent = '🚀 Launch Closed-Loop Simulation';
+      els.btnSimText.textContent = 'Launch Closed-Loop Simulation';
     }
   }
 
@@ -454,7 +454,7 @@
     failTag.setAttribute('font-size', '10');
     failTag.setAttribute('font-weight', 'bold');
     failTag.setAttribute('font-family', 'var(--font-mono)');
-    failTag.textContent = '⚡ FAILURE POINT (Cycle 1 / 15ns)';
+    failTag.textContent = '[FAIL] FAILURE POINT (Cycle 1 / 15ns)';
     svg.appendChild(failTag);
   }
 
@@ -478,7 +478,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to apply patch');
 
-      els.patchStatusText.textContent = `✓ Patch applied to ${data.target}. Backup: ${data.backup}`;
+      els.patchStatusText.textContent = `[OK] Patch applied to ${data.target}. Backup: ${data.backup}`;
       els.patchStatusText.style.color = 'var(--emerald-bright)';
       els.btnRevertFix.style.display = 'inline-flex';
       showToast(data.message, 'success');
@@ -530,7 +530,7 @@
         card.style.marginBottom = '1rem';
         card.innerHTML = `
           <div class="card-header">
-            <h2 class="card-title"><span>📂</span> ${run.id}</h2>
+            <h2 class="card-title">[RUN] ${run.id}</h2>
             <span class="card-badge ${run.confidence > 0 ? '' : 'badge-tag green'}">${run.classification}</span>
           </div>
           <p class="diag-text" style="margin-bottom:0.75rem;">${run.root_cause || 'Simulation & analysis run'}</p>
@@ -539,7 +539,7 @@
             <div style="display:flex; gap:0.5rem;">
               ${run.report_url ? `<a href="${run.report_url}" target="_blank" class="btn btn-secondary btn-xs">Open Report HTML</a>` : ''}
               ${run.plan_url ? `<a href="${run.plan_url}" target="_blank" class="btn btn-secondary btn-xs">Open Plan HTML</a>` : ''}
-              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">⚡ Inspect in Cockpit</button>
+              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">Inspect in Cockpit</button>
             </div>
           </div>
         `;
@@ -590,7 +590,7 @@
     generateDirectedTest: function (reqId) {
       showToast(`Generating SystemVerilog directed sequence for ${reqId}...`, 'info');
       setTimeout(() => {
-        showToast(`✓ Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
+        showToast(`[OK] Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
       }, 1200);
     },
     loadRunIntoCockpit: loadRunIntoCockpit,

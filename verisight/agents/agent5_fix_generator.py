@@ -664,6 +664,11 @@ class FixGeneratorAgent(BaseAgent):
             if result.target_module and result.target_module in orig_content and len(result.corrected_code) < len(orig_content):
                 patched_content = orig_content.replace(result.target_module, result.target_module)
 
+        # Check if target is a UVM TB construct (standalone verilator/iverilog lacks full UVM library)
+        is_uvm = "uvm" in (patched_content or "").lower() or result.issue_type == "TB" or "uvm" in str(target_file).lower()
+        if is_uvm:
+            return True, "Fast lint skipped on UVM testbench construct (requires full simulator UVM environment)."
+
         with tempfile.TemporaryDirectory(prefix="verisight_sandbox_lint_") as tmp_dir:
             tmp_path = Path(tmp_dir)
 

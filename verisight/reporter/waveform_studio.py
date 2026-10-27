@@ -87,7 +87,7 @@ def generate_waveform_studio_tab(
             <!-- Studio Toolbar -->
             <div class="wave-toolbar">
                 <div class="wave-tb-left">
-                    <span class="wave-brand">🌊 Waveform Studio</span>
+                    <span class="wave-brand">WAVEFORM STUDIO</span>
                     <span class="wave-badge" id="waveTraceBadge">ALU Failure Trace (65ns)</span>
                     <span class="wave-timescale" id="waveTimescale">Scale: 1ns / tick</span>
                 </div>
@@ -96,7 +96,7 @@ def generate_waveform_studio_tab(
                     <div class="btn-group">
                         <button class="wave-btn active" id="btnTraceAlu" onclick="loadTracePreset('alu')">ALU Trace</button>
                         <button class="wave-btn" id="btnTraceFifo" onclick="loadTracePreset('fifo')">FIFO X-Prop</button>
-                        <button class="wave-btn" id="btnTraceCustom" onclick="document.getElementById('waveFileInput').click()">📂 Open VCD...</button>
+                        <button class="wave-btn" id="btnTraceCustom" onclick="document.getElementById('waveFileInput').click()">OPEN VCD</button>
                         <input type="file" id="waveFileInput" accept=".vcd,.txt" style="display:none;" onchange="handleVcdFileSelected(event)">
                     </div>
 
@@ -104,19 +104,19 @@ def generate_waveform_studio_tab(
 
                     <!-- Navigation & Time Jump -->
                     <div class="btn-group">
-                        <button class="wave-btn" title="Jump to Start" onclick="jumpWaveTime(0)">⏮️</button>
-                        <button class="wave-btn" title="Step Back 10ns" onclick="stepWaveTime(-10)">⏪ -10ns</button>
-                        <button class="wave-btn" title="Step Forward 10ns" onclick="stepWaveTime(10)">+10ns ⏩</button>
-                        <button class="wave-btn wave-btn-danger" title="Jump to Failure Cycle" onclick="jumpToFailure({failure_timestamp_ns})">🎯 Failure @{failure_timestamp_ns}ns</button>
+                        <button class="wave-btn" title="Jump to Start" onclick="jumpWaveTime(0)">START</button>
+                        <button class="wave-btn" title="Step Back 10ns" onclick="stepWaveTime(-10)">-10ns</button>
+                        <button class="wave-btn" title="Step Forward 10ns" onclick="stepWaveTime(10)">+10ns</button>
+                        <button class="wave-btn wave-btn-danger" title="Jump to Failure Cycle" onclick="jumpToFailure({failure_timestamp_ns})">FAILURE @{failure_timestamp_ns}ns</button>
                     </div>
 
                     <div class="wave-sep"></div>
 
                     <!-- Zoom Controls -->
                     <div class="btn-group">
-                        <button class="wave-btn" title="Zoom Out" onclick="zoomWave(0.8)">🔍−</button>
-                        <button class="wave-btn" title="Zoom In" onclick="zoomWave(1.25)">🔍+</button>
-                        <button class="wave-btn" title="Zoom Fit" onclick="zoomFitWave()">↔️ Fit</button>
+                        <button class="wave-btn" title="Zoom Out" onclick="zoomWave(0.8)">ZOOM OUT</button>
+                        <button class="wave-btn" title="Zoom In" onclick="zoomWave(1.25)">ZOOM IN</button>
+                        <button class="wave-btn" title="Zoom Fit" onclick="zoomFitWave()">FIT</button>
                         <button class="wave-btn" title="Reset Zoom" onclick="resetWaveZoom()">1:1</button>
                     </div>
 
@@ -132,7 +132,7 @@ def generate_waveform_studio_tab(
 
                 <div class="wave-tb-right">
                     <input type="text" id="waveSignalSearch" class="wave-search" placeholder="Filter signals..." oninput="filterWaveSignals()">
-                    <button class="wave-btn" title="Export Waveform Image" onclick="exportWaveformPng()">📷 Snapshot</button>
+                    <button class="wave-btn" title="Export Waveform Image" onclick="exportWaveformPng()">SNAPSHOT</button>
                 </div>
             </div>
 
@@ -178,7 +178,7 @@ def generate_waveform_studio_tab(
                             </div>
                             <!-- Error Highlight Band -->
                             <div class="wave-error-band" id="waveErrorBand" style="display:block;">
-                                <div class="wave-error-flag" id="waveErrorFlag">⚠️ ERROR @ {failure_timestamp_ns}ns</div>
+                                <div class="wave-error-flag" id="waveErrorFlag">[ERROR] @ {failure_timestamp_ns}ns</div>
                             </div>
                         </div>
                     </div>
@@ -704,11 +704,11 @@ def generate_waveform_studio_tab(
                 row.className = 'wave-sig-row';
                 row.id = 'sig-row-' + idx;
 
-                let iconHtml = '<span class="sig-tag-wire">⚡</span>';
+                let iconHtml = '<span class="sig-tag-wire">[1b]</span>';
                 if (sig.name.toLowerCase().includes('clk')) {{
-                    iconHtml = '<span class="sig-tag-clk">⏱️</span>';
+                    iconHtml = '<span class="sig-tag-clk">[CLK]</span>';
                 }} else if (sig.width > 1) {{
-                    iconHtml = '<span class="sig-tag-bus">🚌 [' + (sig.width - 1) + ':0]</span>';
+                    iconHtml = '<span class="sig-tag-bus">[' + (sig.width - 1) + ':0]</span>';
                 }}
 
                 row.innerHTML = `
