@@ -883,19 +883,20 @@ def run_uvm_flow(
     console.print("[bold cyan]      XcelUVM Architect — Autonomous UVM Testbench Generator[/bold cyan]")
     console.print("[bold cyan]══════════════════════════════════════════════════════════[/bold cyan]\n")
 
+    default_rtl = "projects/apb/rtl/apb_slave.sv" if Path("projects/apb/rtl/apb_slave.sv").exists() else "examples/rtl/alu.sv"
     if not rtl_path:
         rtl_path = _prompt_path(
             "Path to RTL source file or directory (.sv, .v)",
-            default="projects/apb/rtl/apb_slave.sv" if Path("projects/apb/rtl/apb_slave.sv").exists() else "examples/rtl/alu.sv",
-            file_types=[".sv", ".v"],
+            required=False,
+            default=default_rtl,
         )
 
+    default_spec = "projects/apb/specs/apb_spec.md" if Path("projects/apb/specs/apb_spec.md").exists() else ""
     if not spec_path:
         spec_path = _prompt_path(
             "Path to specification file (optional, press Enter to infer from RTL)",
-            default="projects/apb/specs/apb_spec.md" if Path("projects/apb/specs/apb_spec.md").exists() else "",
-            file_types=[".md", ".txt"],
-            allow_empty=True,
+            required=False,
+            default=default_spec,
         )
 
     if not output_dir:
