@@ -677,6 +677,7 @@ def run_verilator(
     """Compile and run with Verilator 5+ (--binary --timing -Wno-fatal --trace)."""
     find_simulator("verilator")
 
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     sources, all_files = _collect_sources(rtl_path, tb_path)
     if not sources:
@@ -702,7 +703,7 @@ def run_verilator(
             f"{build_result.stderr or build_result.stdout}"
         )
 
-    binary = output_dir / "obj_dir" / "sim_bin"
+    binary = (output_dir / "obj_dir" / "sim_bin").resolve()
     logger.info(f"Running simulation: {binary}")
     try:
         run_result = subprocess.run(
@@ -1018,7 +1019,7 @@ def run_simulation(
     sim_choice = resolve_simulator(simulator, is_uvm=is_uvm)
     logger.info(f"Simulator resolved: {sim_choice} (is_uvm={is_uvm})")
 
-    output_dir = Path(output_dir) if output_dir else Path("output") / "sim"
+    output_dir = Path(output_dir).resolve() if output_dir else (Path("output") / "sim").resolve()
 
     if sim_choice == "iverilog":
         return run_iverilog(rtl_in, tb_in, top_module, output_dir, uvm_home, timeout_s, is_uvm=is_uvm)
@@ -1069,7 +1070,7 @@ def execute_closed_loop_flow(
     from verisight.plan.planner_orchestrator import VeriSightPlanner
     from verisight.config import set_config, VeriSightConfig, LLMConfig
 
-    out_path = Path(output_dir)
+    out_path = Path(output_dir).resolve()
     out_path.mkdir(parents=True, exist_ok=True)
     sim_out = out_path / "sim"
 
