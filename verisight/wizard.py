@@ -861,13 +861,17 @@ def run_edaplayground_export_flow(
         console.print(f"  • [cyan]design.sv:[/]             {res['design_sv']}")
         console.print(f"  • [cyan]testbench.sv:[/]          {res['testbench_sv']}")
         console.print(f"  • [cyan]Launch Studio (HTML):[/] {res['launch_html']}")
+        console.print(f"  • [cyan]Auto-Injector Script:[/] {res.get('userscript_js', '')}")
         console.print(f"  • [cyan]Configuration (JSON):[/] {res['config_json']}")
         console.print(f"  • [cyan]User Guide (MD):[/]      {res['readme_md']}\n")
+
+        console.print("[bold yellow]⚡ 1-Click Auto-Injector Included:[/] Drag the bookmarklet from Launch Studio to populate both files and flags into EDA Playground in 1 click!\n")
 
         open_dash = Confirm.ask("[bold]Open EDA Playground Launch Studio in browser now?[/bold]", default=True)
         if open_dash:
             _open_html_in_browser(Path(res["launch_html"]))
             console.print(f"[green]✓ Opened: file://{Path(res['launch_html']).resolve()}[/green]")
+            console.print("[dim]Tip: Drag the '⚡ Inject to EDA Playground' bookmarklet to your browser bar, then click it on EDA Playground to load all files![/dim]")
 
     except Exception as e:
         console.print(f"\n[bold red]EDA Playground Export failed:[/] {e}")

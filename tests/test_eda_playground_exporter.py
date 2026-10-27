@@ -46,10 +46,30 @@ def test_export_to_edaplayground_basic(tmp_path):
     assert "vcs" in config["simulators"]
     assert "edaplayground_url" in config
 
+    assert Path(res["userscript_js"]).exists()
+    userscript = Path(res["userscript_js"]).read_text()
+    assert "// ==UserScript==" in userscript
+    assert "VeriSight" in userscript
+
     launch_html = Path(res["launch_html"]).read_text()
     assert "EDA Playground Cloud Simulation Studio" in launch_html
     assert "Copy design.sv" in launch_html
     assert "Copy testbench.sv" in launch_html
+    assert "bookmarkletLink" in launch_html
+    assert "Copy Console Script" in launch_html
+
+
+def test_eda_runner_fallback(tmp_path):
+    """Test eda_runner fallback when Playwright is not installed."""
+    from verisight.tools.eda_runner import run_eda_browser
+    out_dir = tmp_path / "runner_test_bundle"
+    res = export_to_edaplayground(
+        rtl_path="examples/rtl/alu.sv",
+        tb_path="examples/tb/alu_tb.sv",
+        output_dir=str(out_dir),
+    )
+    success = run_eda_browser(bundle_dir=str(out_dir))
+    assert success is True
 
 
 def test_export_to_edaplayground_anonymized(tmp_path):
