@@ -1313,16 +1313,6 @@ def run_wizard():
             },
             {
                 "opt": "3",
-                "title": "🏗️  XcelUVM Architect",
-                "tag": "VIP SUITE",
-                "desc": "Production UVM 1.2 Testbench Synthesis",
-                "features": "• Full VIP Suite • Agents & Scoreboards",
-                "color": "#FFB300",
-                "border": "bold #FFB300",
-                "badge_style": "bold black on #FFE082",
-            },
-            {
-                "opt": "4",
                 "title": "🎯 VeriSight TestBench",
                 "tag": "SPEC-DRIVEN",
                 "desc": "Spec-Driven UVM Synthesis with Ref Model",
@@ -1355,7 +1345,7 @@ def run_wizard():
 
         exit_panel = Panel(
             "[white]Quit VeriSight Interactive Launcher[/white]\n[dim]Clean terminal session exit[/dim]",
-            title="[bold grey70][5][/bold grey70] [bold white]🚪 Exit[/bold white]",
+            title="[bold grey70][4][/bold grey70] [bold white]🚪 Exit[/bold white]",
             title_align="left",
             subtitle="[bold black on #B0BEC5] SYSTEM [/]",
             subtitle_align="right",
@@ -1366,12 +1356,9 @@ def run_wizard():
         )
 
         info_panel = Panel(
-            "[white]Web Cockpit & Cloud Integration[/white]\n"
-            "[dim]• Web: [bold cyan]./start serve[/bold cyan]  • Cloud: [bold cyan]./start edaplay[/bold cyan][/dim]",
-            title="[bold cyan]⚡ QUICK UTILITIES[/bold cyan]",
-            title_align="left",
-            subtitle="[bold black on #80DEEA] TOOLS [/]",
-            subtitle_align="right",
+            "[dim]• Web UI: [bold cyan]./start serve[/bold cyan]   • Cloud: [bold cyan]./start edaplayground[/bold cyan]   • Air-Gap: [bold cyan]./start --airgap[/bold cyan][/dim]",
+            title="[bold cyan]⚡ QUICK UTILITIES & PLATFORM TOOLS[/bold cyan]",
+            title_align="center",
             border_style="dim cyan",
             box=box.ROUNDED,
             padding=(0, 1),
@@ -1383,9 +1370,9 @@ def run_wizard():
             grid.add_column(ratio=1)
             grid.add_column(ratio=1)
             grid.add_row(panels[0], panels[1])
-            grid.add_row(panels[2], panels[3])
-            grid.add_row(exit_panel, info_panel)
+            grid.add_row(panels[2], exit_panel)
             console.print(grid)
+            console.print(info_panel)
         else:
             for p in panels:
                 console.print(p)
@@ -1398,38 +1385,33 @@ def run_wizard():
             "[bold white]Select an engine[/bold white] "
             "[[bold #FF5370]1:Debug[/bold #FF5370] • "
             "[bold #00E5FF]2:Plan[/bold #00E5FF] • "
-            "[bold #FFB300]3:XcelUVM[/bold #FFB300] • "
-            "[bold #E040FB]4:TestBench[/bold #E040FB] • "
-            "[dim]5:Exit[/dim]]",
-            choices=["1", "2", "3", "4", "5", "debug", "plan", "xcel", "tb", "testbench", "exit", "q", "quit"],
+            "[bold #E040FB]3:TestBench[/bold #E040FB] • "
+            "[dim]4:Exit[/dim]]",
+            choices=["1", "2", "3", "4", "debug", "plan", "tb", "testbench", "uvm", "xcel", "xceluvm", "exit", "q", "quit"],
             default="1",
         ).strip().lower()
 
         alias_map = {
             "debug": "1",
             "plan": "2",
+            "tb": "3",
+            "testbench": "3",
+            "uvm": "3",
             "xcel": "3",
             "xceluvm": "3",
-            "tb": "4",
-            "testbench": "4",
-            "exit": "5",
-            "q": "5",
-            "quit": "5",
+            "exit": "4",
+            "q": "4",
+            "quit": "4",
         }
         workflow = alias_map.get(workflow_choice, workflow_choice)
 
-        if workflow == "5":
+        if workflow == "4":
             console.print("\n[dim]👋 Exiting VeriSight. Have a productive verification session![/dim]\n")
             sys.exit(0)
 
-        if workflow == "4":
+        if workflow == "3":
             console.print("\n[bold #E040FB]🎯 Activating VeriSight TestBench — Spec-Driven UVM Synthesis Engine...[/bold #E040FB]")
             run_spec_driven_tb_flow()
-            return
-
-        if workflow == "3":
-            console.print("\n[bold #FFB300]🏗️  Activating XcelUVM Architect VIP Generator...[/bold #FFB300]")
-            run_uvm_flow()
             return
 
         if workflow == "1":

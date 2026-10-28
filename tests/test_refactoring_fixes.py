@@ -290,20 +290,14 @@ def test_streamlined_wizard_menu_options():
     from verisight.wizard import run_wizard
     from unittest.mock import patch
 
-    # Verify option "5" exits cleanly with code 0
-    with patch("rich.prompt.Prompt.ask", return_value="5"):
+    # Verify option "4" exits cleanly with code 0
+    with patch("rich.prompt.Prompt.ask", return_value="4"):
         with pytest.raises(SystemExit) as exc_info:
             run_wizard()
         assert exc_info.value.code == 0
 
-    # Verify option "3" routes to run_uvm_flow
+    # Verify option "3" routes to run_spec_driven_tb_flow
     with patch("rich.prompt.Prompt.ask", return_value="3"):
-        with patch("verisight.wizard.run_uvm_flow") as mock_uvm:
-            run_wizard()
-            mock_uvm.assert_called_once()
-
-    # Verify option "4" routes to run_spec_driven_tb_flow
-    with patch("rich.prompt.Prompt.ask", return_value="4"):
         with patch("verisight.wizard.run_spec_driven_tb_flow") as mock_tb:
             run_wizard()
             mock_tb.assert_called_once()
