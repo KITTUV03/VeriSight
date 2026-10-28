@@ -217,7 +217,7 @@ def generate_presentation():
 
     p2 = tf_hero.add_paragraph()
     r_sub = p2.add_run()
-    r_sub.text = "Autonomous Silicon Verification & Failure Debugging Copilot"
+    r_sub.text = "Autonomous Silicon Verification, Plan Synthesis & Failure Debugging Copilot"
     r_sub.font.name = "Arial"
     r_sub.font.size = Pt(20)
     r_sub.font.bold = True
@@ -225,8 +225,8 @@ def generate_presentation():
 
     p3 = tf_hero.add_paragraph()
     r_desc = p3.add_run()
-    r_desc.text = "Bridging Natural Language Hardware Specifications to Zero-Bug Silicon with Multi-Agent AI,\n" \
-                 "Closed-Loop Simulation, Deterministic Root Cause Analysis, and Automated Patch Generation."
+    r_desc.text = "Bridging Natural Language Hardware Specifications to Zero-Bug Silicon with Tri-Engine Multi-Agent AI,\n" \
+                 "Spec-Driven UVM Testbench Synthesis, Closed-Loop Simulation, and Deterministic Root Cause Analysis."
     r_desc.font.name = "Arial"
     r_desc.font.size = Pt(13)
     r_desc.font.color.rgb = C_TEXT
@@ -324,7 +324,7 @@ def generate_presentation():
     
     agenda_part2 = [
         ("08", "Results & Comparison", "AI vs. Manual Effort Benchmark & Enterprise ROI"),
-        ("09", "Dashboard & 6 Workflows", "Live Coverage Cockpit, Waveform Studio & Repair"),
+        ("09", "Platform Tri-Engine Suite", "VeriSight Debug, Plan Architect & Spec-Driven TestBench"),
         ("10", "Token Utilization Over Cost", "Sovereign Offline Economics & AST Optimization"),
         ("11", "Summary & Defensible Moat", "Domain Grounding, Security & Zero Vendor Lock-In"),
         ("12", "Future Scope & Roadmap", "Autonomous Silicon Evolution (Phase 1, 2, 3)"),
@@ -356,9 +356,9 @@ def generate_presentation():
     r = p.add_run(); r.text = "What is VeriSight?\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
     vision_points = [
-        "Autonomous silicon verification & failure debugging copilot designed for digital ASIC & SoC design.",
+        "Autonomous silicon verification, testbench synthesis & failure debugging copilot designed for digital ASIC & SoC design.",
         "Eliminates the multi-week verification bottleneck between RTL design freeze and tape-out sign-off.",
-        "Deep closed-loop integration: Directly invokes EDA simulators (VCS, Questa, Verilator) and parses waveforms."
+        "Tri-Engine Architecture: Diagnostic Debug, Verification Plan Synthesis, and Spec-Driven UVM 1.2 Testbench Generation."
     ]
     for vp in vision_points:
         p = tf3_1.add_paragraph()
@@ -374,8 +374,8 @@ def generate_presentation():
     r = p.add_run(); r.text = "Core Autonomous Capabilities\n"; r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = C_BLUE
     
     pillars = [
-        ("Autonomous Test Plan Synthesis", "Extracts features, test sequences, covergroups, and SVA assertions directly from specs."),
-        ("Closed-Loop Simulation", "Simulates RTL and testbench, intercepts errors, dumps VCD traces, and auto-triggers triage."),
+        ("Spec-Driven UVM Synthesis", "Synthesizes 14-component UVM 1.2 VIP suites with specification-grounded golden reference models."),
+        ("Autonomous Verification Plan", "Extracts 50+ testcases across 8 categories, 90+ coverage points, and 30+ SVA assertions from specs."),
         ("Root-Cause Diagnostic Engine", "Applies 9 formal decision rules and backwards AST cone traversal to isolate bugs in <15s."),
         ("Self-Synthesizing Patch Generator", "Generates minimal unified git diffs and validates syntax in an isolated compile sandbox.")
     ]
@@ -393,7 +393,7 @@ def generate_presentation():
     tb_c3 = s3.shapes.add_textbox(Inches(8.0), Inches(6.2), Inches(4.3), Inches(0.5))
     tf_c3 = tb_c3.text_frame
     p = tf_c3.paragraphs[0]
-    r = p.add_run(); r.text = "VeriSight Guided CLI Launcher with 6 Autonomous Workflows"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
+    r = p.add_run(); r.text = "VeriSight Guided CLI Launcher with Tri-Engine Architecture"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
 
     s3_steps = [
         [c3_1.shape_id, tb3_1.shape_id],
@@ -510,22 +510,36 @@ def generate_presentation():
         s6.shapes.add_picture(TEMPLATE_IMG, 0, 0, Inches(13.333), Inches(7.5))
     
     # Load source slide 6 from user's presentation
-    src_p = pptx.Presentation(WINDOWS_DOWNLOADS_1)
-    slide6_src = src_p.slides[5]
-    
-    for shape in slide6_src.shapes:
-        if shape.name != "Picture 1":
-            s6._element.spTree.append(shape._element)
+    src_candidates = [
+        "/home/mirafra_lp38/.gemini/antigravity/brain/ebda9bdb-6793-40cd-9d90-a1b3aa94d7eb/.user_uploaded/media_1793207608125_41b06f95.pptx",
+        WINDOWS_DOWNLOADS_1,
+        WINDOWS_DOWNLOADS_UPDATED,
+        "VeriSight_Presentation_Updated.pptx",
+        "VeriSight_Investor_Presentation.pptx"
+    ]
+    src_path = None
+    for cand in src_candidates:
+        if os.path.exists(cand):
+            src_path = cand
+            break
             
-    timing_xml_s6 = None
-    for child in slide6_src._element:
-        if child.tag.endswith("timing"):
-            timing_xml_s6 = child
-            
-    trans_xml_s6 = parse_xml('<p:transition xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:fade/></p:transition>')
-    s6._element.append(trans_xml_s6)
-    if timing_xml_s6 is not None:
-        s6._element.append(timing_xml_s6)
+    if src_path is not None:
+        src_p = pptx.Presentation(src_path)
+        slide6_src = src_p.slides[5]
+        
+        for shape in slide6_src.shapes:
+            if shape.name != "Picture 1":
+                s6._element.spTree.append(shape._element)
+                
+        timing_xml_s6 = None
+        for child in slide6_src._element:
+            if child.tag.endswith("timing"):
+                timing_xml_s6 = child
+                
+        trans_xml_s6 = parse_xml('<p:transition xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:fade/></p:transition>')
+        s6._element.append(trans_xml_s6)
+        if timing_xml_s6 is not None:
+            s6._element.append(timing_xml_s6)
 
     # =========================================================================
     # SLIDE 7: TOPIC 05 - ARCHITECTURE COMPONENTS: AGENTS 1 TO 5
@@ -866,26 +880,25 @@ def generate_presentation():
     apply_slide_effects(s12, s12_steps)
 
     # =========================================================================
-    # SLIDE 13: TOPIC 09 - DASHBOARD OVERVIEW: THE 6 GUIDED WORKFLOWS
+    # SLIDE 13: TOPIC 09 - PLATFORM CAPABILITIES: THE TRI-ENGINE ARCHITECTURE
     # =========================================================================
-    s13 = add_base_slide("Topic 9: Dashboard Overview — The 6 Autonomous Workflows", "Platform Capabilities")
+    s13 = add_base_slide("Topic 9: Platform Capabilities — The Tri-Engine Architecture & Guided Launcher", "Platform Capabilities")
     
-    # Left: Explanation of 6 Workflows
+    # Left: Explanation of Tri-Engine Suite
     c13_l = add_card(s13, Inches(0.8), Inches(1.5), Inches(6.0), Inches(5.3), C_CARD_BG, C_PRIMARY)
     tb13_l = s13.shapes.add_textbox(Inches(1.0), Inches(1.65), Inches(5.6), Inches(5.0))
     tf13_l = tb13_l.text_frame
     tf13_l.word_wrap = True
     
     p = tf13_l.paragraphs[0]
-    r = p.add_run(); r.text = "Complete Suite: 6 Autonomous Workflows\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
+    r = p.add_run(); r.text = "The Tri-Engine Autonomous Verification Suite\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
     wf_list = [
-        ("[1] VeriSight Debug", "Root-cause analysis, 9-rule triage, pyslang AST trace, and automated patch synthesis."),
-        ("[2] VeriSight Plan", "Extracts features, test matrices, covergroups, and SVA assertions directly from specs."),
-        ("[3] Closed-Loop Sim", "Zero-touch runner (iverilog/verilator/vcs) with error interception and auto-triage."),
-        ("[4] Live Web Cockpit", "Interactive browser GUI with Live Coverage Cockpit, Waveform Studio & RCA Inspector."),
-        ("[5] Quick Demos", "1-click instant evaluations on pre-packaged ALU, FIFO, and AXI4-Stream testbeds."),
-        ("[6] Advanced CLI Exit", "Headless scriptable invocation for nightly CI/CD regression farms and pipelines.")
+        ("Engine 1: VeriSight Debug", "Autonomous RCA, 9 deterministic rules, pyslang AST fan-in cone tracing, multi-clock CDC analysis, zero-touch unified git patch synthesis & sandbox validation."),
+        ("Engine 2: VeriSight Plan", "Autonomous Verification Plan, feature decomposition, 50+ scaled testcases across 8 categories, 90+ coverage points, 150+ bins, 30+ SVA assertions. Pure spec-driven execution from PDF/MD with optional RTL."),
+        ("Engine 3: VeriSight TestBench", "Spec-Driven UVM 1.2 synthesis grounded in specification as sole functional truth. Behavioral reference models and scoreboards independently isolate DUT bugs without mirroring RTL flaws (14 VIP files)."),
+        ("Live Web Cockpit (`./start serve`)", "Modern browser GUI with Sage/Burgundy styling, live coverage progress tracking, and interactive sub-cycle waveform inspection."),
+        ("Cloud EDA Exporter (`./start edaplayground`)", "1-click export of complete synthesized testbenches and RTL packages to cloud simulators for instant stakeholder sharing.")
     ]
     for wtitle, wdesc in wf_list:
         p = tf13_l.add_paragraph()
@@ -911,42 +924,41 @@ def generate_presentation():
     apply_slide_effects(s13, s13_steps)
 
     # =========================================================================
-    # SLIDE 14: TOPIC 09 (CONT.) - LIVE COVERAGE COCKPIT (WORKFLOW 2)
+    # SLIDE 14: TOPIC 09 (CONT.) - VERISIGHT TESTBENCH (SPEC-DRIVEN UVM 1.2 SYNTHESIS)
     # =========================================================================
-    s14 = add_base_slide("Topic 9 (Cont.): Live Coverage Cockpit — Planned vs. Actual UCDB", "Coverage Closure")
+    s14 = add_base_slide("Topic 9 (Cont.): VeriSight TestBench — Spec-Driven UVM 1.2 Synthesis", "Spec-Driven TB")
     
-    # Left: Animated GIF of Coverage Closure
-    c14_l = add_card(s14, Inches(0.8), Inches(1.5), Inches(5.5), Inches(5.3), C_CARD_BG)
-    gif_cov = "docs/presentation/gif_02_coverage_closure.gif"
-    if os.path.exists(gif_cov):
-        pic14 = s14.shapes.add_picture(gif_cov, Inches(0.9), Inches(1.65), Inches(5.3), Inches(4.3))
+    # Left: Screenshot of Spec-Driven Verification Scoreboard & VIP suite
+    c14_l = add_card(s14, Inches(0.8), Inches(1.5), Inches(5.6), Inches(5.3), C_CARD_BG)
+    pic_tb = "docs/screenshots/screenshot_16_spec_driven_tb.png"
+    if os.path.exists(pic_tb):
+        pic14 = s14.shapes.add_picture(pic_tb, Inches(0.9), Inches(1.65), Inches(5.4), Inches(4.3))
     else:
         pic14 = None
-    tb_c14 = s14.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(5.3), Inches(0.6))
+    tb_c14 = s14.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(5.4), Inches(0.6))
     tf_c14 = tb_c14.text_frame
     p = tf_c14.paragraphs[0]
-    r = p.add_run(); r.text = "Animated Dynamic Coverage Closure Progression (42% -> 100%)"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
+    r = p.add_run(); r.text = "Spec-Driven Verification Scoreboard & Synthesized 14-Component UVM VIP Suite"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
 
-    # Right: Point-wise Features
-    c14_r = add_card(s14, Inches(6.5), Inches(1.5), Inches(6.0), Inches(5.3), C_CARD_BG, C_PRIMARY)
-    tb14_r = s14.shapes.add_textbox(Inches(6.7), Inches(1.65), Inches(5.6), Inches(5.0))
+    # Right: Point-wise Spec-Driven UVM Synthesis Features
+    c14_r = add_card(s14, Inches(6.6), Inches(1.5), Inches(5.9), Inches(5.3), C_CARD_BG, C_PRIMARY)
+    tb14_r = s14.shapes.add_textbox(Inches(6.8), Inches(1.65), Inches(5.5), Inches(5.0))
     tf14_r = tb14_r.text_frame
     tf14_r.word_wrap = True
     
     p = tf14_r.paragraphs[0]
-    r = p.add_run(); r.text = "Dynamic Coverage Cockpit & Planner Features\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
+    r = p.add_run(); r.text = "Spec-Driven UVM 1.2 Synthesis Engine\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
-    cov_points = [
-        ("Ingests Live Simulator UCDB / vDB", "Parses Synopsys vDB and Questa UCDB databases to compare actual coverage against planned features in real-time."),
-        ("Visual Progress by Feature", "Every architectural feature has a dedicated progress bar showing percentage hit vs 100% target."),
-        ("Red Highlighted Unhit Bins", "Zero-hit bins (e.g. rare FIFO backpressure corner cases) are highlighted in red with direct drill-down."),
-        ("1-Click AI Directed Stimulus", "Engineers click 'Generate Directed Sequence' to automatically synthesize constrained-random sequences targeting unhit bins."),
-        ("ISO 26262 / DO-254 Compliance", "Automatically exports requirement-to-test bi-directional traceability matrix (traceability_matrix.csv).")
+    tb_points = [
+        ("The 'Spec-as-Truth' Principle", "Traditional AI testbenches mirror RTL behavior, concealing design bugs. VeriSight treats the Architectural Specification as the sole functional truth. Golden reference models and scoreboards independently isolate RTL defects rather than reproducing them."),
+        ("10-Stage Reasoning Pipeline", "Spec Ingestion (PDF/MD) -> Port & Protocol Extraction -> Transaction Item Definition -> VIP Components -> Behavioral Golden Reference Model -> Scoreboard Comparator -> Coverage Subscriber -> Top-Level Testbench Module."),
+        ("Complete 14-Component UVM VIP Suite", "Generates `_if.sv`, `_seq_item.sv`, `_sequencer.sv`, `_driver.sv`, `_monitor.sv`, `_agent.sv`, `_reference_model.sv`, `_scoreboard.sv`, `_coverage.sv`, `_sequence.sv`, `_env.sv`, `_test.sv`, `_pkg.sv`, and `_tb_top.sv`."),
+        ("Static IEEE-1800 & Sandbox Pre-Check", "Pre-validated with `pyslang` parser before delivery; guaranteed syntax validity, UVM 1.2 compliance, and zero warnings on VCS, Questa, and Xcelium.")
     ]
-    for ctitle, cdesc in cov_points:
+    for tbtitle, tbdesc in tb_points:
         p = tf14_r.add_paragraph()
-        r1 = p.add_run(); r1.text = f"• {ctitle}: "; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
-        r2 = p.add_run(); r2.text = f"{cdesc}\n\n"; r2.font.size = Pt(10); r2.font.color.rgb = C_TEXT
+        r1 = p.add_run(); r1.text = f"• {tbtitle}:\n"; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
+        r2 = p.add_run(); r2.text = f"{tbdesc}\n\n"; r2.font.size = Pt(9.5); r2.font.color.rgb = C_TEXT
 
     s14_steps = [
         [c14_l.shape_id, pic14.shape_id, tb_c14.shape_id] if pic14 else [c14_l.shape_id, tb_c14.shape_id],
@@ -955,26 +967,70 @@ def generate_presentation():
     apply_slide_effects(s14, s14_steps)
 
     # =========================================================================
-    # SLIDE 15: TOPIC 09 (CONT.) - ROOT-CAUSE STUDIO & WAVEFORM INSPECTOR (WORKFLOW 1 & 4)
+    # SLIDE 15: TOPIC 09 (CONT.) - DYNAMIC COVERAGE CLOSURE & 50+ TEST SCALING (VERISIGHT PLAN)
     # =========================================================================
-    s15 = add_base_slide("Topic 9 (Cont.): Root-Cause Studio & Waveform Inspector", "GUI Diagnostic")
+    s15 = add_base_slide("Topic 9 (Cont.): Dynamic Coverage Closure & 50+ Test Scaling — VeriSight Plan", "Plan Architect")
     
-    c15_l = add_card(s15, Inches(0.8), Inches(1.5), Inches(6.2), Inches(5.3), C_CARD_BG)
-    if os.path.exists("docs/screenshots/screenshot_12_rca_dashboard_gui.png"):
-        pic15 = s15.shapes.add_picture("docs/screenshots/screenshot_12_rca_dashboard_gui.png", Inches(0.9), Inches(1.65), Inches(6.0), Inches(4.3))
+    # Left: Animated GIF of Coverage Closure
+    c15_l = add_card(s15, Inches(0.8), Inches(1.5), Inches(5.5), Inches(5.3), C_CARD_BG)
+    gif_cov = "docs/presentation/gif_02_coverage_closure.gif"
+    if os.path.exists(gif_cov):
+        pic15 = s15.shapes.add_picture(gif_cov, Inches(0.9), Inches(1.65), Inches(5.3), Inches(4.3))
     else:
         pic15 = None
-    tb_c15 = s15.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(6.0), Inches(0.6))
+    tb_c15 = s15.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(5.3), Inches(0.6))
     tf_c15 = tb_c15.text_frame
     p = tf_c15.paragraphs[0]
-    r = p.add_run(); r.text = "Interactive RCA Dashboard & Waveform Studio with Cursor Synchronization"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
+    r = p.add_run(); r.text = "Animated Dynamic Coverage Closure Progression (42% -> 100%)"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
 
-    c15_r = add_card(s15, Inches(7.2), Inches(1.5), Inches(5.3), Inches(5.3), C_CARD_BG, C_PRIMARY)
-    tb15_r = s15.shapes.add_textbox(Inches(7.4), Inches(1.65), Inches(4.9), Inches(5.0))
+    # Right: Point-wise Features of Scaled Verification Plan
+    c15_r = add_card(s15, Inches(6.5), Inches(1.5), Inches(6.0), Inches(5.3), C_CARD_BG, C_PRIMARY)
+    tb15_r = s15.shapes.add_textbox(Inches(6.7), Inches(1.65), Inches(5.6), Inches(5.0))
     tf15_r = tb15_r.text_frame
     tf15_r.word_wrap = True
     
     p = tf15_r.paragraphs[0]
+    r = p.add_run(); r.text = "Scaled Verification Plan & Pure Spec-Driven Execution\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
+    
+    cov_points = [
+        ("Pure Spec-Driven Mode (Optional RTL)", "Ingests architectural datasheets (PDF, Markdown, text). RTL is optional — eliminating default fallback hallucinations and enabling shift-left pre-RTL verification planning directly from specs."),
+        ("50+ Scaled Tests across 8 Categories", "Synthesizes Directed, Constrained-Random, Reset/Init, Boundary/Corner, Error/Negative, Performance/Backpressure, Concurrency, and Protocol-Specific test scenarios."),
+        ("Multi-Covergroups with 90+ CPs & 150+ Bins", "Defines protocol state transitions, illegal state avoidance, cross-coverage matrices, and FIFO/bus boundary conditions."),
+        ("30+ SystemVerilog Assertions (SVA)", "Synthesizes formal protocol timing checks, handshake assertions, and safety properties directly from specification requirements."),
+        ("Simulator UCDB Ingestion & ISO 26262 Matrix", "Ingests Questa UCDB / Synopsys vDB to identify zero-hit holes and outputs bi-directional traceability matrices (`traceability_matrix.csv`).")
+    ]
+    for ctitle, cdesc in cov_points:
+        p = tf15_r.add_paragraph()
+        r1 = p.add_run(); r1.text = f"• {ctitle}: "; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
+        r2 = p.add_run(); r2.text = f"{cdesc}\n\n"; r2.font.size = Pt(9.5); r2.font.color.rgb = C_TEXT
+
+    s15_steps = [
+        [c15_l.shape_id, pic15.shape_id, tb_c15.shape_id] if pic15 else [c15_l.shape_id, tb_c15.shape_id],
+        [c15_r.shape_id, tb15_r.shape_id]
+    ]
+    apply_slide_effects(s15, s15_steps)
+
+    # =========================================================================
+    # SLIDE 16: TOPIC 09 (CONT.) - ROOT-CAUSE STUDIO & WAVEFORM INSPECTOR (VERISIGHT DEBUG)
+    # =========================================================================
+    s16 = add_base_slide("Topic 9 (Cont.): Root-Cause Studio & Waveform Inspector", "GUI Diagnostic")
+    
+    c16_l = add_card(s16, Inches(0.8), Inches(1.5), Inches(6.2), Inches(5.3), C_CARD_BG)
+    if os.path.exists("docs/screenshots/screenshot_12_rca_dashboard_gui.png"):
+        pic16 = s16.shapes.add_picture("docs/screenshots/screenshot_12_rca_dashboard_gui.png", Inches(0.9), Inches(1.65), Inches(6.0), Inches(4.3))
+    else:
+        pic16 = None
+    tb_c16 = s16.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(6.0), Inches(0.6))
+    tf_c16 = tb_c16.text_frame
+    p = tf_c16.paragraphs[0]
+    r = p.add_run(); r.text = "Interactive RCA Dashboard & Waveform Studio with Cursor Synchronization"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
+
+    c16_r = add_card(s16, Inches(7.2), Inches(1.5), Inches(5.3), Inches(5.3), C_CARD_BG, C_PRIMARY)
+    tb16_r = s16.shapes.add_textbox(Inches(7.4), Inches(1.65), Inches(4.9), Inches(5.0))
+    tf16_r = tb16_r.text_frame
+    tf16_r.word_wrap = True
+    
+    p = tf16_r.paragraphs[0]
     r = p.add_run(); r.text = "Sub-Cycle Waveform Correlation Features\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
     rca_points = [
@@ -984,37 +1040,37 @@ def generate_presentation():
         ("pyslang Fan-In Cone Tracing", "Cross-probes failing signals backward to active drivers, uninitialized registers, and clock boundaries.")
     ]
     for rtitle, rdesc in rca_points:
-        p = tf15_r.add_paragraph()
+        p = tf16_r.add_paragraph()
         r1 = p.add_run(); r1.text = f"• {rtitle}:\n"; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
         r2 = p.add_run(); r2.text = f"{rdesc}\n\n"; r2.font.size = Pt(9.5); r2.font.color.rgb = C_TEXT
 
-    s15_steps = [
-        [c15_l.shape_id, pic15.shape_id, tb_c15.shape_id] if pic15 else [c15_l.shape_id, tb_c15.shape_id],
-        [c15_r.shape_id, tb15_r.shape_id]
+    s16_steps = [
+        [c16_l.shape_id, pic16.shape_id, tb_c16.shape_id] if pic16 else [c16_l.shape_id, tb_c16.shape_id],
+        [c16_r.shape_id, tb16_r.shape_id]
     ]
-    apply_slide_effects(s15, s15_steps)
+    apply_slide_effects(s16, s16_steps)
 
     # =========================================================================
-    # SLIDE 16: TOPIC 09 (CONT.) - AUTOMATED PATCHING & SANDBOX SAFETY (WORKFLOW 1 & 3)
+    # SLIDE 17: TOPIC 09 (CONT.) - AUTOMATED PATCHING & SANDBOX SAFETY (VERISIGHT DEBUG)
     # =========================================================================
-    s16 = add_base_slide("Topic 9 (Cont.): Automated Unified Patching & Sandbox Safety", "Automated Repair")
+    s17 = add_base_slide("Topic 9 (Cont.): Automated Unified Patching & Sandbox Safety", "Automated Repair")
     
-    c16_l = add_card(s16, Inches(0.8), Inches(1.5), Inches(6.2), Inches(5.3), C_CARD_BG)
+    c17_l = add_card(s17, Inches(0.8), Inches(1.5), Inches(6.2), Inches(5.3), C_CARD_BG)
     if os.path.exists("docs/screenshots/screenshot_13_automated_patch.png"):
-        pic16 = s16.shapes.add_picture("docs/screenshots/screenshot_13_automated_patch.png", Inches(0.9), Inches(1.65), Inches(6.0), Inches(4.3))
+        pic17 = s17.shapes.add_picture("docs/screenshots/screenshot_13_automated_patch.png", Inches(0.9), Inches(1.65), Inches(6.0), Inches(4.3))
     else:
-        pic16 = None
-    tb_c16 = s16.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(6.0), Inches(0.6))
-    tf_c16 = tb_c16.text_frame
-    p = tf_c16.paragraphs[0]
+        pic17 = None
+    tb_c17 = s17.shapes.add_textbox(Inches(0.9), Inches(6.05), Inches(6.0), Inches(0.6))
+    tf_c17 = tb_c17.text_frame
+    p = tf_c17.paragraphs[0]
     r = p.add_run(); r.text = "VeriSight Unified Git Diff Patch with Automated Sandbox Verification"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
 
-    c16_r = add_card(s16, Inches(7.2), Inches(1.5), Inches(5.3), Inches(5.3), C_CARD_BG, C_PRIMARY)
-    tb16_r = s16.shapes.add_textbox(Inches(7.4), Inches(1.65), Inches(4.9), Inches(5.0))
-    tf16_r = tb16_r.text_frame
-    tf16_r.word_wrap = True
+    c17_r = add_card(s17, Inches(7.2), Inches(1.5), Inches(5.3), Inches(5.3), C_CARD_BG, C_PRIMARY)
+    tb17_r = s17.shapes.add_textbox(Inches(7.4), Inches(1.65), Inches(4.9), Inches(5.0))
+    tf17_r = tb17_r.text_frame
+    tf17_r.word_wrap = True
     
-    p = tf16_r.paragraphs[0]
+    p = tf17_r.paragraphs[0]
     r = p.add_run(); r.text = "The Zero-Touch Repair Loop\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
     patch_steps = [
@@ -1024,20 +1080,20 @@ def generate_presentation():
         ("4. Regression Clean Sign-Off", "Confirms failing assertion is eliminated and all existing regression tests continue to pass.")
     ]
     for ptitle, pdesc in patch_steps:
-        p = tf16_r.add_paragraph()
+        p = tf17_r.add_paragraph()
         r1 = p.add_run(); r1.text = f"{ptitle}\n"; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
         r2 = p.add_run(); r2.text = f"{pdesc}\n\n"; r2.font.size = Pt(9.5); r2.font.color.rgb = C_TEXT
 
-    s16_steps = [
-        [c16_l.shape_id, pic16.shape_id, tb_c16.shape_id] if pic16 else [c16_l.shape_id, tb_c16.shape_id],
-        [c16_r.shape_id, tb16_r.shape_id]
+    s17_steps = [
+        [c17_l.shape_id, pic17.shape_id, tb_c17.shape_id] if pic17 else [c17_l.shape_id, tb_c17.shape_id],
+        [c17_r.shape_id, tb17_r.shape_id]
     ]
-    apply_slide_effects(s16, s16_steps)
+    apply_slide_effects(s17, s17_steps)
 
     # =========================================================================
-    # SLIDE 17: TOPIC 10 - TOKEN UTILIZATION OVER COST
+    # SLIDE 18: TOPIC 10 - TOKEN UTILIZATION OVER COST
     # =========================================================================
-    s17 = add_base_slide("Topic 10: Token Utilization Over Cost — Sovereign Economics", "Cost Efficiency")
+    s18 = add_base_slide("Topic 10: Token Utilization Over Cost — Sovereign Economics", "Cost Efficiency")
     
     token_cards = [
         ("Cloud API Cost per Run",
@@ -1059,12 +1115,12 @@ def generate_presentation():
          "• Prevents prompt bloat and achieves sub-15s response latency.",
          C_AMBER)
     ]
-    s17_steps = []
+    s18_steps = []
     for i, (ttitle, tval, tdesc, tcol) in enumerate(token_cards):
         c_left = Inches(0.8) + i * Inches(3.95)
-        card_shp = add_card(s17, c_left, Inches(1.5), Inches(3.75), Inches(5.3), C_CARD_BG, tcol)
+        card_shp = add_card(s18, c_left, Inches(1.5), Inches(3.75), Inches(5.3), C_CARD_BG, tcol)
         
-        tb = s17.shapes.add_textbox(c_left + Inches(0.2), Inches(1.8), Inches(3.35), Inches(4.7))
+        tb = s18.shapes.add_textbox(c_left + Inches(0.2), Inches(1.8), Inches(3.35), Inches(4.7))
         tf = tb.text_frame
         tf.word_wrap = True
         
@@ -1076,14 +1132,14 @@ def generate_presentation():
         
         p = tf.add_paragraph()
         r = p.add_run(); r.text = tdesc; r.font.size = Pt(10); r.font.color.rgb = C_TEXT
-        s17_steps.append([card_shp.shape_id, tb.shape_id])
+        s18_steps.append([card_shp.shape_id, tb.shape_id])
 
-    apply_slide_effects(s17, s17_steps)
+    apply_slide_effects(s18, s18_steps)
 
     # =========================================================================
-    # SLIDE 18: TOPIC 11 - SUMMARY: THE DEFENSIBLE MOAT
+    # SLIDE 19: TOPIC 11 - SUMMARY: THE DEFENSIBLE MOAT
     # =========================================================================
-    s18 = add_base_slide("Topic 11: Summary — The VeriSight Defensible Moat", "Strategic Advantage")
+    s19 = add_base_slide("Topic 11: Summary — The VeriSight Defensible Moat", "Strategic Advantage")
     
     moat_cards = [
         ("Deep Domain Grounding",
@@ -1103,15 +1159,15 @@ def generate_presentation():
          "• Eliminates multi-million dollar physical mask re-spins and accelerates time-to-market by 6-10 weeks.",
          C_PRIMARY)
     ]
-    s18_steps = []
+    s19_steps = []
     for i, (mtitle, mdesc, mcol) in enumerate(moat_cards):
         row = i // 2
         col = i % 2
         c_left = Inches(0.8) + col * Inches(5.9)
         c_top = Inches(1.5) + row * Inches(2.7)
-        card_shp = add_card(s18, c_left, c_top, Inches(5.7), Inches(2.5), C_CARD_BG, mcol)
+        card_shp = add_card(s19, c_left, c_top, Inches(5.7), Inches(2.5), C_CARD_BG, mcol)
         
-        tb = s18.shapes.add_textbox(c_left + Inches(0.25), c_top + Inches(0.2), Inches(5.2), Inches(2.1))
+        tb = s19.shapes.add_textbox(c_left + Inches(0.25), c_top + Inches(0.2), Inches(5.2), Inches(2.1))
         tf = tb.text_frame
         tf.word_wrap = True
         
@@ -1120,24 +1176,24 @@ def generate_presentation():
         
         p = tf.add_paragraph()
         r = p.add_run(); r.text = mdesc; r.font.size = Pt(10); r.font.color.rgb = C_TEXT
-        s18_steps.append([card_shp.shape_id, tb.shape_id])
+        s19_steps.append([card_shp.shape_id, tb.shape_id])
 
-    apply_slide_effects(s18, s18_steps)
+    apply_slide_effects(s19, s19_steps)
 
     # =========================================================================
-    # SLIDE 19: TOPIC 12 - FUTURE SCOPE: AUTONOMOUS SILICON ROADMAP
+    # SLIDE 20: TOPIC 12 - FUTURE SCOPE: AUTONOMOUS SILICON ROADMAP
     # =========================================================================
-    s19 = add_base_slide("Topic 12: Future Scope — The Autonomous Silicon Roadmap", "Product Roadmap")
+    s20 = add_base_slide("Topic 12: Future Scope — The Autonomous Silicon Roadmap", "Product Roadmap")
     
     roadmap_phases = [
         ("Phase 1: Present (v2.4)",
-         "Production Multi-Agent Triage",
-         "• 6 Guided Autonomous Workflows\n"
+         "Production Tri-Engine Architecture",
+         "• Tri-Engine Suite: Debug, Plan & TestBench\n"
+         "• Spec-Driven UVM 1.2 Synthesis Agent\n"
          "• 9 Formal RCA Decision Rules\n"
          "• pyslang IEEE-1800 AST X-Tracer\n"
          "• Live Coverage Cockpit & Waveform Studio\n"
-         "• Zero-Touch Sandbox Auto-Patching\n"
-         "• FastAPI Asynchronous Web Studio",
+         "• Zero-Touch Sandbox Auto-Patching",
          C_PRIMARY),
         ("Phase 2: Q1-Q2 2027",
          "Continuous Regression Intelligence",
@@ -1156,12 +1212,12 @@ def generate_presentation():
          "• ISO 26262 ASIL-D safety lifecycle sign-off",
          C_AMBER)
     ]
-    s19_steps = []
+    s20_steps = []
     for i, (rtitle, rsub, rdetails, rcolor) in enumerate(roadmap_phases):
         c_left = Inches(0.8) + i * Inches(3.95)
-        card_shp = add_card(s19, c_left, Inches(1.5), Inches(3.75), Inches(5.3), C_CARD_BG, rcolor)
+        card_shp = add_card(s20, c_left, Inches(1.5), Inches(3.75), Inches(5.3), C_CARD_BG, rcolor)
         
-        tb = s19.shapes.add_textbox(c_left + Inches(0.2), Inches(1.7), Inches(3.35), Inches(4.9))
+        tb = s20.shapes.add_textbox(c_left + Inches(0.2), Inches(1.7), Inches(3.35), Inches(4.9))
         tf = tb.text_frame
         tf.word_wrap = True
         
@@ -1173,22 +1229,22 @@ def generate_presentation():
         
         p = tf.add_paragraph()
         r = p.add_run(); r.text = rdetails; r.font.size = Pt(9.5); r.font.color.rgb = C_TEXT
-        s19_steps.append([card_shp.shape_id, tb.shape_id])
+        s20_steps.append([card_shp.shape_id, tb.shape_id])
 
-    apply_slide_effects(s19, s19_steps)
+    apply_slide_effects(s20, s20_steps)
 
     # =========================================================================
-    # SLIDE 20: TOPIC 13 - INTEGRATION INTO REAL WORLD CHIP DESIGN (RESTORED!)
+    # SLIDE 21: TOPIC 13 - INTEGRATION INTO REAL WORLD CHIP DESIGN
     # =========================================================================
-    s20 = add_base_slide("Topic 13: Integration Into Real World Chip Design", "Enterprise Integration")
+    s21 = add_base_slide("Topic 13: Integration Into Real World Chip Design", "Enterprise Integration")
     
     # Left: Point-wise Enterprise Integration
-    c20_l = add_card(s20, Inches(0.8), Inches(1.5), Inches(6.0), Inches(5.3), C_CARD_BG, C_PRIMARY)
-    tb20_l = s20.shapes.add_textbox(Inches(1.0), Inches(1.65), Inches(5.6), Inches(5.0))
-    tf20_l = tb20_l.text_frame
-    tf20_l.word_wrap = True
+    c21_l = add_card(s21, Inches(0.8), Inches(1.5), Inches(6.0), Inches(5.3), C_CARD_BG, C_PRIMARY)
+    tb21_l = s21.shapes.add_textbox(Inches(1.0), Inches(1.65), Inches(5.6), Inches(5.0))
+    tf21_l = tb21_l.text_frame
+    tf21_l.word_wrap = True
     
-    p = tf20_l.paragraphs[0]
+    p = tf21_l.paragraphs[0]
     r = p.add_run(); r.text = "Day-1 Frictionless CI/CD Deployment\n\n"; r.font.size = Pt(14); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
     integrations = [
@@ -1198,31 +1254,31 @@ def generate_presentation():
         ("Strict Enterprise Security Boundary", "Air-gapped on-premise execution with local Ollama/vLLM endpoints and complete RTL IP sanitization.")
     ]
     for ititle, idesc in integrations:
-        p = tf20_l.add_paragraph()
+        p = tf21_l.add_paragraph()
         r1 = p.add_run(); r1.text = f"• {ititle}: "; r1.font.bold = True; r1.font.size = Pt(10.5); r1.font.color.rgb = C_DARK
         r2 = p.add_run(); r2.text = f"{idesc}\n\n"; r2.font.size = Pt(9.5); r2.font.color.rgb = C_TEXT
 
     # Right: Screenshot of CI/CD regression farm
-    c20_r = add_card(s20, Inches(7.0), Inches(1.5), Inches(5.5), Inches(5.3), C_CARD_BG)
+    c21_r = add_card(s21, Inches(7.0), Inches(1.5), Inches(5.5), Inches(5.3), C_CARD_BG)
     if os.path.exists("docs/screenshots/screenshot_15_ci_cd_regression.png"):
-        pic20 = s20.shapes.add_picture("docs/screenshots/screenshot_15_ci_cd_regression.png", Inches(7.1), Inches(1.65), Inches(5.3), Inches(4.3))
+        pic21 = s21.shapes.add_picture("docs/screenshots/screenshot_15_ci_cd_regression.png", Inches(7.1), Inches(1.65), Inches(5.3), Inches(4.3))
     else:
-        pic20 = None
-    tb_c20 = s20.shapes.add_textbox(Inches(7.1), Inches(6.05), Inches(5.3), Inches(0.6))
-    tf_c20 = tb_c20.text_frame
-    p = tf_c20.paragraphs[0]
+        pic21 = None
+    tb_c21 = s21.shapes.add_textbox(Inches(7.1), Inches(6.05), Inches(5.3), Inches(0.6))
+    tf_c21 = tb_c21.text_frame
+    p = tf_c21.paragraphs[0]
     r = p.add_run(); r.text = "Headless CI/CD Nightly Regression Triage Automation"; r.font.size = Pt(9.5); r.font.bold = True; r.font.color.rgb = C_MUTED
 
-    s20_steps = [
-        [c20_l.shape_id, tb20_l.shape_id],
-        [c20_r.shape_id, pic20.shape_id, tb_c20.shape_id] if pic20 else [c20_r.shape_id, tb_c20.shape_id]
+    s21_steps = [
+        [c21_l.shape_id, tb21_l.shape_id],
+        [c21_r.shape_id, pic21.shape_id, tb_c21.shape_id] if pic21 else [c21_r.shape_id, tb_c21.shape_id]
     ]
-    apply_slide_effects(s20, s20_steps)
+    apply_slide_effects(s21, s21_steps)
 
     # =========================================================================
-    # SLIDE 21: TOPIC 14 - APPENDIX: SUPPORTING DOCUMENTS & COMPLIANCE
+    # SLIDE 22: TOPIC 14 - APPENDIX: SUPPORTING DOCUMENTS & COMPLIANCE
     # =========================================================================
-    s21 = add_base_slide("Topic 14: Appendix — Supporting Documents & Compliance", "Verification Standards")
+    s22 = add_base_slide("Topic 14: Appendix — Supporting Documents & Compliance", "Verification Standards")
     
     app_cards = [
         ("ISO 26262 ASIL-D & DO-254",
@@ -1231,7 +1287,7 @@ def generate_presentation():
          C_PRIMARY),
         ("IEEE 1800 & UVM 1.2 Standards",
          "• Full support for IEEE 1800-2023 SystemVerilog language constructs, packages, and interfaces via pyslang.\n"
-         "• Native understanding of UVM TLM 2.0 communication ports, sequence items, drivers, and scoreboards.",
+         "• Synthesis of complete UVM 1.2 VIP environments: sequence items, sequencers, drivers, monitors, golden reference models, and scoreboards.",
          C_BLUE),
         ("107-Page Master Operations Journal",
          "• Exhaustive field engineering documentation with 75 technical annexes, formal theorems, and SVA assertion libraries.\n"
@@ -1242,15 +1298,15 @@ def generate_presentation():
          "• Semantic chunking and fast vector similarity search for cross-block bug correlation.",
          C_DARK)
     ]
-    s21_steps = []
+    s22_steps = []
     for i, (atitle, adesc, acol) in enumerate(app_cards):
         row = i // 2
         col = i % 2
         c_left = Inches(0.8) + col * Inches(5.9)
         c_top = Inches(1.5) + row * Inches(2.7)
-        card_shp = add_card(s21, c_left, c_top, Inches(5.7), Inches(2.5), C_CARD_BG, acol)
+        card_shp = add_card(s22, c_left, c_top, Inches(5.7), Inches(2.5), C_CARD_BG, acol)
         
-        tb = s21.shapes.add_textbox(c_left + Inches(0.25), c_top + Inches(0.2), Inches(5.2), Inches(2.1))
+        tb = s22.shapes.add_textbox(c_left + Inches(0.25), c_top + Inches(0.2), Inches(5.2), Inches(2.1))
         tf = tb.text_frame
         tf.word_wrap = True
         
@@ -1259,27 +1315,27 @@ def generate_presentation():
         
         p = tf.add_paragraph()
         r = p.add_run(); r.text = adesc; r.font.size = Pt(9.5); r.font.color.rgb = C_TEXT
-        s21_steps.append([card_shp.shape_id, tb.shape_id])
+        s22_steps.append([card_shp.shape_id, tb.shape_id])
 
-    apply_slide_effects(s21, s21_steps)
+    apply_slide_effects(s22, s22_steps)
 
     # =========================================================================
-    # SLIDE 22: Q&A / CLOSING SLIDE
+    # SLIDE 23: Q&A / CLOSING SLIDE
     # =========================================================================
-    s22 = add_base_slide()
+    s23 = add_base_slide()
     
-    card22 = add_card(s22, Inches(1.5), Inches(1.5), Inches(10.3), Inches(5.2), C_CARD_BG, C_PRIMARY)
-    tb22 = s22.shapes.add_textbox(Inches(1.8), Inches(1.8), Inches(9.7), Inches(4.6))
-    tf22 = tb22.text_frame
-    tf22.word_wrap = True
+    card23 = add_card(s23, Inches(1.5), Inches(1.5), Inches(10.3), Inches(5.2), C_CARD_BG, C_PRIMARY)
+    tb23 = s23.shapes.add_textbox(Inches(1.8), Inches(1.8), Inches(9.7), Inches(4.6))
+    tf23 = tb23.text_frame
+    tf23.word_wrap = True
     
-    p = tf22.paragraphs[0]
+    p = tf23.paragraphs[0]
     r = p.add_run(); r.text = "VERISIGHT™\n"; r.font.size = Pt(36); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     
-    p = tf22.add_paragraph()
+    p = tf23.add_paragraph()
     r = p.add_run(); r.text = "The Future of Silicon Verification is Autonomous.\n\n"; r.font.size = Pt(18); r.font.bold = True; r.font.color.rgb = C_DARK
     
-    p = tf22.add_paragraph()
+    p = tf23.add_paragraph()
     r = p.add_run()
     r.text = "Thank you for your time. We are now open for Questions & Answers.\n\n" \
              "• Ready for Enterprise Pilot Deployments across VCS, Questa, and Xcelium\n" \
@@ -1287,12 +1343,12 @@ def generate_presentation():
              "• Live Web Studio available at http://localhost:8000\n\n"
     r.font.size = Pt(12.5); r.font.color.rgb = C_TEXT
     
-    p = tf22.add_paragraph()
+    p = tf23.add_paragraph()
     r = p.add_run(); r.text = "Lead Architect: Patel Kittu (@KITTUV03)   |   Co-Lead: Vinod Nikhil Monterio\n"; r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = C_PRIMARY
     r2 = p.add_run(); r2.text = "VeriSight Production Release v2.4 • Confidential Enterprise Edition • October 2026"; r2.font.size = Pt(11); r2.font.color.rgb = C_MUTED
 
-    s22_steps = [[card22.shape_id, tb22.shape_id]]
-    apply_slide_effects(s22, s22_steps)
+    s23_steps = [[card23.shape_id, tb23.shape_id]]
+    apply_slide_effects(s23, s23_steps)
 
     # Save to Local Repo
     print(f"Saving presentation with {len(prs.slides)} slides to {PPTX_WORKSPACE_UPDATED}...")
@@ -1301,13 +1357,12 @@ def generate_presentation():
     print("SUCCESS: Workspace presentation files created successfully!")
 
     # Copy to Windows Downloads Path
-    try:
-        shutil.copyfile(PPTX_WORKSPACE_UPDATED, WINDOWS_DOWNLOADS_1)
-        shutil.copyfile(PPTX_WORKSPACE_UPDATED, WINDOWS_DOWNLOADS_UPDATED)
-        print(f"SUCCESS: Copied updated PPTX to {WINDOWS_DOWNLOADS_1}")
-        print(f"SUCCESS: Copied updated PPTX to {WINDOWS_DOWNLOADS_UPDATED}")
-    except Exception as e:
-        print(f"Note: Could not copy to Windows download path: {e}")
+    for dest in [WINDOWS_DOWNLOADS_UPDATED, WINDOWS_DOWNLOADS_1]:
+        try:
+            shutil.copyfile(PPTX_WORKSPACE_UPDATED, dest)
+            print(f"SUCCESS: Copied updated PPTX to {dest}")
+        except Exception as e:
+            print(f"Note: Could not copy to {dest}: {e}")
 
 if __name__ == "__main__":
     generate_presentation()
