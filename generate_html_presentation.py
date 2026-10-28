@@ -14,18 +14,21 @@ def generate_html_deck():
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0b4d32;
-            --primary-accent: #22c55e;
-            --top-bar: #33C55A;
-            --bg-gradient: linear-gradient(135deg, #eaf5ee 0%, #dbeef0 100%);
-            --card-bg: rgba(255, 255, 255, 0.95);
-            --card-border: #cbd5e1;
-            --dark: #0f172a;
-            --text: #334155;
-            --muted: #64748b;
-            --blue: #0284c7;
-            --amber: #d97706;
-            --red: #dc2626;
+            --primary: #861a33;
+            --primary-accent: #bf2b4c;
+            --top-bar: #861a33;
+            --bg-gradient: linear-gradient(135deg, #fbf9f5 0%, #f4efe6 50%, #e6ece7 100%);
+            --card-bg: rgba(255, 255, 255, 0.96);
+            --card-border: #d4ded6;
+            --dark: #121614;
+            --text: #2c3531;
+            --muted: #5e6f60;
+            --blue: #861a33;
+            --amber: #d4a373;
+            --red: #bf2b4c;
+            --sage: #93a395;
+            --cream: #f4efe6;
+            --burgundy: #861a33;
         }
 
         * {
@@ -80,7 +83,7 @@ def generate_html_deck():
         .brand-logo-text {
             font-size: 16px;
             font-weight: 700;
-            color: #0b6b47;
+            color: #861a33;
             letter-spacing: -0.3px;
         }
 

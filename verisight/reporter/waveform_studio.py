@@ -201,8 +201,8 @@ def generate_waveform_studio_tab(
     <!-- WAVEFORM STUDIO STYLES -->
     <style>
         .wave-studio-container {{
-            background: #080c14;
-            border: 1px solid rgba(56, 189, 248, 0.2);
+            background: #0c0e0d;
+            border: 1px solid rgba(147, 163, 149, 0.2);
             border-radius: 12px;
             overflow: hidden;
             display: flex;
@@ -212,8 +212,8 @@ def generate_waveform_studio_tab(
             margin: 16px 0 24px;
         }}
         .wave-toolbar {{
-            background: #0d1322;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: #131715;
+            border-bottom: 1px solid rgba(244, 239, 230, 0.08);
             padding: 8px 14px;
             display: flex;
             align-items: center;
@@ -229,23 +229,23 @@ def generate_waveform_studio_tab(
         .wave-brand {{
             font-weight: 800;
             font-size: 14px;
-            color: #38bdf8;
+            color: #f4efe6;
             letter-spacing: 0.5px;
             display: flex;
             align-items: center;
             gap: 6px;
         }}
         .wave-badge {{
-            background: rgba(56, 189, 248, 0.12);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            color: #7dd3fc;
+            background: rgba(134, 26, 51, 0.15);
+            border: 1px solid rgba(191, 43, 76, 0.35);
+            color: #e04a6c;
             padding: 2px 8px;
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
         }}
         .wave-timescale {{
-            color: #64748b;
+            color: #93a395;
             font-size: 11px;
             font-family: "JetBrains Mono", monospace;
         }}
@@ -258,13 +258,13 @@ def generate_waveform_studio_tab(
         .wave-sep {{
             width: 1px;
             height: 20px;
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(244, 239, 230, 0.12);
             margin: 0 4px;
         }}
         .wave-btn {{
-            background: #1e293b;
-            color: #cbd5e1;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(244, 239, 230, 0.05);
+            color: #cfc6b5;
+            border: 1px solid rgba(244, 239, 230, 0.1);
             padding: 4px 10px;
             border-radius: 5px;
             font-size: 11px;
@@ -274,29 +274,29 @@ def generate_waveform_studio_tab(
             font-family: inherit;
         }}
         .wave-btn:hover {{
-            background: #334155;
+            background: rgba(147, 163, 149, 0.15);
             color: #ffffff;
-            border-color: rgba(56, 189, 248, 0.4);
+            border-color: rgba(147, 163, 149, 0.4);
         }}
         .wave-btn.active {{
-            background: #0284c7;
+            background: #861a33;
             color: #ffffff;
-            border-color: #38bdf8;
-            box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+            border-color: #bf2b4c;
+            box-shadow: 0 0 10px rgba(134, 26, 51, 0.4);
         }}
         .wave-btn-danger {{
-            background: rgba(239, 68, 68, 0.2);
-            border-color: rgba(239, 68, 68, 0.4);
-            color: #fca5a5;
+            background: rgba(134, 26, 51, 0.2);
+            border-color: rgba(191, 43, 76, 0.4);
+            color: #f5a3b5;
         }}
         .wave-btn-danger:hover {{
-            background: #ef4444;
+            background: #bf2b4c;
             color: #ffffff;
         }}
         .wave-search {{
-            background: #111827;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #f1f5f9;
+            background: #0f1211;
+            border: 1px solid rgba(244, 239, 230, 0.12);
+            color: #f4efe6;
             padding: 4px 10px;
             border-radius: 5px;
             font-size: 11px;
@@ -305,12 +305,12 @@ def generate_waveform_studio_tab(
             transition: width 0.2s;
         }}
         .wave-search:focus {{
-            border-color: #38bdf8;
+            border-color: #bf2b4c;
             width: 180px;
         }}
         .wave-cursor-banner {{
-            background: #0b111e;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            background: #0f1211;
+            border-bottom: 1px solid rgba(244, 239, 230, 0.06);
             padding: 6px 14px;
             display: flex;
             align-items: center;
@@ -323,12 +323,12 @@ def generate_waveform_studio_tab(
             gap: 6px;
         }}
         .cur-lbl {{
-            color: #64748b;
+            color: #93a395;
             font-weight: 700;
             letter-spacing: 0.5px;
         }}
         .cur-val {{
-            color: #38bdf8;
+            color: #f4efe6;
             font-weight: 800;
             font-size: 13px;
             font-family: "JetBrains Mono", monospace;
@@ -337,15 +337,15 @@ def generate_waveform_studio_tab(
             display: flex;
             align-items: center;
             gap: 6px;
-            color: #fca5a5;
+            color: #f5a3b5;
             font-weight: 600;
         }}
         .pulse-dot {{
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #ef4444;
-            box-shadow: 0 0 8px #ef4444;
+            background: #bf2b4c;
+            box-shadow: 0 0 8px #bf2b4c;
             animation: pulse 1.5s infinite;
         }}
         @keyframes pulse {{

@@ -60,10 +60,11 @@ class CoveragePoint(BaseModel):
     sample_event: str = Field(default="@(posedge clk)", description="Sampling event or clock edge")
     bins: List[CoverageBin] = Field(default_factory=list, description="Defined bins")
     description: str = Field(description="Verification intent of this coverage point")
-    actual_coverage: Optional[float] = Field(default=None, description="Actual hit percentage from simulator DB")
+    actual_coverage: Optional[float] = Field(default=None, description="Actual hit percentage from simulator DB, computed over reported bins only; None if no simulator evidence exists for this coverpoint")
     hit_bins_count: Optional[int] = None
     total_bins_count: Optional[int] = None
     unhit_bins: List[str] = Field(default_factory=list, description="Names of unhit bins")
+    not_reported_bins: List[str] = Field(default_factory=list, description="Names of bins with no matching entry in the ingested simulator coverage DB (no evidence either way)")
 
 
 class CovergroupDef(BaseModel):
@@ -142,10 +143,17 @@ class VerificationPlanReport(BaseModel):
     assertions: List[SVAProperty] = Field(default_factory=list)
     traceability_matrix: List[TraceabilityRow] = Field(default_factory=list)
     coverage_holes: List[Dict[str, Any]] = Field(default_factory=list)
+    unreported_bins_count: int = Field(default=0, description="Bins with no matching entry in the ingested simulator coverage DB (unknown hit status)")
+    coverage_evidence_level: Optional[str] = Field(default=None, description="no_simulation_data | simulator_data_ingested — whether actual_coverage figures are backed by a real coverage DB")
     rag_cached: bool = False
     sv_coverage_code: Optional[str] = None
     sv_assertion_code: Optional[str] = None
     sv_coverage_syntax_ok: Optional[bool] = None
     sv_assertions_syntax_ok: Optional[bool] = None
     sv_validation_notes: List[str] = Field(default_factory=list)
+    uvm_generated: bool = Field(default=False, description="Whether a full UVM testbench environment was also generated for this plan")
+    uvm_output_dir: Optional[str] = Field(default=None, description="Directory containing the generated UVM environment, if uvm_generated")
+    uvm_files_generated: List[str] = Field(default_factory=list, description="Relative paths of generated UVM files")
+    uvm_syntax_ok: Optional[bool] = Field(default=None, description="Whether the generated UVM interface/tb_top passed pyslang syntax validation")
+    uvm_protocol_detected: Optional[str] = Field(default=None, description="Protocol classification used to synthesize the UVM environment")
 

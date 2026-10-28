@@ -173,6 +173,17 @@ Provide the output as a JSON object with a single "features" list of objects wit
                         if title not in seen_titles and len(desc) > 8:
                             seen_titles.add(title)
                             cat = "Register" if any(k in current_section.lower() or k in title.lower() for k in ["reg", "offset", "csr"]) else "Functional"
+                            # Only mark "Confirmed" when a real RTL port/signal name is
+                            # actually mentioned in this row's text. Parsing RTL at all does
+                            # not by itself confirm a specific feature — that previously
+                            # mislabeled every table row as Confirmed and hid real
+                            # spec/RTL mismatches.
+                            if rtl_port_names and any(p in desc.lower() for p in rtl_port_names):
+                                table_cross = "Confirmed"
+                            elif rtl_data:
+                                table_cross = "Missing_In_RTL"
+                            else:
+                                table_cross = "N/A"
                             features.append(
                                 FeatureItem(
                                     feature_id=f"FEAT-{feat_idx:03d}",
@@ -181,7 +192,7 @@ Provide the output as a JSON object with a single "features" list of objects wit
                                     category=cat,
                                     source_section=current_section,
                                     priority="High" if "reset" in desc.lower() or "error" in desc.lower() else "Medium",
-                                    rtl_cross_check="Confirmed" if any(p in desc.lower() for p in rtl_port_names) else ("Confirmed" if rtl_data else "N/A"),
+                                    rtl_cross_check=table_cross,
                                 )
                             )
                             feat_idx += 1

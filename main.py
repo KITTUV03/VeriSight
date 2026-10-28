@@ -116,6 +116,11 @@ Examples:
         type=str,
         help="Path to coverage report file (optional)",
     )
+    parser.add_argument(
+        "--generate-uvm",
+        action="store_true",
+        help="With 'plan': also generate a full UVM testbench environment whose coverage subscriber reuses the plan's own covergroups",
+    )
 
     # Output
     parser.add_argument(
@@ -436,7 +441,12 @@ def main():
                 kb = None
 
         planner = VeriSightPlanner(output_dir=plan_output, knowledge_base=kb)
-        planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
+        planner.run(
+            spec_path=args.spec,
+            rtl_path=args.rtl,
+            coverage_path=args.coverage,
+            generate_uvm=args.generate_uvm,
+        )
         return
 
     # Handle 'train' command: Knowledge Base Training & Dataset Population

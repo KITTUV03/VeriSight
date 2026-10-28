@@ -358,7 +358,7 @@
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', x + 4);
       text.setAttribute('y', 24);
-      text.setAttribute('fill', '#8b9bb4');
+      text.setAttribute('fill', '#93a395');
       text.setAttribute('font-size', '10');
       text.setAttribute('font-family', 'var(--font-mono)');
       text.textContent = `${Math.round(tPs / 1000)}ns`;
@@ -378,7 +378,7 @@
       rowLine.setAttribute('y1', yBase + rowHeight);
       rowLine.setAttribute('x2', width);
       rowLine.setAttribute('y2', yBase + rowHeight);
-      rowLine.setAttribute('stroke', 'rgba(255, 255, 255, 0.03)');
+      rowLine.setAttribute('stroke', 'rgba(244, 239, 230, 0.04)');
       svg.appendChild(rowLine);
 
       if (sig.is_bus) {
@@ -394,7 +394,7 @@
           const valText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           valText.setAttribute('x', x + 12);
           valText.setAttribute('y', midY + 4);
-          valText.setAttribute('fill', tr.v.includes('x') ? '#ff3366' : '#00e5ff');
+          valText.setAttribute('fill', tr.v.includes('x') ? '#bf2b4c' : '#f4efe6');
           valText.setAttribute('font-size', '10');
           valText.setAttribute('font-family', 'var(--font-mono)');
           valText.textContent = tr.v;
@@ -404,7 +404,7 @@
         pathD += `L ${width} ${midY}`;
         const busPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         busPath.setAttribute('d', pathD);
-        busPath.setAttribute('stroke', sig.name.includes('result') ? '#ff3366' : '#00e5ff');
+        busPath.setAttribute('stroke', sig.name.includes('result') ? '#bf2b4c' : '#c2cfc3');
         busPath.setAttribute('stroke-width', '1.5');
         busPath.setAttribute('fill', 'none');
         svg.appendChild(busPath);
@@ -428,7 +428,7 @@
 
         const wavePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wavePath.setAttribute('d', pathD);
-        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#ff3366' : '#00f59b');
+        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#bf2b4c' : '#93a395');
         wavePath.setAttribute('stroke-width', '1.75');
         wavePath.setAttribute('fill', 'none');
         svg.appendChild(wavePath);
@@ -442,7 +442,7 @@
     failLine.setAttribute('y1', 0);
     failLine.setAttribute('x2', failX);
     failLine.setAttribute('y2', totalHeight);
-    failLine.setAttribute('stroke', '#ff3366');
+    failLine.setAttribute('stroke', '#bf2b4c');
     failLine.setAttribute('stroke-width', '2');
     failLine.setAttribute('stroke-dasharray', '4,2');
     svg.appendChild(failLine);
@@ -450,7 +450,7 @@
     const failTag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     failTag.setAttribute('x', failX + 6);
     failTag.setAttribute('y', 36);
-    failTag.setAttribute('fill', '#ff3366');
+    failTag.setAttribute('fill', '#bf2b4c');
     failTag.setAttribute('font-size', '10');
     failTag.setAttribute('font-weight', 'bold');
     failTag.setAttribute('font-family', 'var(--font-mono)');

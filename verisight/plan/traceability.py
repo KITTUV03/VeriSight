@@ -131,7 +131,7 @@ def export_csv(matrix: List[TraceabilityRow], output_path: Path):
 def export_markdown(report: VerificationPlanReport, output_path: Path):
     """Export complete verification plan in Markdown format."""
     cov_db_source = report.coverage_db_source or "Simulator UCDB/vDB Ingest"
-    actual_overall = f"{report.actual_coverage_overall}%" if report.actual_coverage_overall is not None else "92.0%"
+    actual_overall = f"{report.actual_coverage_overall}%" if report.actual_coverage_overall is not None else "N/A (Not Simulated)"
 
     lines = [
         f"# VeriSight Plan — Verification & Architecture Plan",
@@ -154,7 +154,7 @@ def export_markdown(report: VerificationPlanReport, output_path: Path):
 
     for f in report.features:
         act = f"{f.actual_coverage}%" if f.actual_coverage is not None else "N/A"
-        st = f.coverage_status or ("Closed" if f.actual_coverage and f.actual_coverage >= 100 else "In Progress")
+        st = f.coverage_status or "Not Simulated"
         holes_desc = ", ".join([f"`{h['bin_name']}`" for h in f.unhit_bins]) or "None (100% Hit)"
         lines.append(f"| `{f.feature_id}` | {f.title} | **{act}** | {f.target_coverage}% | {st} | {holes_desc} |")
 
@@ -254,7 +254,9 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     total_rows = max(len(report.traceability_matrix), 1)
     closure_pct = round(((cov_cnt + 0.5 * part_cnt) / total_rows) * 100, 1)
 
-    actual_cov_overall = report.actual_coverage_overall if report.actual_coverage_overall is not None else 92.0
+    has_sim_evidence = report.actual_coverage_overall is not None
+    actual_cov_overall_display = f"{report.actual_coverage_overall}%" if has_sim_evidence else "N/A"
+    actual_cov_overall_width = min(100.0, report.actual_coverage_overall) if has_sim_evidence else 0.0
     cov_db_source = report.coverage_db_source or "Simulator UCDB/vDB Ingest (Questa / VCS / Verilator)"
 
     # Detect protocol signature
@@ -278,21 +280,25 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     features_cockpit_json = []
     cockpit_cards = []
     for f in report.features:
-        act_cov = f.actual_coverage if f.actual_coverage is not None else 92.0
+        has_sim_data = f.actual_coverage is not None
+        act_cov = f.actual_coverage if has_sim_data else 0.0
         tgt_cov = f.target_coverage or 100.0
-        deficit = round(max(0.0, tgt_cov - act_cov), 1)
+        deficit = round(max(0.0, tgt_cov - act_cov), 1) if has_sim_data else None
 
         features_cockpit_json.append({
             "feature_id": f.feature_id,
             "title": f.title,
-            "actual_coverage": act_cov,
+            "actual_coverage": f.actual_coverage,
             "target_coverage": tgt_cov,
             "deficit": deficit,
             "unhit_bins": f.unhit_bins or [],
             "directed_stimulus_hint": f.directed_stimulus_hint or "// Directed stimulus sequence ready",
         })
 
-        if act_cov >= 100.0:
+        if not has_sim_data:
+            status_badge = '<span class="pill pill-dashed">NOT SIMULATED</span>'
+            status_sub = "No simulator coverage database supplied for this feature — plan not yet executed"
+        elif act_cov >= 100.0:
             status_badge = '<span class="pill pill-solid">100% CLOSED</span>'
             status_sub = "Coverage Target Fully Satisfied — All simulator bins hit"
         elif act_cov >= 90.0:
@@ -352,10 +358,10 @@ def export_html(report: VerificationPlanReport, output_path: Path):
                 </div>
                 <div class="meter-wrap">
                     <div class="meter-bar">
-                        <div class="meter-fill" style="width: {min(100.0, act_cov)}%;"></div>
+                        <div class="meter-fill" style="width: {min(100.0, act_cov) if has_sim_data else 0}%;"></div>
                     </div>
                     <div class="meter-meta">
-                        <span class="meter-act-val">{act_cov}% Hit</span>
+                        <span class="meter-act-val">{f"{act_cov}% Hit" if has_sim_data else "Not Simulated"}</span>
                         <span class="meter-sub-text">{status_sub}</span>
                         <span class="meter-tgt-val">Target: {tgt_cov}%</span>
                     </div>
@@ -394,7 +400,7 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     feat_rows = []
     for f in report.features:
         prio_lower = (f.priority or "High").lower()
-        rtl_status = f.rtl_cross_check or "VERIFIED IN AST"
+        rtl_status = f.rtl_cross_check or "Not Checked"
         search_blob = f"{f.feature_id} {f.title} {f.category} {f.priority} {f.description}".lower()
         feat_rows.append(f"""
             <tr class="feat-row" id="feat-row-{html.escape(f.feature_id)}" data-cat="{(f.category or '').lower()}" data-prio="{prio_lower}" data-text="{html.escape(search_blob)}">
@@ -1484,9 +1490,9 @@ def export_html(report: VerificationPlanReport, output_path: Path):
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">SIMULATOR COVERAGE</div>
-                <div class="kpi-val">{actual_cov_overall}%</div>
+                <div class="kpi-val">{actual_cov_overall_display}</div>
                 <div class="progress-bar-wrap">
-                    <div class="progress-bar-fill" style="width: {min(100.0, actual_cov_overall)}%;"></div>
+                    <div class="progress-bar-fill" style="width: {actual_cov_overall_width}%;"></div>
                 </div>
                 <div class="kpi-sub">{report.hit_bins}/{report.total_bins} Bins Hit ({report.unhit_bins_count} Holes)</div>
             </div>
@@ -1519,7 +1525,7 @@ def export_html(report: VerificationPlanReport, output_path: Path):
             <div class="cockpit-banner">
                 <div>
                     <span>DATABASE: <strong id="covDbLabel">{html.escape(cov_db_source)}</strong></span>
-                    <span style="margin-left: 14px;">CLOSURE HIT: <strong id="overallCovDisplay">{actual_cov_overall}%</strong> (Target: {report.target_coverage_overall}%)</span>
+                    <span style="margin-left: 14px;">CLOSURE HIT: <strong id="overallCovDisplay">{actual_cov_overall_display}</strong> (Target: {report.target_coverage_overall}%)</span>
                 </div>
                 <div class="header-actions">
                     <span class="counter-label">SIMULATION RUN PRESETS:</span>
@@ -2044,7 +2050,7 @@ def export_html(report: VerificationPlanReport, output_path: Path):
                 document.getElementById('overallCovDisplay').innerText = '68.4%';
             }} else {{
                 document.getElementById('covDbLabel').innerText = '{html.escape(cov_db_source)}';
-                document.getElementById('overallCovDisplay').innerText = '{actual_cov_overall}%';
+                document.getElementById('overallCovDisplay').innerText = '{actual_cov_overall_display}';
             }}
             filterCockpit();
         }}

@@ -14,6 +14,15 @@ Synthesizes production-grade, formal and simulation SVA assertion checkers for:
 - Read-only register access protection and error response (PSLVERR, HRESP)
 - FIFO overflow and underflow protection
 - Counter terminal count and boundary assertions
+
+Standalone utility: this module is a spec-text-only (no RTL required) quick SVA
+synthesizer, kept separate from the main VeriSight Plan pipeline. It is NOT called
+by `VeriSightPlanner`/`planner_orchestrator.py` and its hardcoded protocol signal
+names (e.g. `psel`, `awvalid`) are not grounded against parsed RTL ports. The main
+pipeline's RTL-grounded, anti-hallucination-checked equivalent is
+`verisight/plan/assertion_architect.py` (LLM-first) with
+`verisight/plan/protocol_architect.py` as its deterministic fallback — use those
+for anything that feeds a `VerificationPlanReport`.
 """
 
 import re

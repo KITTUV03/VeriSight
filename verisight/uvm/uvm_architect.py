@@ -77,9 +77,18 @@ class UVMArchitect:
         spec_path: Optional[str] = None,
         design_name: Optional[str] = None,
         output_dir: Optional[str] = None,
+        covergroups: Optional[List[Any]] = None,
     ) -> UVMGenerationResult:
         """
         Generate complete UVM testbench environment for a given RTL and spec.
+
+        Args:
+            covergroups: Optional list of `verisight.plan.schemas.CovergroupDef`
+                already designed by VeriSight Plan's CoverageArchitect from the
+                extracted spec features. When provided, the generated coverage
+                subscriber samples exactly this feature-grounded coverage model
+                (reusing its coverpoints/bins/crosses) instead of synthesizing a
+                second, independent, generic per-port coverage model.
         """
         target_dir = Path(output_dir) if output_dir else self.output_dir
 
@@ -222,7 +231,7 @@ class UVMArchitect:
         generated_files.append(str(sb_path.relative_to(target_dir)))
 
         # I. Functional Coverage Collector (UVM Subscriber)
-        cov_code = self._gen_coverage(clean_design, input_ports, output_ports, clk_name, rst_name, proto)
+        cov_code = self._gen_coverage(clean_design, input_ports, output_ports, clk_name, rst_name, proto, covergroups)
         cov_path = target_dir / "verif" / f"{clean_design}_coverage.sv"
         with open(cov_path, "w", encoding="utf-8") as f:
             f.write(cov_code)
@@ -823,7 +832,12 @@ endclass : {design}_scoreboard
         clk: str,
         rst: str,
         proto: str,
+        covergroups: Optional[List[Any]] = None,
     ) -> str:
+        if covergroups:
+            seq_item_fields = {p["name"] for p in inputs} | {p["name"] for p in outputs}
+            return self._gen_coverage_from_plan(design, covergroups, seq_item_fields)
+
         # Build coverpoints for all inputs and outputs
         cp_lines = []
         for p in inputs:
@@ -871,6 +885,113 @@ class {design}_coverage extends uvm_subscriber #({design}_seq_item);
   virtual function void write({design}_seq_item t);
     this.t = t;
     cg_{design}_functional.sample();
+  endfunction : write
+
+endclass : {design}_coverage
+
+`endif // {design.upper()}_COVERAGE_SV
+"""
+
+    def _gen_coverage_from_plan(
+        self,
+        design: str,
+        covergroups: List[Any],
+        seq_item_fields: set,
+    ) -> str:
+        """
+        Build the UVM coverage subscriber's covergroups directly from the
+        feature-grounded `CovergroupDef` list already designed by VeriSight
+        Plan's CoverageArchitect, instead of synthesizing a second, independent
+        generic per-port coverage model. Each coverpoint's RTL-grounded
+        target_signal expression is rewritten to sample the corresponding
+        `t.<field>` on the UVM sequence item transaction.
+        """
+        from verisight.plan.coverage_architect import estimate_and_filter_crosses, _sanitize_sv_id as _san
+
+        def _to_txn_expr(expr: str) -> str:
+            return re.sub(
+                r"[a-zA-Z_][a-zA-Z0-9_]*",
+                lambda m: f"t.{m.group(0)}" if m.group(0) in seq_item_fields else m.group(0),
+                expr.strip(),
+            )
+
+        cg_decls: List[str] = []
+        cg_ids: List[str] = []
+        for cg in covergroups:
+            cg_id = _san(cg.group_name)
+            if cg_id in cg_ids:
+                cg_id = f"{cg_id}_{len(cg_ids)}"
+            cg_ids.append(cg_id)
+
+            cp_blocks = []
+            seen_cp: set = set()
+            for cp in cg.coverpoints:
+                cp_id = _san(cp.name)
+                if cp_id in seen_cp:
+                    cp_id = f"{cp_id}_{_san(cp.coverage_id)}"
+                seen_cp.add(cp_id)
+
+                sampled_expr = _to_txn_expr(cp.target_signal)
+
+                if cp.bins:
+                    seen_bins: set = set()
+                    bin_lines = []
+                    for b in cp.bins:
+                        b_id = _san(b.bin_name)
+                        if b_id in seen_bins:
+                            b_id = f"{b_id}_{len(seen_bins)}"
+                        seen_bins.add(b_id)
+                        bin_lines.append(f"      {b.bin_type} {b_id} = {b.condition};")
+                else:
+                    bin_lines = ["      bins all_values[] = default;"]
+
+                cp_blocks.append(
+                    f"    // [{cp.coverage_id}] {cp.description}\n"
+                    f"    {cp_id}: coverpoint {sampled_expr} {{\n" + "\n".join(bin_lines) + "\n    }"
+                )
+
+            safe_crosses, skip_notes = estimate_and_filter_crosses(cg)
+            cross_lines = [f"    {n}" for n in skip_notes] + [f"    {c};" for c in safe_crosses]
+
+            cg_decls.append(
+                f"  // Covergroup: {cg_id} — {cg.description}\n"
+                f"  // Sampled explicitly from write() below; no clocking event (transaction-based, not signal-level).\n"
+                f"  covergroup {cg_id};\n"
+                f"    option.per_instance = 1;\n"
+                f"    option.name = \"{cg_id}\";\n\n"
+                + "\n\n".join(cp_blocks)
+                + ("\n\n" + "\n".join(cross_lines) if cross_lines else "")
+                + f"\n  endgroup : {cg_id}"
+            )
+
+        new_body = "\n".join(f"    {cg_id} = new();" for cg_id in cg_ids)
+        sample_body = "\n".join(f"    {cg_id}.sample();" for cg_id in cg_ids)
+
+        return f"""// ===========================================================================
+// VeriSight UVM Architect — Functional Coverage Collector (UVM Subscriber)
+// Target: {design}
+// Grounded directly in the VeriSight Plan coverage model ({len(covergroups)}
+// covergroup(s)) designed by CoverageArchitect from the extracted spec
+// features — not a second, independently-designed coverage model.
+// ===========================================================================
+`ifndef {design.upper()}_COVERAGE_SV
+`define {design.upper()}_COVERAGE_SV
+
+class {design}_coverage extends uvm_subscriber #({design}_seq_item);
+  `uvm_component_utils({design}_coverage)
+
+  {design}_seq_item t;
+
+{chr(10).join(cg_decls)}
+
+  function new(string name = "{design}_coverage", uvm_component parent = null);
+    super.new(name, parent);
+{new_body}
+  endfunction : new
+
+  virtual function void write({design}_seq_item t);
+    this.t = t;
+{sample_body}
   endfunction : write
 
 endclass : {design}_coverage

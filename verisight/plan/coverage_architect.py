@@ -37,6 +37,12 @@ CRITICAL RULES:
 6. Return a valid JSON object matching the requested schema.
 """
 
+# Safety threshold for the estimated Cartesian-product bin count of a `cross`.
+# Crosses estimated above this are not emitted raw — they are skipped with a
+# logged/commented explanation rather than silently generating an unreviewable
+# combinatorial explosion of bins.
+MAX_CROSS_BIN_ESTIMATE = 500
+
 SV_KEYWORDS = {
     "clk", "rst_n", "rst", "posedge", "negedge", "disable", "iff", "property",
     "endproperty", "assert", "cover", "assume", "default", "clocking", "endclocking",
@@ -67,6 +73,72 @@ def _sanitize_sv_id(s: str) -> str:
     if cleaned[0].isdigit():
         cleaned = f"sig_{cleaned}"
     return cleaned
+
+
+def estimate_and_filter_crosses(cg: CovergroupDef) -> "tuple[List[str], List[str]]":
+    """
+    Estimate the Cartesian-product bin count of each declared cross before
+    emitting it, using the real bin counts of the coverpoints it references
+    (a coverpoint with no explicit bins collapses to a single `default` bin,
+    per generate_sv_code). Crosses referencing no resolvable coverpoint, or
+    whose estimated size exceeds MAX_CROSS_BIN_ESTIMATE, are not emitted raw;
+    a comment explaining why is emitted in their place instead.
+
+    Standalone module-level function (not a CoverageArchitect method) so other
+    SystemVerilog generators — e.g. UVMArchitect's coverage subscriber — can
+    reuse the same safety check instead of re-implementing it.
+
+    Returns (valid_cross_statements, skip_comments).
+    """
+    cp_bin_counts: Dict[str, int] = {}
+    for cp in cg.coverpoints:
+        cp_bin_counts[_sanitize_sv_id(cp.name)] = max(1, len(cp.bins))
+
+    valid: List[str] = []
+    comments: List[str] = []
+    for cr in cg.crosses:
+        cleaned = cr.strip().rstrip(";")
+        m = re.search(r"\bcross\b", cleaned, flags=re.IGNORECASE)
+        body = cleaned[m.end():] if m else cleaned
+
+        # Split on top-level commas only (not commas inside binsof(...) parens).
+        raw_terms = re.split(r",(?![^(]*\))", body)
+        referenced: List[str] = []
+        for term in raw_terms:
+            for ident in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", term):
+                if ident in cp_bin_counts and ident not in referenced:
+                    referenced.append(ident)
+                    break
+
+        if len(referenced) < 2:
+            comments.append(
+                f"// [SKIPPED] Cross '{cleaned}' references fewer than 2 resolvable "
+                f"coverpoints in this covergroup — not emitted."
+            )
+            continue
+
+        est_size = 1
+        for r in referenced:
+            est_size *= cp_bin_counts[r]
+
+        if est_size > MAX_CROSS_BIN_ESTIMATE:
+            dims = " x ".join(f"{r}({cp_bin_counts[r]})" for r in referenced)
+            logger.warning(
+                f"Skipping cross in '{cg.group_name}': '{cleaned}' estimated at "
+                f"{est_size} bin combinations [{dims}], exceeds the "
+                f"{MAX_CROSS_BIN_ESTIMATE}-bin safety threshold."
+            )
+            comments.append(
+                f"// [SKIPPED] Cross '{cleaned}' estimated at {est_size} bin "
+                f"combinations [{dims}] exceeds the {MAX_CROSS_BIN_ESTIMATE}-bin "
+                f"safety threshold. Use selective bins (binsof ... intersect {{...}}) "
+                f"or a narrower cross instead of the full Cartesian product."
+            )
+            continue
+
+        valid.append(cleaned)
+
+    return valid, comments
 
 
 class CoverageArchitect(BaseAgent):
@@ -353,8 +425,10 @@ Requirements:
                 lines.append(f"    }}")
                 lines.append("")
 
-            for cr in cg.crosses:
-                cleaned_cr = cr.strip().rstrip(";")
+            safe_crosses, skipped_notes = estimate_and_filter_crosses(cg)
+            for note in skipped_notes:
+                lines.append(f"    {note}")
+            for cleaned_cr in safe_crosses:
                 lines.append(f"    {cleaned_cr};")
 
             lines.append(f"  endgroup : {cg_id}")

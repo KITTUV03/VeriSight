@@ -70,6 +70,7 @@ class VeriSightPlanner:
         rtl_path: Optional[str] = None,
         design_name: Optional[str] = None,
         coverage_path: Optional[str] = None,
+        generate_uvm: bool = False,
     ) -> VerificationPlanReport:
         """
         Execute full autonomous verification planning pipeline.
@@ -78,6 +79,10 @@ class VeriSightPlanner:
             spec_path: Path to specification document (.md, .txt).
             rtl_path: Optional path to RTL file or directory (.sv, .v).
             design_name: Optional design name (inferred from path if omitted).
+            generate_uvm: If True, also generate a full UVM testbench environment
+                (verisight.uvm.UVMArchitect) whose coverage subscriber reuses this
+                plan's own covergroups instead of a second, independent model.
+                Off by default to preserve existing behavior/outputs.
 
         Returns:
             VerificationPlanReport object.
@@ -234,6 +239,25 @@ class VeriSightPlanner:
 
         total_cov_points = sum(len(cg.coverpoints) for cg in covergroups)
 
+        # 6b. Optional UVM Testbench Environment Generation
+        # Reuses this plan's own covergroups (grounded in extracted features) for
+        # the UVM coverage subscriber instead of synthesizing a second, independent
+        # coverage model.
+        uvm_result = None
+        if generate_uvm:
+            logger.info("Generating UVM testbench environment (reusing this plan's coverage model)...")
+            try:
+                from verisight.uvm.uvm_architect import UVMArchitect
+                uvm_result = UVMArchitect(output_dir=str(self.output_dir / "uvm")).generate(
+                    rtl_path=rtl_path,
+                    spec_path=spec_path,
+                    design_name=design_name,
+                    covergroups=covergroups,
+                )
+                logger.info(f"UVM environment generated in {uvm_result.output_dir} ({len(uvm_result.files_generated)} files).")
+            except Exception as e:
+                logger.warning(f"UVM environment generation failed: {e}")
+
         report = VerificationPlanReport(
             plan_id=str(uuid.uuid4())[:8],
             design_name=design_name,
@@ -256,6 +280,11 @@ class VeriSightPlanner:
             sv_coverage_syntax_ok=cov_syntax_ok,
             sv_assertions_syntax_ok=sva_syntax_ok,
             sv_validation_notes=val_notes,
+            uvm_generated=uvm_result is not None,
+            uvm_output_dir=uvm_result.output_dir if uvm_result else None,
+            uvm_files_generated=uvm_result.files_generated if uvm_result else [],
+            uvm_syntax_ok=uvm_result.syntax_clean if uvm_result else None,
+            uvm_protocol_detected=uvm_result.protocol_detected if uvm_result else None,
         )
 
         # 7. Dynamic Coverage Closure Ingestion (Planned vs. Actual UCDB/vDB)
