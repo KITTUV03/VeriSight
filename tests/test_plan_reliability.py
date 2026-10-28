@@ -176,6 +176,31 @@ class TestPlanReliability(unittest.TestCase):
                 self.assertTrue(cov_file.exists())
                 self.assertTrue(sva_file.exists())
 
+    def test_planner_orchestrator_spec_only_no_rtl(self):
+        """Verify VeriSightPlanner execution when RTL is omitted (pure spec-driven mode)."""
+        from unittest.mock import patch
+        from verisight.agents.base_agent import BaseAgent
+
+        spec_path = "examples/specs/alu_spec.md"
+        with patch.object(BaseAgent, "reason", side_effect=RuntimeError("Offline test fallback")):
+            with tempfile.TemporaryDirectory() as td:
+                planner = VeriSightPlanner(output_dir=td)
+                # rtl_path is explicitly None: must not auto-discover or bind to any RTL
+                report = planner.run(spec_path=spec_path, rtl_path=None, design_name="ALU_SPEC_ONLY")
+
+                self.assertIsNone(report.rtl_source)
+                self.assertGreater(report.total_features, 0)
+                self.assertGreaterEqual(report.total_tests, 50)
+                self.assertGreater(report.total_coverage_points, 10)
+                self.assertGreater(report.total_assertions, 5)
+                self.assertTrue(report.sv_coverage_syntax_ok)
+                self.assertTrue(report.sv_assertions_syntax_ok)
+
+                cov_file = Path(td) / "coverage_model.sv"
+                sva_file = Path(td) / "dut_assertions.sv"
+                self.assertTrue(cov_file.exists())
+                self.assertTrue(sva_file.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

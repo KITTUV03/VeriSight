@@ -471,7 +471,7 @@ def _prompt_path(
         prompt_str = f"[bold white]{prompt_text}[/bold white] {req_label}"
         val = Prompt.ask(prompt_str, default=default).strip()
 
-        if not val:
+        if not val or (not required and val.lower() in ("none", "skip", "no", "n", "empty")):
             if required and not allow_empty:
                 console.print("[red]This input is required.[/red]")
                 continue
@@ -574,17 +574,19 @@ def run_plan_flow(
         spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default=default_spec)
     if not rtl_path:
         default_rtl = ""
+        detected_rtl = None
         if spec_path:
             sp = Path(spec_path)
             for cd in [sp.parent.parent / "rtl", sp.parent / "rtl"]:
                 if cd.exists() and cd.is_dir():
                     rtl_cands = list(cd.glob("*.sv")) + list(cd.glob("*.v"))
                     if rtl_cands:
-                        default_rtl = str(rtl_cands[0])
+                        detected_rtl = str(rtl_cands[0])
                         break
-        if not default_rtl and Path("examples/rtl/alu.sv").exists():
-            default_rtl = "examples/rtl/alu.sv"
-        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
+        if detected_rtl:
+            console.print(f"  [dim]Tip: Adjacent project RTL found at[/dim] [cyan]{detected_rtl}[/cyan] [dim](press Enter to skip for Spec-Driven Planning)[/dim]")
+        # RTL is strictly optional: default is empty string so pressing Enter skips without selecting any default RTL
+        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
     if coverage_path is None:
         coverage_path = _prompt_path("Simulator Coverage Database / Report (optional .ucdb, .vdb, .txt, .json)", required=False, default="")
     if not output_dir:
@@ -601,7 +603,7 @@ def run_plan_flow(
     summary_table.add_column("Configured Target", style="white", width=54)
 
     summary_table.add_row("Design Specification", str(spec_path) if spec_path else "[dim]None[/dim]")
-    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[dim]Inferred / Optional[/dim]")
+    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[bold green]None (Spec-Driven Planning)[/bold green]")
     summary_table.add_row("Coverage Database", str(coverage_path) if coverage_path else "[dim]None (Cold-start Plan)[/dim]")
     summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
     summary_table.add_row("Output Directory", output_dir)
@@ -655,6 +657,12 @@ def run_plan_flow(
 
     scorecard.add_row("Synthesis Status", "[bold green]✓ Verification Plan Generated[/bold green]")
     scorecard.add_row("Target Design", f"[bold white]{report.design_name.upper()}[/bold white]")
+    scorecard.add_row(
+        "Planning Mode",
+        "[bold green]Spec-Driven (Pure Specification Grounding)[/bold green]"
+        if not report.rtl_source
+        else f"[cyan]Specification + RTL Co-Design ({Path(report.rtl_source).name})[/cyan]",
+    )
     scorecard.add_row("Decomposed Features", f"[bold green]{report.total_features}[/bold green] functional features")
     scorecard.add_row("Defined Test Scenarios", f"[bold green]{report.total_tests}[/bold green] test scenarios")
     scorecard.add_row("Coverage Points", f"[bold green]{report.total_coverage_points}[/bold green] covergroups & bins")
@@ -737,8 +745,6 @@ def run_debug_flow(
                     if r_files:
                         default_rtl = str(r_files[0])
                         break
-        if not default_rtl and Path("examples/rtl/alu.sv").exists():
-            default_rtl = "examples/rtl/alu.sv"
         rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
 
     if not tb_path:
@@ -751,8 +757,6 @@ def run_debug_flow(
                     if t_files:
                         default_tb = str(t_files[0])
                         break
-        if not default_tb and Path("examples/tb/alu_tb.sv").exists():
-            default_tb = "examples/tb/alu_tb.sv"
         tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default=default_tb)
 
     if not spec_path:
@@ -765,8 +769,6 @@ def run_debug_flow(
                     if s_files:
                         default_spec = str(s_files[0])
                         break
-        if not default_spec and Path("examples/specs/alu_spec.md").exists():
-            default_spec = "examples/specs/alu_spec.md"
         spec_path = _prompt_path("Design Specification document (.md)", required=False, default=default_spec)
 
     if not output_dir:
