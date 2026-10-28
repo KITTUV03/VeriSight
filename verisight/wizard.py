@@ -88,23 +88,34 @@ def _open_html_in_browser(html_path: Path) -> bool:
 
 def _print_welcome_banner():
     """Print the interactive wizard welcome banner."""
-    banner_content = (
-        "[bold cyan]⚡ V E R I S I G H T[/bold cyan]  [dim]•[/dim]  [bold white]AUTONOMOUS ASIC & SOC VERIFICATION[/bold white]\n"
-        "[dim cyan]Tri-Engine Architecture: Diagnostic Debug • Plan Synthesis • UVM Architecture[/dim cyan]\n"
-        "[dim]Enterprise-grade multi-agent reasoning, deep AST inspection & protocol compliance[/dim]"
+    badges = (
+        "[bold black on #00E5FF] AUTONOMOUS ASIC/SOC [/] "
+        "[bold black on #00E676] UVM 1.2 VIP [/] "
+        "[bold black on #E040FB] MULTI-AGENT RCA [/] "
+        "[bold black on #FFD600] IEEE 1800 PYSLANG [/]"
     )
+    tagline = (
+        "[bold white]Enterprise-Grade AI Architecture for ASIC / SoC Design Verification[/bold white]\n"
+        "[dim]Cycle-accurate simulation triage, specification-driven test planning, and production UVM environments.[/dim]"
+    )
+    status_line = (
+        "[dim]Protocols:[/] [bold cyan]AMBA (AXI/AHB/APB)[/] [dim]•[/dim] [bold cyan]PCIe[/] [dim]•[/dim] [bold cyan]CHI[/] [dim]•[/dim] [bold cyan]DDR[/] [dim]•[/dim] [bold cyan]I2C[/] [dim]•[/dim] [bold cyan]SPI[/]   "
+        "[dim]Frontend:[/] [bold green]pyslang clean[/bold green]   "
+        "[dim]Status:[/] [bold green]● Active[/bold green]"
+    )
+    banner_content = f"{badges}\n\n{tagline}\n\n{status_line}"
     console.print()
     console.print(
         Panel(
             banner_content,
             box=box.ROUNDED,
-            border_style="cyan",
-            expand=False,
+            border_style="bold cyan",
             padding=(1, 3),
-            title="[bold cyan] VERISIGHT CORE ENGINE [/bold cyan]",
+            title="[bold white]⚡  [bold cyan]V E R I S I G H T[/bold cyan]  [dim]•[/dim]  [bold yellow]INTELLIGENT VERIFICATION PLATFORM[/bold yellow]  ⚡[/bold white]",
             title_align="center",
-            subtitle="[dim]v1.2.0 Enterprise Edition[/dim]",
+            subtitle="[dim]v1.3.0 Enterprise Architecture • Sovereign Air-Gap Ready[/dim]",
             subtitle_align="right",
+            expand=True,
         )
     )
     console.print()
@@ -1273,66 +1284,158 @@ def run_spec_driven_tb_flow(
 
 
 def run_wizard():
-    """Execute the unified interactive guided setup wizard."""
+    """Execute the unified interactive guided setup wizard with modern colorful boxes."""
     try:
         _print_welcome_banner()
 
-        table = Table(
-            title="[bold cyan]Step 1: Select Autonomous Verification Engine[/bold cyan]",
+        console.print("[bold cyan]Step 1: Select Autonomous Verification Engine[/bold cyan]\n")
+
+        cards_data = [
+            {
+                "opt": "1",
+                "title": "🛠️  VeriSight Debug",
+                "tag": "RCA & FIX",
+                "desc": "Autonomous RCA & Failure Localization",
+                "features": "• Log Windowing • VCD Trace • Safe Patch",
+                "color": "#FF5370",
+                "border": "bold #FF5370",
+                "badge_style": "bold black on #FF8A80",
+            },
+            {
+                "opt": "2",
+                "title": "📋 VeriSight Plan",
+                "tag": "PLAN & SVA",
+                "desc": "Test Planning, Coverage Models & SVA",
+                "features": "• 50+ Test Cases • Covergroups • SVA",
+                "color": "#00E5FF",
+                "border": "bold #00E5FF",
+                "badge_style": "bold black on #80D8FF",
+            },
+            {
+                "opt": "3",
+                "title": "🏗️  XcelUVM Architect",
+                "tag": "VIP SUITE",
+                "desc": "Production UVM 1.2 Testbench Synthesis",
+                "features": "• Full VIP Suite • Agents & Scoreboards",
+                "color": "#FFB300",
+                "border": "bold #FFB300",
+                "badge_style": "bold black on #FFE082",
+            },
+            {
+                "opt": "4",
+                "title": "🎯 VeriSight TestBench",
+                "tag": "SPEC-DRIVEN",
+                "desc": "Spec-Driven UVM Synthesis with Ref Model",
+                "features": "• Spec-as-Truth • Golden Ref Model • Audit",
+                "color": "#E040FB",
+                "border": "bold #E040FB",
+                "badge_style": "bold black on #EA80FC",
+            },
+        ]
+
+        panels = []
+        for item in cards_data:
+            content = (
+                f"[bold white]{item['desc']}[/bold white]\n"
+                f"[{item['color']}]{item['features']}[/{item['color']}]"
+            )
+            title_text = f"[{item['border']}][{item['opt']}][/] [bold white]{item['title']}[/bold white]"
+            p = Panel(
+                content,
+                title=title_text,
+                title_align="left",
+                subtitle=f"[{item['badge_style']}] {item['tag']} [/]",
+                subtitle_align="right",
+                border_style=item["border"],
+                box=box.ROUNDED,
+                padding=(0, 1),
+                expand=True,
+            )
+            panels.append(p)
+
+        exit_panel = Panel(
+            "[white]Quit VeriSight Interactive Launcher[/white]\n[dim]Clean terminal session exit[/dim]",
+            title="[bold grey70][5][/bold grey70] [bold white]🚪 Exit[/bold white]",
+            title_align="left",
+            subtitle="[bold black on #B0BEC5] SYSTEM [/]",
+            subtitle_align="right",
+            border_style="grey58",
             box=box.ROUNDED,
-            header_style="bold cyan",
-            show_lines=True,
-        )
-        table.add_column("Opt", justify="center", style="bold yellow", width=5)
-        table.add_column("Autonomous Engine", style="bold white", width=25)
-        table.add_column("Primary Verification Capability", style="white")
-
-        table.add_row(
-            "1",
-            "🛠️  VeriSight Debug",
-            "Autonomous Root-Cause Analysis, Failure Localization & Code Patching",
-        )
-        table.add_row(
-            "2",
-            "📋 VeriSight Plan",
-            "Test Plan Generation, Protocol Coverage Models & SVA Assertion Suites",
-        )
-        table.add_row(
-            "3",
-            "🏗️  XcelUVM Architect",
-            "Autonomous Full Production UVM 1.2 Testbench Environment Synthesis",
-        )
-        table.add_row(
-            "4",
-            "🎯 VeriSight TestBench",
-            "Spec-Driven UVM Testbench Synthesis with Specification-Grounded Reference Models",
-        )
-        table.add_row(
-            "5",
-            "🚪 Exit",
-            "Quit VeriSight Launcher",
+            padding=(0, 1),
+            expand=True,
         )
 
-        console.print(table)
+        info_panel = Panel(
+            "[white]Web Cockpit & Cloud Integration[/white]\n"
+            "[dim]• Web: [bold cyan]./start serve[/bold cyan]  • Cloud: [bold cyan]./start edaplay[/bold cyan][/dim]",
+            title="[bold cyan]⚡ QUICK UTILITIES[/bold cyan]",
+            title_align="left",
+            subtitle="[bold black on #80DEEA] TOOLS [/]",
+            subtitle_align="right",
+            border_style="dim cyan",
+            box=box.ROUNDED,
+            padding=(0, 1),
+            expand=True,
+        )
+
+        if console.width >= 75:
+            grid = Table.grid(expand=True, padding=(0, 1))
+            grid.add_column(ratio=1)
+            grid.add_column(ratio=1)
+            grid.add_row(panels[0], panels[1])
+            grid.add_row(panels[2], panels[3])
+            grid.add_row(exit_panel, info_panel)
+            console.print(grid)
+        else:
+            for p in panels:
+                console.print(p)
+            console.print(exit_panel)
+            console.print(info_panel)
+
         console.print()
 
-        workflow = Prompt.ask(
-            "[bold cyan]Select an option[/bold cyan]",
-            choices=["1", "2", "3", "4", "5"],
+        workflow_choice = Prompt.ask(
+            "[bold white]Select an engine[/bold white] "
+            "[[bold #FF5370]1:Debug[/bold #FF5370] • "
+            "[bold #00E5FF]2:Plan[/bold #00E5FF] • "
+            "[bold #FFB300]3:XcelUVM[/bold #FFB300] • "
+            "[bold #E040FB]4:TestBench[/bold #E040FB] • "
+            "[dim]5:Exit[/dim]]",
+            choices=["1", "2", "3", "4", "5", "debug", "plan", "xcel", "tb", "testbench", "exit", "q", "quit"],
             default="1",
-        )
+        ).strip().lower()
+
+        alias_map = {
+            "debug": "1",
+            "plan": "2",
+            "xcel": "3",
+            "xceluvm": "3",
+            "tb": "4",
+            "testbench": "4",
+            "exit": "5",
+            "q": "5",
+            "quit": "5",
+        }
+        workflow = alias_map.get(workflow_choice, workflow_choice)
 
         if workflow == "5":
-            console.print("\n[dim]Exiting VeriSight. Goodbye![/dim]\n")
+            console.print("\n[dim]👋 Exiting VeriSight. Have a productive verification session![/dim]\n")
             sys.exit(0)
 
         if workflow == "4":
+            console.print("\n[bold #E040FB]🎯 Activating VeriSight TestBench — Spec-Driven UVM Synthesis Engine...[/bold #E040FB]")
             run_spec_driven_tb_flow()
             return
 
         if workflow == "3":
+            console.print("\n[bold #FFB300]🏗️  Activating XcelUVM Architect VIP Generator...[/bold #FFB300]")
             run_uvm_flow()
             return
+
+        if workflow == "1":
+            console.print("\n[bold #FF5370]⚡ Activating VeriSight Debug Triage & RCA Engine...[/bold #FF5370]")
+        elif workflow == "2":
+            console.print("\n[bold #00E5FF]📋 Activating VeriSight Plan Architect...[/bold #00E5FF]")
 
         console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
         provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
