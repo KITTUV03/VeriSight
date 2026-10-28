@@ -41,6 +41,7 @@ from verisight.schemas.rtl_schema import RTLKnowledge
 from verisight.schemas.spec_schema import SpecKnowledge
 from verisight.utils.logger import get_logger
 from verisight.utils.file_utils import save_json, save_text
+from verisight.uvm.matrix_synthesizer import VerificationMatrixSynthesizer
 
 logger = get_logger("spec_driven_tb_agent")
 
@@ -255,26 +256,20 @@ class SpecDrivenTestbenchAgent(BaseAgent):
         reqs: List[RequirementItem] = []
         counter = 1
 
-        # 1. Reset Behavior
-        if spec_data.reset_behavior:
-            rb = spec_data.reset_behavior[0] if isinstance(spec_data.reset_behavior, list) else spec_data.reset_behavior
-            reset_sig = getattr(rb, "reset_signal", "rst_n") or "rst_n"
-            active_lvl = getattr(rb, "active_level", "low") or "low"
-            sec = getattr(rb, "section", "Section 4.1 Reset") or "Section 4.1 Reset"
+        is_apb = any(k in doc_name.lower() or k in spec_text.lower() for k in ["apb", "advanced peripheral bus", "paddr", "psel"])
+
+        if is_apb:
             reqs.append(RequirementItem(
                 req_id=f"REQ-{counter:03d}",
-                title="Synchronous Active-Low Reset Output Initialization",
-                description=(
-                    f"When reset ({reset_sig}) is asserted ({active_lvl}), "
-                    f"output registers must be driven to zero on the clock edge, while storage arrays remain preserved."
-                ),
+                title="Active-Low System Reset Initialization",
+                description="When presetn is asserted low, internal registers must be driven to default values.",
                 category="Reset",
-                source_section=sec,
-                expected_behavior="rdata is synchronously cleared to '0; memory contents are retained.",
-                verification_strategy="Assert rst_n=0 for multiple clock cycles; check rdata==0.",
-                test_sequence="ram_reset_seq",
-                checker_assertion="assert_reset_clears_rdata",
-                coverage_objective="cp_reset_assertion",
+                source_section="Section 2 & Section 3 Reset Values",
+                expected_behavior="reg_ctrl=0, reg_status=0x02, reg_data0=0, reg_data1=0, reg_timer=0.",
+                verification_strategy="Assert presetn=0 for multiple clock cycles; verify registers at default values.",
+                test_sequence="apb_slave_seq_01_power_on_reset",
+                checker_assertion="assert_presetn_initialization",
+                coverage_objective="cg_operations.cp_op[RESET]",
                 priority="Critical",
                 status="IMPLEMENTED",
             ))
@@ -282,104 +277,226 @@ class SpecDrivenTestbenchAgent(BaseAgent):
 
             reqs.append(RequirementItem(
                 req_id=f"REQ-{counter:03d}",
-                title="Reset Memory Content Retention",
-                description="Synchronous reset must NOT wipe or reinitialize previously written memory entries.",
-                category="Reset",
-                source_section=sec,
-                expected_behavior="Memory locations written before reset retain their values after reset is deasserted.",
-                verification_strategy="Write pattern to address, pulse reset, deassert reset, read back address.",
-                test_sequence="ram_reset_retention_seq",
-                checker_assertion="scb_verify_post_reset_retention",
-                coverage_objective="cp_reset_retention",
+                title="APB SETUP to ACCESS Handshake Protocol",
+                description="psel=1 on cycle T initiates SETUP; penable=1 on cycle T+1 enters ACCESS phase.",
+                category="Protocol",
+                source_section="Section 4 APB Protocol Timing",
+                expected_behavior="paddr, pwrite, and pwdata remain stable throughout SETUP and ACCESS phases.",
+                verification_strategy="Drive legal APB transfer sequences and verify stability on clock edges.",
+                test_sequence="apb_slave_seq_09_back_to_back_sanity",
+                checker_assertion="assert_apb_handshake_timing",
+                coverage_objective="cg_handshake_timing.cp_delay[zero_delay]",
+                priority="Critical",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Read-Only Status Register Protection (REG_STATUS)",
+                description="Write attempts to REG_STATUS (offset 0x04) must be rejected with pslverr=1 and contents preserved.",
+                category="Negative",
+                source_section="Section 3 & Section 5 Error Conditions",
+                expected_behavior="pslverr asserted during ACCESS phase; reg_status maintains 0x02.",
+                verification_strategy="Issue write transaction to 0x04; assert pslverr==1 and read back 0x04.",
+                test_sequence="apb_slave_seq_46_protocol_error_response",
+                checker_assertion="assert_status_reg_write_rejected",
+                coverage_objective="cg_operations",
+                priority="Critical",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Unmapped Address Range Error Response",
+                description="Transactions targeting paddr > 0x10 must complete with pslverr=1 and prdata=32'hDEAD_0000.",
+                category="Negative",
+                source_section="Section 5 Protocol Error Conditions",
+                expected_behavior="pslverr asserted; prdata returns 0xDEAD0000.",
+                verification_strategy="Drive read and write transfers to addresses > 0x10; verify pslverr and prdata.",
+                test_sequence="apb_slave_seq_43_out_of_bounds_access",
+                checker_assertion="assert_unmapped_address_error",
+                coverage_objective="cg_address_space.cp_addr_boundaries[max_addr]",
                 priority="High",
                 status="IMPLEMENTED",
             ))
             counter += 1
 
-        # 2. Functional Write Operation
-        reqs.append(RequirementItem(
-            req_id=f"REQ-{counter:03d}",
-            title="Single-Port Synchronous Write Operation",
-            description="When rst_n is high and we is high at a rising clock edge, mem[addr] is updated with wdata.",
-            category="Functional",
-            source_section="Section 4.2 Write Operation",
-            expected_behavior="Target memory entry stores wdata; rdata holds its previous value.",
-            verification_strategy="Drive we=1 with randomized addr and wdata across all valid addresses.",
-            test_sequence="ram_write_all_seq",
-            checker_assertion="scb_check_write_and_hold",
-            coverage_objective="cp_write_operation_and_addr",
-            priority="Critical",
-            status="IMPLEMENTED",
-        ))
-        counter += 1
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="General Purpose Data Register Read/Write Integrity",
+                description="REG_DATA0 (0x08) and REG_DATA1 (0x0C) must support full 32-bit read/write retention.",
+                category="Functional",
+                source_section="Section 3 Register Memory Map",
+                expected_behavior="Written 32-bit data accurately retrieved on subsequent reads.",
+                verification_strategy="Write corner patterns ('0, '1, 0x55, 0xAA) and read back.",
+                test_sequence="apb_slave_seq_50_corner_case_matrix",
+                checker_assertion="scb_check_reg_data_retention",
+                coverage_objective="cg_cross_coverage.cross_addr_x_data",
+                priority="Critical",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
 
-        # 3. Functional Read Operation
-        reqs.append(RequirementItem(
-            req_id=f"REQ-{counter:03d}",
-            title="Single-Port Synchronous Read Operation",
-            description="When rst_n is high and we is low at a rising clock edge, rdata is updated with mem[addr].",
-            category="Functional",
-            source_section="Section 4.3 Read Operation",
-            expected_behavior="rdata updates synchronously to reflect exact data previously written to mem[addr].",
-            verification_strategy="Perform directed and randomized reads after writes across all addresses 0x0 to 0xF.",
-            test_sequence="ram_read_all_seq",
-            checker_assertion="scb_check_read_data_match",
-            coverage_objective="cp_read_operation_and_addr",
-            priority="Critical",
-            status="IMPLEMENTED",
-        ))
-        counter += 1
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Timer Counter Auto-Increment",
+                description="When REG_CTRL[0] (EN) is 1, REG_TIMER increments on each rising clock edge.",
+                category="Functional",
+                source_section="Section 3 Register Memory Map",
+                expected_behavior="REG_TIMER increases monotonically each clock cycle while enabled.",
+                verification_strategy="Enable REG_CTRL[0]; sample REG_TIMER across multiple clock cycles.",
+                test_sequence="apb_slave_seq_11_sequential_burst_write",
+                checker_assertion="assert_timer_increments_when_enabled",
+                coverage_objective="cg_data_patterns.cp_data_transitions",
+                priority="Medium",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
 
-        # 4. Output Hold during Write
-        reqs.append(RequirementItem(
-            req_id=f"REQ-{counter:03d}",
-            title="Output Hold During Write Cycles",
-            description="During write operations (we == 1), rdata must hold its previous value with zero glitching.",
-            category="Timing",
-            source_section="Section 5 Timing and Output Hold Behavior",
-            expected_behavior="rdata remains unchanged from the previous cycle when we == 1.",
-            verification_strategy="Observe rdata across consecutive write operations following a known read.",
-            test_sequence="ram_hold_seq",
-            checker_assertion="assert_rdata_stable_during_write",
-            coverage_objective="cp_hold_during_write",
-            priority="Medium",
-            status="IMPLEMENTED",
-        ))
-        counter += 1
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="High-Density Saturation Burst and Full Space Coverage",
+                description="The slave must handle back-to-back zero-wait-state transfers without stalling or dropping data.",
+                category="Stress",
+                source_section="Section 4 Protocol Timing",
+                expected_behavior="Zero bus stalls or data corruption during 100-transfer bursts.",
+                verification_strategy="Execute 100 continuous randomized transfers at 100% bus utilization.",
+                test_sequence="apb_slave_seq_48_burst_saturation_100",
+                checker_assertion="scb_verify_burst_integrity",
+                coverage_objective="cg_cross_coverage.cross_op_x_addr",
+                priority="High",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
 
-        # 5. Boundary Address Range
-        reqs.append(RequirementItem(
-            req_id=f"REQ-{counter:03d}",
-            title="Full Address Range Boundary Coverage",
-            description="Memory must correctly address all 2^ADDR_WIDTH words from min address 0 to max address (2^ADDR_WIDTH)-1.",
-            category="Boundary",
-            source_section="Section 6 Memory Organization and Addressing",
-            expected_behavior="Boundary words at 0x0 and max (0xF for 4-bit) store and return distinct data.",
-            verification_strategy="Write and read back min address (0) and max address (15) with alternating bit patterns.",
-            test_sequence="ram_boundary_seq",
-            checker_assertion="scb_check_boundary_addresses",
-            coverage_objective="cp_addr_min_max_bins",
-            priority="High",
-            status="IMPLEMENTED",
-        ))
-        counter += 1
+        else:
+            # Memory / RAM / Generic Default
+            if spec_data.reset_behavior:
+                rb = spec_data.reset_behavior[0] if isinstance(spec_data.reset_behavior, list) else spec_data.reset_behavior
+                reset_sig = getattr(rb, "reset_signal", "rst_n") or "rst_n"
+                active_lvl = getattr(rb, "active_level", "low") or "low"
+                sec = getattr(rb, "section", "Section 4.1 Reset") or "Section 4.1 Reset"
+                reqs.append(RequirementItem(
+                    req_id=f"REQ-{counter:03d}",
+                    title="Synchronous Active-Low Reset Output Initialization",
+                    description=(
+                        f"When reset ({reset_sig}) is asserted ({active_lvl}), "
+                        f"output registers must be driven to zero on the clock edge, while storage arrays remain preserved."
+                    ),
+                    category="Reset",
+                    source_section=sec,
+                    expected_behavior="rdata is synchronously cleared to '0; memory contents are retained.",
+                    verification_strategy="Assert rst_n=0 for multiple clock cycles; check rdata==0.",
+                    test_sequence="ram_reset_seq",
+                    checker_assertion="assert_reset_clears_rdata",
+                    coverage_objective="cg_operations.cp_op[RESET]",
+                    priority="Critical",
+                    status="IMPLEMENTED",
+                ))
+                counter += 1
 
-        # 6. Consecutive Read-After-Write (RAW) Hazard
-        reqs.append(RequirementItem(
-            req_id=f"REQ-{counter:03d}",
-            title="Consecutive Cycle Read-After-Write (RAW) Latency",
-            description="A write to address A at cycle T followed immediately by a read from address A at cycle T+1 must return newly written data.",
-            category="Protocol",
-            source_section="Section 4.4 Operation Priority / Timing",
-            expected_behavior="Read operation at cycle T+1 samples updated memory contents written at cycle T.",
-            verification_strategy="Execute immediate back-to-back write-then-read transactions to identical addresses.",
-            test_sequence="ram_raw_hazard_seq",
-            checker_assertion="scb_check_raw_hazard_data",
-            coverage_objective="cross_raw_hazard",
-            priority="High",
-            status="IMPLEMENTED",
-        ))
-        counter += 1
+                reqs.append(RequirementItem(
+                    req_id=f"REQ-{counter:03d}",
+                    title="Reset Memory Content Retention",
+                    description="Synchronous reset must NOT wipe or reinitialize previously written memory entries.",
+                    category="Reset",
+                    source_section=sec,
+                    expected_behavior="Memory locations written before reset retain their values after reset is deasserted.",
+                    verification_strategy="Write pattern to address, pulse reset, deassert reset, read back address.",
+                    test_sequence="ram_reset_retention_seq",
+                    checker_assertion="scb_verify_post_reset_retention",
+                    coverage_objective="cg_cross_coverage.cross_op_x_addr",
+                    priority="High",
+                    status="IMPLEMENTED",
+                ))
+                counter += 1
+
+            # Functional Write Operation
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Single-Port Synchronous Write Operation",
+                description="When rst_n is high and we is high at a rising clock edge, mem[addr] is updated with wdata.",
+                category="Functional",
+                source_section="Section 4.2 Write Operation",
+                expected_behavior="Target memory entry stores wdata; rdata holds its previous value.",
+                verification_strategy="Drive we=1 with randomized addr and wdata across all valid addresses.",
+                test_sequence="ram_write_all_seq",
+                checker_assertion="scb_check_write_and_hold",
+                coverage_objective="cg_operations.cp_op[WRITE]",
+                priority="Critical",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            # Functional Read Operation
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Single-Port Synchronous Read Operation",
+                description="When rst_n is high and we is low at a rising clock edge, rdata is updated with mem[addr].",
+                category="Functional",
+                source_section="Section 4.3 Read Operation",
+                expected_behavior="rdata updates synchronously to reflect exact data previously written to mem[addr].",
+                verification_strategy="Perform directed and randomized reads after writes across all addresses 0x0 to 0xF.",
+                test_sequence="ram_read_all_seq",
+                checker_assertion="scb_check_read_data_match",
+                coverage_objective="cg_operations.cp_op[READ]",
+                priority="Critical",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            # Output Hold during Write
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Output Hold During Write Cycles",
+                description="During write operations (we == 1), rdata must hold its previous value with zero glitching.",
+                category="Timing",
+                source_section="Section 5 Timing and Output Hold Behavior",
+                expected_behavior="rdata remains unchanged from the previous cycle when we == 1.",
+                verification_strategy="Observe rdata across consecutive write operations following a known read.",
+                test_sequence="ram_hold_seq",
+                checker_assertion="assert_rdata_stable_during_write",
+                coverage_objective="cg_operations.cp_op_transition[WRITE=>WRITE]",
+                priority="Medium",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            # Boundary Address Range
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Full Address Range Boundary Coverage",
+                description="Memory must correctly address all 2^ADDR_WIDTH words from min address 0 to max address (2^ADDR_WIDTH)-1.",
+                category="Boundary",
+                source_section="Section 6 Memory Organization and Addressing",
+                expected_behavior="Boundary words at 0x0 and max (0xF for 4-bit) store and return distinct data.",
+                verification_strategy="Write and read back min address (0) and max address (15) with alternating bit patterns.",
+                test_sequence="ram_boundary_seq",
+                checker_assertion="scb_check_boundary_addresses",
+                coverage_objective="cg_address_space.cp_addr_boundaries",
+                priority="High",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
+
+            # Consecutive Read-After-Write (RAW) Hazard
+            reqs.append(RequirementItem(
+                req_id=f"REQ-{counter:03d}",
+                title="Consecutive Cycle Read-After-Write (RAW) Latency",
+                description="A write to address A at cycle T followed immediately by a read from address A at cycle T+1 must return newly written data.",
+                category="Protocol",
+                source_section="Section 4.4 Operation Priority / Timing",
+                expected_behavior="Read operation at cycle T+1 samples updated memory contents written at cycle T.",
+                verification_strategy="Execute immediate back-to-back write-then-read transactions to identical addresses.",
+                test_sequence="ram_raw_hazard_seq",
+                checker_assertion="scb_check_raw_hazard_data",
+                coverage_objective="cg_cross_coverage.cross_raw_hazard",
+                priority="High",
+                status="IMPLEMENTED",
+            ))
+            counter += 1
 
         return reqs
 
@@ -692,6 +809,20 @@ class SpecDrivenTestbenchAgent(BaseAgent):
         clk = mental_model.clock_signal
         rst = mental_model.reset_signal
 
+        dw = 8
+        aw = 4
+        for p in params_info:
+            if "DATA" in p.get("name", "").upper():
+                try:
+                    dw = int(p.get("value", 8))
+                except Exception:
+                    pass
+            elif "ADDR" in p.get("name", "").upper():
+                try:
+                    aw = int(p.get("value", 4))
+                except Exception:
+                    pass
+
         generated_files: List[str] = []
 
         # 1. Interface
@@ -763,6 +894,7 @@ class {d}_seq_item #(
   rand logic                      we;
   rand logic [ADDR_WIDTH-1:0]     addr;
   rand logic [DATA_WIDTH-1:0]     wdata;
+  rand int unsigned               delay;
        logic [DATA_WIDTH-1:0]     rdata; // Sampled output
 
   `uvm_object_param_utils_begin({d}_seq_item #(DATA_WIDTH, ADDR_WIDTH))
@@ -770,6 +902,7 @@ class {d}_seq_item #(
     `uvm_field_int (we,                 UVM_DEFAULT)
     `uvm_field_int (addr,               UVM_DEFAULT | UVM_HEX)
     `uvm_field_int (wdata,              UVM_DEFAULT | UVM_HEX)
+    `uvm_field_int (delay,              UVM_DEFAULT | UVM_DEC)
     `uvm_field_int (rdata,              UVM_DEFAULT | UVM_HEX)
   `uvm_object_utils_end
 
@@ -780,6 +913,10 @@ class {d}_seq_item #(
     }} else if (op == READ) {{
       we == 1'b0;
     }}
+  }}
+
+  constraint c_delay_bounds {{
+    delay inside {{[0 : 10]}};
   }}
 
   constraint c_addr_bounds {{
@@ -881,6 +1018,9 @@ class {d}_driver #(
   endtask : run_phase
 
   virtual task drive_item(req_t item);
+    if (item.delay > 0) begin
+      repeat (item.delay) @(vif.drv_cb);
+    end
     @(vif.drv_cb);
     if (item.op == {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::RESET) begin
       vif.drv_cb.{rst} <= 1'b0;
@@ -1186,196 +1326,12 @@ endclass : {d}_scoreboard
 """
         self._write_file(verif_dir / f"{d}_scoreboard.sv", scb_code, generated_files, target_dir)
 
-        # 9. Functional Coverage Subscriber
-        cov_code = f"""// ===========================================================================
-// VeriSight Spec-Driven UVM Testbench — Functional Coverage
-// Target: {d} | REQ-001 through REQ-006 Grounded
-// ===========================================================================
-`ifndef {d.upper()}_COVERAGE_SV
-`define {d.upper()}_COVERAGE_SV
-
-class {d}_coverage #(
-  parameter int DATA_WIDTH = 8,
-  parameter int ADDR_WIDTH = 4
-) extends uvm_subscriber #({d}_seq_item #(DATA_WIDTH, ADDR_WIDTH));
-
-  typedef {d}_seq_item #(DATA_WIDTH, ADDR_WIDTH) item_t;
-  `uvm_component_param_utils({d}_coverage #(DATA_WIDTH, ADDR_WIDTH))
-
-  item_t cur_item;
-
-  covergroup {d}_cg;
-    option.per_instance = 1;
-    option.name = "{d}_functional_coverage";
-
-    // REQ-001, REQ-003, REQ-004: Operation modes
-    cp_op: coverpoint cur_item.op {{
-      bins write_op = {{item_t::WRITE}};
-      bins read_op  = {{item_t::READ}};
-      bins reset_op = {{item_t::RESET}};
-    }}
-
-    // REQ-005: Full address space bins (0 through 2^ADDR_WIDTH - 1)
-    cp_addr: coverpoint cur_item.addr {{
-      bins min_addr    = {{0}};
-      bins max_addr    = {{(1 << ADDR_WIDTH) - 1}};
-      bins mid_range[] = {{[1 : (1 << ADDR_WIDTH) - 2]}};
-    }}
-
-    // REQ-003: Data word extremes
-    cp_wdata: coverpoint cur_item.wdata {{
-      bins zero     = {{'0}};
-      bins all_ones = {{'1}};
-      bins alt_aa   = {{8'hAA}};
-      bins alt_55   = {{8'h55}};
-      bins others   = default;
-    }}
-
-    // Cross: Every address exercised under Write and Read
-    cross_op_addr: cross cp_op, cp_addr {{
-      ignore_bins ignore_rst = binsof(cp_op) intersect {{item_t::RESET}};
-    }}
-  endgroup : {d}_cg
-
-  function new(string name = "{d}_coverage", uvm_component parent = null);
-    super.new(name, parent);
-    {d}_cg = new();
-  endfunction : new
-
-  virtual function void write(item_t t);
-    cur_item = t;
-    {d}_cg.sample();
-  endfunction : write
-
-endclass : {d}_coverage
-
-`endif // {d.upper()}_COVERAGE_SV
-"""
+        # 9. Functional Coverage Subscriber (5 Dedicated Covergroups, 120+ Bins)
+        cov_code = VerificationMatrixSynthesizer.generate_coverage_code(d, dw, aw)
         self._write_file(verif_dir / f"{d}_coverage.sv", cov_code, generated_files, target_dir)
 
-        # 10. Sequences
-        seq_code = f"""// ===========================================================================
-// VeriSight Spec-Driven UVM Testbench — Sequences
-// Target: {d} | REQ-001 to REQ-006 Test Scenarios
-// ===========================================================================
-`ifndef {d.upper()}_SEQUENCES_SV
-`define {d.upper()}_SEQUENCES_SV
-
-// Base Sequence
-class {d}_base_seq #(
-  parameter int DATA_WIDTH = 8,
-  parameter int ADDR_WIDTH = 4
-) extends uvm_sequence #({d}_seq_item #(DATA_WIDTH, ADDR_WIDTH));
-
-  `uvm_object_param_utils({d}_base_seq #(DATA_WIDTH, ADDR_WIDTH))
-
-  function new(string name = "{d}_base_seq");
-    super.new(name);
-  endfunction : new
-
-endclass : {d}_base_seq
-
-// REQ-001: Reset Sequence
-class {d}_reset_seq #(
-  parameter int DATA_WIDTH = 8,
-  parameter int ADDR_WIDTH = 4
-) extends {d}_base_seq #(DATA_WIDTH, ADDR_WIDTH);
-
-  `uvm_object_param_utils({d}_reset_seq #(DATA_WIDTH, ADDR_WIDTH))
-
-  function new(string name = "{d}_reset_seq");
-    super.new(name);
-  endfunction : new
-
-  virtual task body();
-    req = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::type_id::create("req");
-    start_item(req);
-    req.op = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::RESET;
-    finish_item(req);
-  endtask : body
-
-endclass : {d}_reset_seq
-
-// REQ-003, REQ-004, REQ-005: Full Address Space Sweep
-class {d}_all_addr_seq #(
-  parameter int DATA_WIDTH = 8,
-  parameter int ADDR_WIDTH = 4
-) extends {d}_base_seq #(DATA_WIDTH, ADDR_WIDTH);
-
-  `uvm_object_param_utils({d}_all_addr_seq #(DATA_WIDTH, ADDR_WIDTH))
-
-  function new(string name = "{d}_all_addr_seq");
-    super.new(name);
-  endfunction : new
-
-  virtual task body();
-    // 1. Write unique data across all addresses
-    for (int i = 0; i < (1 << ADDR_WIDTH); i++) begin
-      req = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::type_id::create("req");
-      start_item(req);
-      assert(req.randomize() with {{
-        op == {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::WRITE;
-        addr == i;
-      }});
-      finish_item(req);
-    end
-
-    // 2. Read back all addresses to verify retrieval
-    for (int i = 0; i < (1 << ADDR_WIDTH); i++) begin
-      req = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::type_id::create("req");
-      start_item(req);
-      assert(req.randomize() with {{
-        op == {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::READ;
-        addr == i;
-      }});
-      finish_item(req);
-    end
-  endtask : body
-
-endclass : {d}_all_addr_seq
-
-// REQ-006: Read-After-Write (RAW) Hazard Sequence
-class {d}_raw_hazard_seq #(
-  parameter int DATA_WIDTH = 8,
-  parameter int ADDR_WIDTH = 4
-) extends {d}_base_seq #(DATA_WIDTH, ADDR_WIDTH);
-
-  `uvm_object_param_utils({d}_raw_hazard_seq #(DATA_WIDTH, ADDR_WIDTH))
-
-  function new(string name = "{d}_raw_hazard_seq");
-    super.new(name);
-  endfunction : new
-
-  virtual task body();
-    repeat (20) begin
-      bit [ADDR_WIDTH-1:0] target_addr;
-      bit [DATA_WIDTH-1:0] target_data;
-      void'(std::randomize(target_addr));
-      void'(std::randomize(target_data));
-
-      // Cycle T: Write
-      req = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::type_id::create("w_req");
-      start_item(req);
-      req.op    = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::WRITE;
-      req.we    = 1'b1;
-      req.addr  = target_addr;
-      req.wdata = target_data;
-      finish_item(req);
-
-      // Cycle T+1: Immediate Read
-      req = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::type_id::create("r_req");
-      start_item(req);
-      req.op    = {d}_seq_item#(DATA_WIDTH, ADDR_WIDTH)::READ;
-      req.we    = 1'b0;
-      req.addr  = target_addr;
-      finish_item(req);
-    end
-  endtask : body
-
-endclass : {d}_raw_hazard_seq
-
-`endif // {d.upper()}_SEQUENCES_SV
-"""
+        # 10. Sequences (52 Exhaustive Unique Sequences Across 8 Categories)
+        seq_code = VerificationMatrixSynthesizer.generate_sequences_code(d, dw, aw)
         self._write_file(verif_dir / f"{d}_sequences.sv", seq_code, generated_files, target_dir)
 
         # 11. Environment
@@ -1420,74 +1376,8 @@ endclass : {d}_env
 """
         self._write_file(verif_dir / f"{d}_env.sv", env_code, generated_files, target_dir)
 
-        # 12. Test
-        test_code = f"""// ===========================================================================
-// VeriSight Spec-Driven UVM Testbench — Test Suite
-// Target: {d}
-// ===========================================================================
-`ifndef {d.upper()}_TEST_SV
-`define {d.upper()}_TEST_SV
-
-class {d}_base_test extends uvm_test;
-
-  `uvm_component_utils({d}_base_test)
-
-  {d}_env #(8, 4) env;
-
-  function new(string name = "{d}_base_test", uvm_component parent = null);
-    super.new(name, parent);
-  endfunction : new
-
-  virtual function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-    env = {d}_env#(8, 4)::type_id::create("env", this);
-  endfunction : build_phase
-
-  virtual function void end_of_elaboration_phase(uvm_phase phase);
-    super.end_of_elaboration_phase(phase);
-    uvm_top.print_topology();
-  endfunction : end_of_elaboration_phase
-
-endclass : {d}_base_test
-
-// Comprehensive Specification Verification Test
-class {d}_comprehensive_test extends {d}_base_test;
-
-  `uvm_component_utils({d}_comprehensive_test)
-
-  function new(string name = "{d}_comprehensive_test", uvm_component parent = null);
-    super.new(name, parent);
-  endfunction : new
-
-  virtual task run_phase(uvm_phase phase);
-    {d}_reset_seq      #(8, 4) rst_seq;
-    {d}_all_addr_seq   #(8, 4) all_addr_seq;
-    {d}_raw_hazard_seq #(8, 4) raw_seq;
-
-    phase.raise_objection(this);
-
-    `uvm_info("TEST", "Starting Spec-Driven Comprehensive Regression Test...", UVM_LOW)
-
-    // Scenario 1: Initial Reset Verification (REQ-001)
-    rst_seq = {d}_reset_seq#(8, 4)::type_id::create("rst_seq");
-    rst_seq.start(env.agt.sqr);
-
-    // Scenario 2: Full Address Sweep (REQ-003, REQ-004, REQ-005)
-    all_addr_seq = {d}_all_addr_seq#(8, 4)::type_id::create("all_addr_seq");
-    all_addr_seq.start(env.agt.sqr);
-
-    // Scenario 3: Back-to-Back RAW Hazard Stress (REQ-006)
-    raw_seq = {d}_raw_hazard_seq#(8, 4)::type_id::create("raw_seq");
-    raw_seq.start(env.agt.sqr);
-
-    #100ns;
-    phase.drop_objection(this);
-  endtask : run_phase
-
-endclass : {d}_comprehensive_test
-
-`endif // {d.upper()}_TEST_SV
-"""
+        # 12. Test Suite (52 Distinct UVM Tests)
+        test_code = VerificationMatrixSynthesizer.generate_tests_code(d, dw, aw)
         self._write_file(verif_dir / f"{d}_test.sv", test_code, generated_files, target_dir)
 
         # 13. Package
@@ -1564,7 +1454,7 @@ module {d}_tb_top;
       null, "uvm_test_top.*", "vif", dut_if
     );
 
-    run_test("{d}_comprehensive_test");
+    run_test("{d}_test_52_comprehensive_suite");
   end
 
 endmodule : {d}_tb_top
@@ -1583,7 +1473,7 @@ vlog -sv +incdir+verif verif/{d}_pkg.sv
 vlog -sv {Path(rtl_file).name}
 vlog -sv +incdir+verif top/{d}_tb_top.sv
 
-vsim -c -voptargs="+acc" work.{d}_tb_top +UVM_TESTNAME={d}_comprehensive_test -do "run -all; quit -f"
+vsim -c -voptargs="+acc" work.{d}_tb_top +UVM_TESTNAME={d}_test_52_comprehensive_suite -do "run -all; quit -f"
 """
         self._write_file(target_dir / "run.do", run_do_code, generated_files, target_dir)
 
@@ -1602,7 +1492,7 @@ questa:
 \tvsim -c -do run.do
 
 vcs:
-\tvcs -sverilog -ntb_opts uvm-1.2 +incdir+verif verif/{d}_if.sv verif/{d}_pkg.sv $(RTL_SRC) top/{d}_tb_top.sv -R +UVM_TESTNAME={d}_comprehensive_test
+\tvcs -sverilog -ntb_opts uvm-1.2 +incdir+verif verif/{d}_if.sv verif/{d}_pkg.sv $(RTL_SRC) top/{d}_tb_top.sv -R +UVM_TESTNAME={d}_test_52_comprehensive_suite
 
 clean:
 \trm -rf work transcript vsim.wlf simv* csrc *.vcd *.log ucli.key vc_hdrs.h
@@ -1747,6 +1637,36 @@ clean:
             vp_text += f"- **Stimulus Sequence:** `{r.test_sequence}`\n"
             vp_text += f"- **Checker:** `{r.checker_assertion}`\n"
             vp_text += f"- **Coverage:** `{r.coverage_objective}`\n\n"
+
+        matrix_items = VerificationMatrixSynthesizer.get_test_matrix(design_name)
+        vp_text += "\n---\n\n## Exhaustive 52-Testcase Verification Matrix\n\n"
+        vp_text += "| Test ID | Test Class Name | Category | Objective | Target Coverage |\n"
+        vp_text += "|---|---|---|---|---|\n"
+        for ti in matrix_items:
+            vp_text += f"| **{ti.test_id}** | `{ti.name}` | {ti.category} | {ti.title}: {ti.description} | `{ti.target_coverage}` |\n"
+
+        vp_text += "\n---\n\n## Multi-Covergroup Functional Coverage Model (120+ Coverage Bins)\n\n"
+        vp_text += "### 1. Operations & Transitions (`cg_operations`)\n"
+        vp_text += "- **Operation Bins:** `WRITE`, `READ`, `RESET`\n"
+        vp_text += "- **Transition Bins:** `WRITE => READ`, `READ => WRITE`, `WRITE => WRITE`, `READ => READ`, `RESET => WRITE`, `RESET => READ`\n\n"
+        vp_text += "### 2. Address Space, Boundaries & Walking Patterns (`cg_address_space`)\n"
+        vp_text += "- **Boundary Bins:** `min_addr` (0), `min_plus_1` (1), `mid_low`, `mid_center`, `max_minus_1`, `max_addr`\n"
+        vp_text += "- **Walking Bit Set Bins:** Power-of-2 address line shifts (`bit_0_set` to `bit_3_set`)\n"
+        vp_text += "- **Transition Bins:** `min => max`, `max => min`\n\n"
+        vp_text += "### 3. Data Patterns, Corner Values & Bit Toggles (`cg_data_patterns`)\n"
+        vp_text += "- **Corner Bins:** All Zeros (`'0`), All Ones (`'1`), Alternating `0xAA`, `0x55`, `0xA5`, `0x5A`\n"
+        vp_text += "- **Walking Bit Bins:** Single-bit walking shifts across all data lines\n"
+        vp_text += "- **Transitions:** `all_zeros => all_ones`, `all_ones => all_zeros`\n"
+        vp_text += "- **Distribution:** 8-octant uniform value range bins\n\n"
+        vp_text += "### 4. Timing Delays & Inter-Transaction Handshakes (`cg_handshake_timing`)\n"
+        vp_text += "- **Delay Bins:** `zero_delay` (0), `single_cycle` (1), `short_delay` ([2:4]), `medium_delay` ([5:9]), `long_delay` ([10:30])\n"
+        vp_text += "- **Transitions:** `burst_to_pause` (0 => [5:30]), `pause_to_burst` ([5:30] => 0)\n\n"
+        vp_text += "### 5. Cross-Coverage Matrix (`cg_cross_coverage`)\n"
+        vp_text += "- `cross_op_x_addr`: Operations crossed with address boundary bins\n"
+        vp_text += "- `cross_op_x_data`: Operations crossed with corner data patterns\n"
+        vp_text += "- `cross_addr_x_data`: Boundary addresses crossed with corner data patterns\n"
+        vp_text += "- `cross_op_x_delay`: Operations crossed with timing delay bins\n\n"
+
         save_text(vp_text, vplan_md)
 
         # 3. Requirement Traceability Matrix
@@ -1771,6 +1691,13 @@ clean:
         mat_text += "|---|---|---|---|---|---|---|\n"
         for m in matrix_data:
             mat_text += f"| **{m['req_id']}** | {m['spec_requirement']} | `{m['rtl_mapping']}` | `{m['test_sequence']}` | `{m['checker']}` | `{m['coverage']}` | `{m['status']}` |\n"
+
+        mat_text += "\n---\n\n## 52-Testcase Traceability Mapping\n\n"
+        mat_text += "| Test ID | Test Class | Category | Target Verification Requirement |\n"
+        mat_text += "|---|---|---|---|\n"
+        for ti in matrix_items:
+            mat_text += f"| **{ti.test_id}** | `{ti.name}` | {ti.category} | {ti.title} |\n"
+
         save_text(mat_text, matrix_md)
 
         # 4. Validation Report

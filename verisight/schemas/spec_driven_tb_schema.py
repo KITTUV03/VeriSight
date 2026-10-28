@@ -104,3 +104,4 @@ class SpecDrivenTBResult(BaseModel):
     mental_model_file: Optional[str] = None
     vplan_file: Optional[str] = None
     report_file: Optional[str] = None
+

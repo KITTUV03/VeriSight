@@ -105,3 +105,22 @@ def test_spec_driven_tb_agent_generation(tmp_path):
 
     # 7. Verify Static Review
     assert result.static_validation.syntax_clean is True
+
+    # 8. Verify 50+ Test Cases & Multi-Covergroup Generation
+    tests_content = (out_dir / "verif/ram_rtl_test.sv").read_text()
+    assert tests_content.count("class ram_rtl_test_") >= 50
+
+    seq_content = (out_dir / "verif/ram_rtl_sequences.sv").read_text()
+    assert seq_content.count("class ram_rtl_seq_") >= 50
+
+    cov_content = (out_dir / "verif/ram_rtl_coverage.sv").read_text()
+    assert "covergroup cg_operations" in cov_content
+    assert "covergroup cg_address_space" in cov_content
+    assert "covergroup cg_data_patterns" in cov_content
+    assert "covergroup cg_handshake_timing" in cov_content
+    assert "covergroup cg_cross_coverage" in cov_content
+
+    vplan_content = (out_dir / "verification_plan.md").read_text()
+    assert "Exhaustive 52-Testcase Verification Matrix" in vplan_content
+    assert "TC-52" in vplan_content
+
