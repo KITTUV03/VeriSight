@@ -130,9 +130,50 @@ Return a JSON object with a single "test_scenarios" list of objects with fields:
 
         if all_tests:
             logger.info(f"Successfully generated {len(all_tests)} test scenarios via LLM.")
-            return all_tests
+            base_tests = all_tests
+        else:
+            base_tests = self._deterministic_generate(features, design_name, rtl_info)
 
-        return self._deterministic_generate(features, design_name, rtl_info)
+        # Augment with the comprehensive 52-test matrix from VerificationMatrixSynthesizer
+        from verisight.uvm.matrix_synthesizer import VerificationMatrixSynthesizer
+        matrix_items = VerificationMatrixSynthesizer.get_test_matrix(design_name)
+
+        final_tests = list(base_tests)
+        existing_titles = {t.title.lower() for t in final_tests}
+        fids = [f.feature_id for f in features] if features else ["FEAT-001"]
+
+        for item in matrix_items:
+            if len(final_tests) >= 52 and item.title.lower() in existing_titles:
+                continue
+            if item.title.lower() in existing_titles:
+                continue
+
+            ttype = "Directed"
+            cat_low = item.category.lower()
+            if "stress" in cat_low or "saturation" in cat_low:
+                ttype = "Stress"
+            elif "corner" in cat_low or "bound" in cat_low or "pattern" in cat_low:
+                ttype = "Corner_Case"
+            elif "negative" in cat_low or "error" in cat_low or "hazard" in cat_low:
+                ttype = "Error_Injection"
+            elif "random" in cat_low:
+                ttype = "Constrained_Random"
+
+            scenario = TestScenario(
+                test_id=f"TEST-{len(final_tests)+1:03d}",
+                feature_ids=[fids[(len(final_tests)) % len(fids)]],
+                title=item.title,
+                test_type=ttype,
+                description=f"[{item.category}] {item.description} Target: {item.target_coverage}",
+                stimulus=item.stimulus_type,
+                expected_response=f"Scoreboard verifies DUT output against golden reference model with 100% data integrity for {item.title}.",
+                priority="Critical" if "reset" in cat_low or "sanity" in cat_low else ("High" if "bound" in cat_low or "hazard" in cat_low else "Medium"),
+            )
+            final_tests.append(scenario)
+            existing_titles.add(item.title.lower())
+
+        logger.info(f"Test plan synthesized {len(final_tests)} exhaustive test scenarios for {design_name}.")
+        return final_tests
 
     def _deterministic_generate(
         self,
