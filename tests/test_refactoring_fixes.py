@@ -284,3 +284,20 @@ def test_agent5_sandbox_security():
     ok, notes = agent._inspect_verification_checks(tamper_patch_weaken, "")
     assert ok is False
     assert "weakened" in notes
+
+
+def test_streamlined_wizard_menu_options():
+    from verisight.wizard import run_wizard
+    from unittest.mock import patch
+
+    # Verify option "4" exits cleanly with code 0
+    with patch("rich.prompt.Prompt.ask", return_value="4"):
+        with pytest.raises(SystemExit) as exc_info:
+            run_wizard()
+        assert exc_info.value.code == 0
+
+    # Verify option "3" routes to run_uvm_flow
+    with patch("rich.prompt.Prompt.ask", return_value="3"):
+        with patch("verisight.wizard.run_uvm_flow") as mock_uvm:
+            run_wizard()
+            mock_uvm.assert_called_once()

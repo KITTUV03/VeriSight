@@ -2,9 +2,9 @@
 VeriSight Interactive Guided Setup Wizard.
 
 A unified, user-friendly CLI wizard providing:
-1. VeriSight Debug  — Autonomous Root-Cause Analysis & Fix Generator.
-2. VeriSight Plan   — Autonomous Verification Plan, Functional Coverage & SVA Suite.
-3. Quick Demos      — Instant runs on ALU and FIFO designs.
+1. VeriSight Debug   — Autonomous Root-Cause Analysis & Fix Generator.
+2. VeriSight Plan    — Autonomous Verification Plan, Functional Coverage & SVA Suite.
+3. XcelUVM Architect — Autonomous Full Production UVM 1.2 Testbench Environment.
 """
 
 import os
@@ -88,23 +88,26 @@ def _open_html_in_browser(html_path: Path) -> bool:
 
 def _print_welcome_banner():
     """Print the interactive wizard welcome banner."""
-    title = (
-        "[bold cyan]🔍 VeriSight — Autonomous Verification & Debugging Platform[/bold cyan]\n"
-        "[bold white]Dual-Engine Autonomous Suite: VeriSight Debug & VeriSight Plan[/bold white]"
+    banner_content = (
+        "[bold cyan]⚡ V E R I S I G H T[/bold cyan]  [dim]•[/dim]  [bold white]AUTONOMOUS ASIC & SOC VERIFICATION[/bold white]\n"
+        "[dim cyan]Tri-Engine Architecture: Diagnostic Debug • Plan Synthesis • UVM Architecture[/dim cyan]\n"
+        "[dim]Enterprise-grade multi-agent reasoning, deep AST inspection & protocol compliance[/dim]"
     )
     console.print()
     console.print(
         Panel(
-            title,
-            box=box.DOUBLE,
+            banner_content,
+            box=box.ROUNDED,
             border_style="cyan",
             expand=False,
-            padding=(1, 4),
+            padding=(1, 3),
+            title="[bold cyan] VERISIGHT CORE ENGINE [/bold cyan]",
+            title_align="center",
+            subtitle="[dim]v1.2.0 Enterprise Edition[/dim]",
+            subtitle_align="right",
         )
     )
-    console.print(
-        "[dim]Welcome! Select an autonomous workflow below to get started.[/dim]\n"
-    )
+    console.print()
 
 
 def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool, str]:
@@ -140,33 +143,38 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
         a_valid, a_status = probe_anthropic_key(anthropic_env)
         l_valid, l_status = probe_local_engine()
 
-    table = Table(title="Detected AI Execution Environments & Health Status", box=box.ROUNDED, show_lines=True)
-    table.add_column("Environment / Provider", style="cyan", width=28)
-    table.add_column("Live Health & Credentials", width=44)
+    table = Table(
+        title="[bold cyan]Detected AI Execution Environments & Health Status[/bold cyan]",
+        box=box.ROUNDED,
+        show_lines=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Environment / Provider", style="bold white", width=28)
+    table.add_column("Live Health & Credentials", width=48)
 
     # Gemini Status
     if g_valid:
-        g_cell = f"[bold green]✓ Valid & Active[/bold green] ({g_status})"
+        g_cell = f"[bold green]● Active & Validated[/bold green] [dim]({g_status})[/dim]"
     elif gemini_env:
-        g_cell = f"[yellow]⚠ Probe Warning[/yellow] ({g_status})"
+        g_cell = f"[bold yellow]▲ Probe Warning[/bold yellow] [dim]({g_status})[/dim]"
     else:
-        g_cell = "[yellow]Not configured in .env[/yellow]"
+        g_cell = "[dim yellow]○ Not configured in .env[/dim yellow]"
     table.add_row("Google Gemini (Cloud)", g_cell)
 
     # Anthropic Status
     if a_valid:
-        a_cell = f"[bold green]✓ Valid & Active[/bold green] ({a_status})"
+        a_cell = f"[bold green]● Active & Validated[/bold green] [dim]({a_status})[/dim]"
     elif anthropic_env:
-        a_cell = f"[yellow]⚠ Probe Warning[/yellow] ({a_status})"
+        a_cell = f"[bold yellow]▲ Probe Warning[/bold yellow] [dim]({a_status})[/dim]"
     else:
-        a_cell = "[yellow]Not configured in .env[/yellow]"
+        a_cell = "[dim yellow]○ Not configured in .env[/dim yellow]"
     table.add_row("Anthropic Claude (Cloud)", a_cell)
 
     # Local Engine Status
     if l_valid:
-        l_cell = f"[bold green]✓ Local engine online[/bold green] ({l_status})"
+        l_cell = f"[bold green]● Local Engine Online[/bold green] [dim]({l_status})[/dim]"
     else:
-        l_cell = "[bold cyan]Ready On-Prem[/bold cyan] (Zero Cloud RTL Leakage Certified)"
+        l_cell = "[bold cyan]● Sovereign Local Ready[/bold cyan] [dim](Zero Cloud RTL Leakage Certified)[/dim]"
     table.add_row("🛡️ Sovereign On-Prem (Local)", l_cell)
 
     console.print(table)
@@ -235,7 +243,7 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     for i, c in enumerate(choices):
         prefix = f"{recommended_idx}."
         if c.startswith(prefix):
-            choices[i] = c.replace(prefix, f"{prefix} (Recommended)", 1)
+            choices[i] = c.replace(prefix, f"{prefix} [bold green][RECOMMENDED][/bold green]", 1)
             break
 
     console.print("[bold]Select AI Execution & Security Mode:[/bold]")
@@ -453,15 +461,18 @@ def _prompt_path(
     required: bool = False,
     is_dir: bool = False,
     default: str = "",
+    file_types: Optional[list] = None,
+    allow_empty: bool = True,
+    **kwargs,
 ) -> Optional[str]:
     """Prompt user for a file or directory path, verifying existence with retry."""
     req_label = "[red](Required)[/red]" if required else "[dim](Optional — press Enter to skip)[/dim]"
     while True:
-        prompt_str = f"[bold]{prompt_text}[/bold] {req_label}"
+        prompt_str = f"[bold white]{prompt_text}[/bold white] {req_label}"
         val = Prompt.ask(prompt_str, default=default).strip()
 
         if not val:
-            if required:
+            if required and not allow_empty:
                 console.print("[red]This input is required.[/red]")
                 continue
             return None
@@ -544,11 +555,23 @@ def run_plan_flow(
     local_endpoint: str = "",
 ):
     """Execute the VeriSight Plan workflow."""
-    console.print("\n[bold cyan]📋 VeriSight Plan — Verification & Architecture Plan[/bold cyan]")
-    console.print("[dim]Generate Test Plan, Feature Decomposition, SystemVerilog Coverage & SVA Suite.[/dim]\n")
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Verification Plan, Feature Decomposition & SVA Suite Synthesizer[/bold white]\n"
+            "[dim]Translates specifications into formal test plans, protocol functional coverage, and SystemVerilog assertions.[/dim]",
+            title="[bold cyan]📋 VERISIGHT PLAN ARCHITECT[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
     if not spec_path:
-        spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default="")
+        default_spec = "examples/specs/alu_spec.md" if Path("examples/specs/alu_spec.md").exists() else ""
+        spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default=default_spec)
     if not rtl_path:
         default_rtl = ""
         if spec_path:
@@ -559,11 +582,32 @@ def run_plan_flow(
                     if rtl_cands:
                         default_rtl = str(rtl_cands[0])
                         break
+        if not default_rtl and Path("examples/rtl/alu.sv").exists():
+            default_rtl = "examples/rtl/alu.sv"
         rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
     if coverage_path is None:
         coverage_path = _prompt_path("Simulator Coverage Database / Report (optional .ucdb, .vdb, .txt, .json)", required=False, default="")
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for verification plan[/bold]", default="output/verification_plan").strip()
+
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]VeriSight Plan Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Design Specification", str(spec_path) if spec_path else "[dim]None[/dim]")
+    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[dim]Inferred / Optional[/dim]")
+    summary_table.add_row("Coverage Database", str(coverage_path) if coverage_path else "[dim]None (Cold-start Plan)[/dim]")
+    summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
+    summary_table.add_row("Output Directory", output_dir)
+
+    console.print(summary_table)
+    console.print()
 
     # Configure VeriSight environment for Plan
     llm_kwargs: Dict[str, Any] = {
@@ -592,46 +636,59 @@ def run_plan_flow(
         except Exception:
             kb = None
 
-    console.print("\n[bold cyan]🚀 Launching VeriSight Plan Architect...[/bold cyan]\n")
-    try:
-        planner = VeriSightPlanner(output_dir=output_dir, knowledge_base=kb)
-        report = planner.run(
-            spec_path=spec_path,
-            rtl_path=rtl_path,
-            coverage_path=coverage_path if coverage_path else None,
-        )
+    with console.status("[bold green]Synthesizing Verification Architecture, Coverage Models & SVA...[/bold green]"):
+        try:
+            planner = VeriSightPlanner(output_dir=output_dir, knowledge_base=kb)
+            report = planner.run(
+                spec_path=spec_path,
+                rtl_path=rtl_path,
+                coverage_path=coverage_path if coverage_path else None,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Verification Planning failed:[/] {e}")
+            return
 
-        console.print("\n" + "=" * 62)
-        console.print("[bold green]🎉 Verification Plan Generated Successfully![/bold green]")
-        console.print("=" * 62)
-        console.print(f"  [bold]Target Design:[/]         {report.design_name}")
-        console.print(f"  [bold]Decomposed Features:[/]   {report.total_features}")
-        console.print(f"  [bold]Defined Test Scenarios:[/] {report.total_tests}")
-        console.print(f"  [bold]Coverage Points:[/]        {report.total_coverage_points}")
-        console.print(f"  [bold]SVA Formal Assertions:[/] {report.total_assertions}")
-        console.print(f"  [bold]Simulator Coverage:[/]    [cyan]{report.actual_coverage_overall}% Hit[/cyan] (Target: {report.target_coverage_overall}%)")
-        console.print(f"  [bold]Unhit Coverage Holes:[/]  [yellow]{report.unhit_bins_count} bins[/yellow]")
-        console.print()
-        console.print(f"  [bold cyan]Generated Artifacts in {output_dir}/:[/bold cyan]")
-        console.print(f"    • [white]verification_plan.html[/white]  (Interactive HTML Dashboard)")
-        console.print(f"    • [white]verification_plan.md[/white]    (Engineering Markdown Plan)")
-        console.print(f"    • [white]traceability_matrix.csv[/white] (ISO 26262/DO-254 Matrix)")
-        console.print(f"    • [white]coverage_model.sv[/white]      (SystemVerilog Covergroups Package)")
-        console.print(f"    • [white]dut_assertions.sv[/white]      (SystemVerilog Assertions Suite)")
-        console.print(f"    • [white]verification_plan.json[/white]  (Unified JSON Schema)")
-        console.print()
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Metric", style="bold cyan", width=25)
+    scorecard.add_column("Value", style="bold white", width=53)
 
-        html_file = Path(output_dir) / "verification_plan.html"
-        if html_file.exists():
-            open_html = Confirm.ask("[bold]Open the interactive HTML Verification Plan in your browser?[/bold]", default=True)
-            if open_html:
-                if _open_html_in_browser(html_file):
-                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
-                else:
-                    console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
+    scorecard.add_row("Synthesis Status", "[bold green]✓ Verification Plan Generated[/bold green]")
+    scorecard.add_row("Target Design", f"[bold white]{report.design_name.upper()}[/bold white]")
+    scorecard.add_row("Decomposed Features", f"[bold green]{report.total_features}[/bold green] functional features")
+    scorecard.add_row("Defined Test Scenarios", f"[bold green]{report.total_tests}[/bold green] test scenarios")
+    scorecard.add_row("Coverage Points", f"[bold green]{report.total_coverage_points}[/bold green] covergroups & bins")
+    scorecard.add_row("SVA Formal Assertions", f"[bold green]{report.total_assertions}[/bold green] assertions synthesized")
+    scorecard.add_row("Simulator Coverage Hit", f"[cyan]{report.actual_coverage_overall}% Hit[/cyan] (Target: {report.target_coverage_overall}%)")
+    scorecard.add_row("Unhit Coverage Holes", f"[yellow]{report.unhit_bins_count} unhit bins identified[/yellow]")
 
-    except Exception as e:
-        console.print(f"\n[bold red]Verification Planning failed:[/] {e}")
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] VERISIGHT PLAN METRICS SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Generated Artifacts Table
+    art_table = Table(title=f"[bold cyan]Generated Plan Artifacts ({output_dir}/)[/bold cyan]", box=box.ROUNDED, show_lines=False)
+    art_table.add_column("Artifact", style="bold white", width=26)
+    art_table.add_column("Format / Purpose", style="dim white", width=52)
+
+    art_table.add_row("verification_plan.html", "Interactive Web Dashboard (Coverage & Plan)")
+    art_table.add_row("verification_plan.md", "Executive Engineering Verification Plan")
+    art_table.add_row("traceability_matrix.csv", "Requirements Traceability Matrix (ISO 26262/DO-254)")
+    art_table.add_row("coverage_model.sv", "Synthesized SystemVerilog Covergroups Package")
+    art_table.add_row("dut_assertions.sv", "Synthesized SVA Formal Assertions Module")
+    art_table.add_row("verification_plan.json", "Standardized Verification Schema")
+
+    console.print(art_table)
+    console.print()
+
+    html_file = Path(output_dir) / "verification_plan.html"
+    if html_file.exists():
+        open_html = Confirm.ask("[bold]Open the interactive HTML Verification Plan in your browser?[/bold]", default=True)
+        if open_html:
+            if _open_html_in_browser(html_file):
+                console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]\n")
+            else:
+                console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]\n")
 
 
 def run_debug_flow(
@@ -648,19 +705,92 @@ def run_debug_flow(
     local_endpoint: str = "",
 ):
     """Execute the VeriSight Debug workflow."""
-    console.print("\n[bold cyan]🛠️ VeriSight Debug — Autonomous Simulation RCA & Fix[/bold cyan]")
-    console.print("[dim]Analyze simulation logs, trace root cause, and generate automated code fixes.[/dim]\n")
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Root-Cause Analysis, Failure Localization & Bug Patching[/bold white]\n"
+            "[dim]Analyzes simulation logs, parses VCD & AST, identifies root causes, and synthesizes verified patches.[/dim]",
+            title="[bold cyan]🛠️  VERISIGHT DEBUG ENGINE[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
     if not log_path:
-        log_path = _prompt_path("Simulation Log file (.log)", required=True, default="")
+        default_log = ""
+        for cand_log in ["projects/ram/logs/sim.log", "examples/logs/sim.log"]:
+            if Path(cand_log).exists():
+                default_log = cand_log
+                break
+        log_path = _prompt_path("Simulation Log file (.log)", required=True, default=default_log)
+
     if not rtl_path:
-        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
+        default_rtl = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "rtl", lp.parent / "rtl"]:
+                if cand.exists() and cand.is_dir():
+                    r_files = list(cand.glob("*.sv")) + list(cand.glob("*.v"))
+                    if r_files:
+                        default_rtl = str(r_files[0])
+                        break
+        if not default_rtl and Path("examples/rtl/alu.sv").exists():
+            default_rtl = "examples/rtl/alu.sv"
+        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
+
     if not tb_path:
-        tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default="")
+        default_tb = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "tb", lp.parent / "tb"]:
+                if cand.exists() and cand.is_dir():
+                    t_files = list(cand.glob("*.sv")) + list(cand.glob("*.v"))
+                    if t_files:
+                        default_tb = str(t_files[0])
+                        break
+        if not default_tb and Path("examples/tb/alu_tb.sv").exists():
+            default_tb = "examples/tb/alu_tb.sv"
+        tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default=default_tb)
+
     if not spec_path:
-        spec_path = _prompt_path("Design Specification document (.md)", required=False, default="")
+        default_spec = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "specs", lp.parent / "specs"]:
+                if cand.exists() and cand.is_dir():
+                    s_files = list(cand.glob("*.md")) + list(cand.glob("*.txt"))
+                    if s_files:
+                        default_spec = str(s_files[0])
+                        break
+        if not default_spec and Path("examples/specs/alu_spec.md").exists():
+            default_spec = "examples/specs/alu_spec.md"
+        spec_path = _prompt_path("Design Specification document (.md)", required=False, default=default_spec)
+
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for reports[/bold]", default="output/custom_debug").strip()
+
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]Debug Pipeline Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Simulation Log", str(log_path) if log_path else "[dim]None[/dim]")
+    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[dim]None[/dim]")
+    summary_table.add_row("UVM Testbench", str(tb_path) if tb_path else "[dim]None[/dim]")
+    summary_table.add_row("Design Spec", str(spec_path) if spec_path else "[dim]None[/dim]")
+    summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
+    summary_table.add_row("Output Directory", output_dir)
+
+    console.print(summary_table)
+    console.print()
 
     llm_kwargs: Dict[str, Any] = {
         "provider": provider,
@@ -687,43 +817,56 @@ def run_debug_flow(
         log_level="INFO",
     )
 
-    console.print("\n[bold cyan]🚀 Launching VeriSight Debug Pipeline...[/bold cyan]\n")
-    try:
-        pipeline = VeriSightPipeline(config=config)
-        report = pipeline.run(
-            spec_path=spec_path,
-            rtl_path=rtl_path,
-            tb_path=tb_path,
-            log_path=log_path,
-        )
+    with console.status("[bold green]Executing Multi-Agent RCA & Diagnostic Analysis...[/bold green]"):
+        try:
+            pipeline = VeriSightPipeline(config=config)
+            report = pipeline.run(
+                spec_path=spec_path,
+                rtl_path=rtl_path,
+                tb_path=tb_path,
+                log_path=log_path,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")
+            return
 
-        console.print("\n" + "=" * 62)
-        console.print("[bold green]🎉 Analysis Completed Successfully![/bold green]")
-        console.print("=" * 62)
-        console.print(f"  [bold]Classification:[/]  {report.classification}")
-        console.print(f"  [bold]Root Cause:[/]      {report.root_cause}")
-        console.print(f"  [bold]Category:[/]        {report.category}")
-        console.print(f"  [bold]Module:[/]          {report.module}")
-        console.print()
-        console.print(f"  [bold cyan]Generated Reports in {output_dir}/:[/bold cyan]")
-        console.print(f"    • [white]report.html[/white]  (Visual interactive report)")
-        console.print(f"    • [white]report.md[/white]    (Detailed markdown documentation)")
-        console.print(f"    • [white]error.json[/white]   (Machine-readable error schema)")
-        console.print(f"    • [white]summary.txt[/white]  (Executive summary)")
-        console.print(f"    • [white]fix/[/white]         (Automated code patch)")
-        console.print()
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Metric", style="bold cyan", width=24)
+    scorecard.add_column("Value", style="bold white", width=54)
 
-        html_file = Path(output_dir) / "report.html"
-        if html_file.exists():
-            open_html = Confirm.ask("[bold]Open the HTML report in your browser?[/bold]", default=True)
-            if open_html:
-                if _open_html_in_browser(html_file):
-                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
-                else:
-                    console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
+    scorecard.add_row("Diagnosis Status", "[bold green]✓ RCA Analysis Completed[/bold green]")
+    scorecard.add_row("Classification", f"[bold yellow]{report.classification}[/bold yellow]")
+    scorecard.add_row("Culprit Module", f"[bold white]{report.module}[/bold white]")
+    scorecard.add_row("Failure Category", f"[bold white]{report.category}[/bold white]")
+    scorecard.add_row("Identified Root Cause", f"[white]{report.root_cause}[/white]")
 
-    except Exception as e:
-        console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] VERISIGHT DEBUG RCA SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Generated Artifacts Table
+    art_table = Table(title=f"[bold cyan]Generated Debug Artifacts ({output_dir}/)[/bold cyan]", box=box.ROUNDED, show_lines=False)
+    art_table.add_column("Artifact", style="bold white", width=24)
+    art_table.add_column("Format / Purpose", style="dim white", width=54)
+
+    art_table.add_row("report.html", "Visual Interactive RCA Cockpit (Browser)")
+    art_table.add_row("report.md", "Detailed Engineering Root-Cause Documentation")
+    art_table.add_row("error.json", "Standardized Machine-Readable Error Schema")
+    art_table.add_row("summary.txt", "Executive Summary for CI/CD Integration")
+    art_table.add_row("fix/", "Automated RTL/TB Remediation Code Patch")
+
+    console.print(art_table)
+    console.print()
+
+    html_file = Path(output_dir) / "report.html"
+    if html_file.exists():
+        open_html = Confirm.ask("[bold]Open the HTML report in your browser?[/bold]", default=True)
+        if open_html:
+            if _open_html_in_browser(html_file):
+                console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]\n")
+            else:
+                console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]\n")
 
 
 def run_sim_flow(
@@ -883,9 +1026,20 @@ def run_uvm_flow(
     output_dir: Optional[str] = None,
 ):
     """Run autonomous UVM Testbench Environment Generator (XcelUVM Architect)."""
-    console.print("\n[bold cyan]══════════════════════════════════════════════════════════[/bold cyan]")
-    console.print("[bold cyan]      XcelUVM Architect — Autonomous UVM Testbench Generator[/bold cyan]")
-    console.print("[bold cyan]══════════════════════════════════════════════════════════[/bold cyan]\n")
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Production-Grade UVM 1.2 Testbench Environment Synthesis[/bold white]\n"
+            "[dim]Parses RTL AST, detects protocol compliance, and synthesizes complete UVM components,\n"
+            "scoreboards, reference models, functional coverage, and Questa/VCS simulation harnesses.[/dim]",
+            title="[bold cyan]🏗️  XCELUVM ARCHITECT — UVM TESTBENCH GENERATOR[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
     default_rtl = "projects/apb/rtl/apb_slave.sv" if Path("projects/apb/rtl/apb_slave.sv").exists() else "examples/rtl/alu.sv"
     if not rtl_path:
@@ -909,147 +1063,185 @@ def run_uvm_flow(
             default="output/uvm_environment",
         ).strip()
 
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]XcelUVM Architect Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Target RTL Design", str(rtl_path) if rtl_path else "[dim]Auto-synthesized[/dim]")
+    summary_table.add_row("Design Specification", str(spec_path) if spec_path else "[dim]Inferred from RTL & Protocol[/dim]")
+    summary_table.add_row("Output Directory", output_dir)
+    summary_table.add_row("Methodology Standard", "IEEE 1800.2 UVM 1.2 Production Testbench")
+
+    console.print(summary_table)
+    console.print()
+
     from verisight.uvm.uvm_architect import UVMArchitect
 
     with console.status("[bold green]Synthesizing complete UVM 1.2 Testbench Environment...[/bold green]"):
-        architect = UVMArchitect(output_dir=output_dir)
-        res = architect.generate(
-            rtl_path=str(rtl_path) if rtl_path else None,
-            spec_path=str(spec_path) if spec_path else None,
-            output_dir=output_dir,
-        )
+        try:
+            architect = UVMArchitect(output_dir=output_dir)
+            res = architect.generate(
+                rtl_path=str(rtl_path) if rtl_path else None,
+                spec_path=str(spec_path) if spec_path else None,
+                output_dir=output_dir,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]UVM Synthesis failed:[/] {e}")
+            return
 
-    console.print("\n[bold green]✓ Full UVM Testbench Environment Synthesized Successfully![/bold green]")
-    console.print(f"  Target Design:      [cyan]{res.design_name.upper()}[/cyan]")
-    console.print(f"  Detected Protocol:  [cyan]{res.protocol_detected.upper()}[/cyan]")
-    console.print(f"  DUT Ports Mapped:   [cyan]{res.inputs_count} inputs, {res.outputs_count} outputs[/cyan]")
-    console.print(f"  Output Directory:   [cyan]{res.output_dir}[/cyan]\n")
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Property", style="bold cyan", width=24)
+    scorecard.add_column("Value", style="bold white", width=54)
 
-    console.print("[bold]Generated UVM Components:[/bold]")
+    scorecard.add_row("Synthesis Status", "[bold green]✓ Complete UVM Environment Synthesized[/bold green]")
+    scorecard.add_row("Target Design", f"[bold white]{res.design_name.upper()}[/bold white]")
+    scorecard.add_row("Detected Protocol", f"[bold cyan]{res.protocol_detected.upper()}[/bold cyan]")
+    scorecard.add_row("DUT Ports Mapped", f"[bold white]{res.inputs_count} inputs, {res.outputs_count} outputs[/bold white]")
+    scorecard.add_row("Output Directory", f"[cyan]{res.output_dir}[/cyan]")
+    scorecard.add_row("Generated Components", f"[bold green]{len(res.files_generated)} components[/bold green]")
+
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] XCELUVM SYNTHESIS SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Formatted component table
+    comp_table = Table(
+        title=f"[bold cyan]Synthesized UVM Testbench Suite ({output_dir}/)[/bold cyan]",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+        show_lines=False,
+    )
+    comp_table.add_column("File / Component", style="bold white", width=30)
+    comp_table.add_column("UVM Class / Role", style="dim white", width=48)
+
     for f in res.files_generated:
-        console.print(f"  • [cyan]{f}[/cyan]")
+        f_name = Path(f).name
+        role = "UVM Component"
+        if "_if.sv" in f_name:
+            role = "SystemVerilog Interface & Modports"
+        elif "_seq_item.sv" in f_name:
+            role = "uvm_sequence_item (Constrained Transactions)"
+        elif "_sequencer.sv" in f_name:
+            role = "uvm_sequencer typedef"
+        elif "_driver.sv" in f_name:
+            role = "uvm_driver (Pin-level Protocol Driving)"
+        elif "_monitor.sv" in f_name:
+            role = "uvm_monitor (Protocol Sampling & Analysis Port)"
+        elif "_agent.sv" in f_name:
+            role = "uvm_agent (Active/Passive Configurable Agent)"
+        elif "_ref_model.sv" in f_name or "_reference_model.sv" in f_name:
+            role = "Behavioral Golden Reference Model"
+        elif "_scoreboard.sv" in f_name:
+            role = "uvm_scoreboard (In-order Checking & Error Counting)"
+        elif "_coverage.sv" in f_name:
+            role = "uvm_subscriber (Protocol Functional Coverage)"
+        elif "_seq.sv" in f_name or "_sequence.sv" in f_name:
+            role = "uvm_sequence (Sanity, Random & Corner-Case Sequences)"
+        elif "_env.sv" in f_name:
+            role = "uvm_env (Top Environment Topology)"
+        elif "_test.sv" in f_name:
+            role = "uvm_test (Base Test & Directed/Random Tests)"
+        elif "_pkg.sv" in f_name:
+            role = "SystemVerilog Package (`include wrapper)"
+        elif "_tb_top.sv" in f_name:
+            role = "Testbench Top Module (Clock/Reset Gen & DUT Instantiation)"
+        elif "run.do" in f_name:
+            role = "Siemens Questa / ModelSim Batch Simulation Script"
+        elif "Makefile" in f_name:
+            role = "Synopsys VCS / Questa Automation Makefile"
+
+        comp_table.add_row(f_name, role)
+
+    console.print(comp_table)
+    console.print()
+
+    # Next steps box
+    sim_guide = (
+        "[bold white]To run the synthesized UVM Testbench:[/bold white]\n"
+        f"  [cyan]cd {output_dir}[/cyan]\n"
+        "  • [bold]Siemens Questa / ModelSim:[/] [white]vsim -c -do run.do[/white]\n"
+        "  • [bold]Synopsys VCS:[/]              [white]make run_vcs[/white]\n"
+        "  • [bold]Cadence Xcelium:[/]           [white]make run_xcelium[/white]"
+    )
+    console.print(Panel(sim_guide, title="[bold cyan] Simulation Quick-Start [/bold cyan]", box=box.ROUNDED, border_style="cyan"))
     console.print()
 
 
 def run_wizard():
     """Execute the unified interactive guided setup wizard."""
-    _print_welcome_banner()
+    try:
+        _print_welcome_banner()
 
-    console.print("[bold cyan]Step 1: Choose Autonomous Workflow[/bold cyan]")
-    console.print("  [1] [bold green]🛠️  VeriSight Debug[/bold green]  — Root-Cause Analysis & Fix for Sim Failures")
-    console.print("  [2] [bold green]📋 VeriSight Plan[/bold green]   — Generate Test Plan, Coverage Model & SVA Suite")
-    console.print("  [3] [bold green]🚀 Closed-Loop Sim[/bold green]  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit")
-    console.print("  [4] [bold cyan]🌐 Live Web Cockpit[/bold cyan] — Launch Interactive Browser Studio (Sim/Waveforms/RCA)")
-    console.print("  [5] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
-    console.print("  [6] [bold magenta]📦 Export for EDA Playground[/bold magenta] — Package RTL+TB for Cloud Questa / VCS")
-    console.print("  [7] [bold blue]🏗️  XcelUVM Testbench Architect[/bold blue] — Generate Full Production UVM Testbench")
-    console.print("  [8] [bold red]🚪 Exit[/bold red]")
-    console.print()
+        table = Table(
+            title="[bold cyan]Step 1: Select Autonomous Verification Engine[/bold cyan]",
+            box=box.ROUNDED,
+            header_style="bold cyan",
+            show_lines=True,
+        )
+        table.add_column("Opt", justify="center", style="bold yellow", width=5)
+        table.add_column("Autonomous Engine", style="bold white", width=25)
+        table.add_column("Primary Verification Capability", style="white")
 
-    workflow = Prompt.ask(
-        "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5", "6", "7", "8"],
-        default="1",
-    )
+        table.add_row(
+            "1",
+            "🛠️  VeriSight Debug",
+            "Autonomous Root-Cause Analysis, Failure Localization & Code Patching",
+        )
+        table.add_row(
+            "2",
+            "📋 VeriSight Plan",
+            "Test Plan Generation, Protocol Coverage Models & SVA Assertion Suites",
+        )
+        table.add_row(
+            "3",
+            "🏗️  XcelUVM Architect",
+            "Autonomous Full Production UVM 1.2 Testbench Environment Synthesis",
+        )
+        table.add_row(
+            "4",
+            "🚪 Exit",
+            "Quit VeriSight Launcher",
+        )
 
-    if workflow == "8":
-        console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
+        console.print(table)
+        console.print()
+
+        workflow = Prompt.ask(
+            "[bold cyan]Select an option[/bold cyan]",
+            choices=["1", "2", "3", "4"],
+            default="1",
+        )
+
+        if workflow == "4":
+            console.print("\n[dim]Exiting VeriSight. Goodbye![/dim]\n")
+            sys.exit(0)
+
+        if workflow == "3":
+            run_uvm_flow()
+            return
+
+        console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
+        provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
+
+        if workflow == "1":
+            run_debug_flow(
+                provider, api_key, model_name,
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+
+        elif workflow == "2":
+            run_plan_flow(
+                provider, api_key, model_name,
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+
+    except KeyboardInterrupt:
+        console.print("\n\n[dim]Launcher interrupted by user. Exiting VeriSight.[/dim]\n")
         sys.exit(0)
-
-    if workflow == "7":
-        run_uvm_flow()
-        return
-
-    if workflow == "6":
-        run_edaplayground_export_flow()
-        return
-
-    if workflow == "4":
-        from verisight.server.app import start_server
-        console.print("\n[bold cyan]⚡ Launching VeriSight Live Web Cockpit at http://127.0.0.1:8000[/bold cyan]")
-        start_server(host="127.0.0.1", port=8000, open_browser=True)
-        return
-
-    console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
-    provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
-
-    if workflow == "1":
-        run_debug_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "2":
-        run_plan_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "3":
-        run_sim_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "5":
-        console.print("\n[bold cyan]Select Pre-packaged Demo:[/bold cyan]")
-        console.print("  [1] ALU Debug Demo   (Detect Missing Reset Bug)")
-        console.print("  [2] FIFO Debug Demo  (Synchronous FIFO UVM Debug)")
-        console.print("  [3] ALU Plan Demo    (Generate Full Test Plan, SV Coverage & SVA for ALU)")
-        console.print("  [4] FIFO Plan Demo   (Generate Full Test Plan, SV Coverage & SVA for FIFO)")
-        console.print("  [5] ALU Closed-Loop  (Simulate ALU RTL+TB -> Waveform RCA -> Coverage)")
-        console.print("  [6] ALU Cloud Export (Generate EDA Playground Questa/VCS Bundle)")
-
-        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4", "5", "6"], default="1")
-
-        if demo_sel == "1":
-            run_debug_flow(
-                provider, api_key, model_name,
-                spec_path="examples/specs/alu_spec.md",
-                rtl_path="examples/rtl/",
-                tb_path="examples/tb/",
-                log_path="examples/logs/sim.log",
-                output_dir="output/demo_alu_debug",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "2":
-            run_debug_flow(
-                provider, api_key, model_name,
-                spec_path="projects/fifo/specs/spec.md",
-                rtl_path="projects/fifo/rtl/",
-                tb_path="projects/fifo/tb/",
-                log_path="projects/fifo/logs/sim.log",
-                output_dir="output/demo_fifo_debug",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "3":
-            run_plan_flow(
-                provider, api_key, model_name,
-                spec_path="examples/specs/alu_spec.md",
-                rtl_path="examples/rtl/",
-                output_dir="output/demo_alu_plan",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "4":
-            run_plan_flow(
-                provider, api_key, model_name,
-                spec_path="projects/fifo/specs/spec.md",
-                rtl_path="projects/fifo/rtl/",
-                output_dir="output/demo_fifo_plan",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "5":
-            run_sim_flow(
-                provider, api_key, model_name,
-                rtl_path="examples/rtl/alu.sv",
-                tb_path="examples/tb/alu_tb.sv",
-                spec_path="examples/specs/alu_spec.md",
-                output_dir="output/demo_alu_closed_loop",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "6":
-            run_edaplayground_export_flow(
-                rtl_path="examples/rtl/alu.sv",
-                tb_path="examples/tb/alu_tb.sv",
-                output_dir="output/demo_alu_edaplayground",
-            )
