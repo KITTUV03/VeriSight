@@ -59,8 +59,9 @@ Examples:
             "start", "wizard", "train", "train-kb", "learn", "plan",
             "sim", "simulate", "serve", "server", "web", "cockpit", "ui",
             "export-edaplayground", "edaplayground", "edaplay",
+            "tb", "testbench", "gentb", "uvm",
         ],
-        help="Optional command: 'start' (guided wizard), 'train' (train & ground RAG knowledge base on 100+ verification scenarios), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), 'serve' (live interactive web cockpit), or 'export-edaplayground' (bundle for EDA Playground cloud simulation)",
+        help="Optional command: 'start' (guided wizard), 'tb' (spec-driven testbench generation agent), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), 'serve' (live interactive web cockpit), or 'export-edaplayground' (bundle for EDA Playground cloud simulation)",
     )
     parser.add_argument(
         "--export-edaplayground",
@@ -447,6 +448,19 @@ def main():
             coverage_path=args.coverage,
             generate_uvm=args.generate_uvm,
         )
+        return
+
+    # Handle 'tb' / 'testbench' / 'gentb' / 'uvm' command: Spec-Driven Testbench Generation Agent (Workflow 4)
+    if args.command in ("tb", "testbench", "gentb", "uvm"):
+        from verisight.agents.spec_driven_tb_agent import SpecDrivenTestbenchAgent
+        if not args.spec or not args.rtl:
+            console.print("[red]Error:[/red] Spec-Driven Testbench Generation requires both --spec and --rtl.")
+            console.print("  Example: python main.py tb --spec projects/ram/specs/spec.md --rtl projects/ram/rtl/ram_rtl.sv --output output/spec_driven_uvm")
+            sys.exit(1)
+        tb_output = args.output if args.output != "output" else "output/spec_driven_uvm"
+        agent = SpecDrivenTestbenchAgent(output_dir=tb_output)
+        res = agent.generate_testbench(spec_path=args.spec, rtl_path=args.rtl, output_dir=tb_output, run_sim=True)
+        console.print(f"[bold green]✓ Spec-Driven UVM Testbench generated successfully in:[/] {res.output_dir}")
         return
 
     # Handle 'train' command: Knowledge Base Training & Dataset Population

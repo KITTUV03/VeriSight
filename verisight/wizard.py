@@ -1174,6 +1174,102 @@ def run_uvm_flow(
     console.print()
 
 
+def run_spec_driven_tb_flow(
+    rtl_path: Optional[str] = None,
+    spec_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Run Spec-Driven Testbench Generation Agent (Workflow 4)."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Spec-Driven Testbench Generation Agent (Workflow 4)[/bold white]\n"
+            "[dim]Synthesizes complete, specification-grounded SystemVerilog UVM 1.2 testbenches.\n"
+            "Enforces that the Specification is the functional source of truth: reference models and\n"
+            "scoreboards independently discover RTL defects rather than reproducing them.[/dim]",
+            title="[bold magenta]🎯 VERISIGHT TESTBENCH — SPEC-DRIVEN UVM SYNTHESIS[/bold magenta]",
+            box=box.ROUNDED,
+            border_style="magenta",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
+
+    default_rtl = "projects/ram/rtl/ram_rtl.sv" if Path("projects/ram/rtl/ram_rtl.sv").exists() else "examples/rtl/alu.sv"
+    if not rtl_path:
+        rtl_path = _prompt_path(
+            "Path to RTL source file (.sv, .v)",
+            required=True,
+            default=default_rtl,
+        )
+
+    default_spec = "projects/ram/specs/spec.md" if Path("projects/ram/specs/spec.md").exists() else "examples/specs/alu_spec.md"
+    if not spec_path:
+        spec_path = _prompt_path(
+            "Path to Design Specification file (.md, .txt)",
+            required=True,
+            default=default_spec,
+        )
+
+    if not output_dir:
+        output_dir = Prompt.ask(
+            "[bold]Output directory for generated UVM environment[/bold]",
+            default="output/spec_driven_uvm",
+        ).strip()
+
+    from verisight.agents.spec_driven_tb_agent import SpecDrivenTestbenchAgent
+
+    with console.status("[bold magenta]Running Spec-Driven Testbench Generation Agent...[/bold magenta]"):
+        try:
+            agent = SpecDrivenTestbenchAgent(output_dir=output_dir)
+            res = agent.generate_testbench(
+                spec_path=str(spec_path),
+                rtl_path=str(rtl_path),
+                output_dir=output_dir,
+                run_sim=True,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Spec-Driven Testbench Generation failed:[/] {e}")
+            return
+
+    # Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="magenta", expand=False)
+    scorecard.add_column("Property", style="bold magenta", width=28)
+    scorecard.add_column("Value", style="bold white", width=54)
+
+    scorecard.add_row("Agent Workflow", "[bold magenta]Workflow 4: Spec-Driven Testbench[/bold magenta]")
+    scorecard.add_row("Target Design", f"[bold white]{res.design_name.upper()}[/bold white]")
+    scorecard.add_row("Specification Title", f"[cyan]{res.mental_model.spec_title}[/cyan]")
+    scorecard.add_row("Requirements Grounded", f"[bold green]{len(res.requirements)} atomic REQ items[/bold green]")
+    scorecard.add_row("Intent vs. RTL Checks", f"[bold yellow]{len(res.mental_model.intent_vs_implementation)} checkpoints[/bold yellow]")
+    scorecard.add_row("Static Syntax Review", "[bold green]✓ Passed (pyslang IEEE 1800)[/bold green]" if res.static_validation.syntax_clean else "[bold red]Diagnostics Logged[/bold red]")
+    if res.simulation_validation:
+        sim_stat = "[bold yellow]RTL Defect Successfully Exposed![/bold yellow]" if res.simulation_validation.mismatches_detected > 0 else "[bold green]Simulation Passed Cleanly[/bold green]"
+        scorecard.add_row("Simulation Status", sim_stat)
+        scorecard.add_row("Scoreboard Findings", f"{res.simulation_validation.mismatches_detected} mismatches against spec")
+
+    console.print()
+    console.print(Panel(scorecard, title="[bold magenta] SPEC-DRIVEN VERIFICATION SCORECARD [/bold magenta]", box=box.ROUNDED, border_style="magenta"))
+    console.print()
+
+    # Formatted component table
+    comp_table = Table(
+        title=f"[bold magenta]Synthesized Spec-Driven UVM Suite ({output_dir}/)[/bold magenta]",
+        box=box.ROUNDED,
+        header_style="bold magenta",
+        show_lines=False,
+    )
+    comp_table.add_column("File / Component", style="bold white", width=32)
+    comp_table.add_column("UVM Class / Role", style="dim white", width=46)
+
+    for comp in res.uvm_components:
+        comp_table.add_row(comp.file_name, comp.role)
+
+    console.print(comp_table)
+    console.print()
+
+
 def run_wizard():
     """Execute the unified interactive guided setup wizard."""
     try:
@@ -1206,6 +1302,11 @@ def run_wizard():
         )
         table.add_row(
             "4",
+            "🎯 VeriSight TestBench",
+            "Spec-Driven UVM Testbench Synthesis with Specification-Grounded Reference Models",
+        )
+        table.add_row(
+            "5",
             "🚪 Exit",
             "Quit VeriSight Launcher",
         )
@@ -1215,13 +1316,17 @@ def run_wizard():
 
         workflow = Prompt.ask(
             "[bold cyan]Select an option[/bold cyan]",
-            choices=["1", "2", "3", "4"],
+            choices=["1", "2", "3", "4", "5"],
             default="1",
         )
 
-        if workflow == "4":
+        if workflow == "5":
             console.print("\n[dim]Exiting VeriSight. Goodbye![/dim]\n")
             sys.exit(0)
+
+        if workflow == "4":
+            run_spec_driven_tb_flow()
+            return
 
         if workflow == "3":
             run_uvm_flow()
