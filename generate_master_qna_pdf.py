@@ -607,3 +607,4 @@ def build_master_qna_pdf(output_path: str):
 if __name__ == "__main__":
     out_file = sys.argv[1] if len(sys.argv) > 1 else "VeriSight_Master_Demonstration_QnA_Guide.pdf"
     build_master_qna_pdf(out_file)
+
