@@ -1,7 +1,3 @@
-"""
-External tool orchestration for VeriSight.
+from verisight.tools.eda_playground_exporter import export_to_edaplayground
 
-Wraps third-party CLI tools (yosys, x-tracer) used for real
-X-propagation root-cause analysis, as opposed to the static
-heuristic analysis Agent 3 performs by default.
-"""
+__all__ = ["export_to_edaplayground"]

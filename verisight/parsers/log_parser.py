@@ -16,8 +16,9 @@ from verisight.schemas.log_schema import (
     LogKnowledge, LogEntry, AssertionFailure, ScoreboardMismatch,
     Timeout, ConstraintFailure, NullPointer, FactoryError,
     ConfigDBFailure, TLMFailure, PhaseDeadlock, ProtocolViolation,
-    SimulationSummary,
+    SimulationSummary, ToolError, FailureEvent,
 )
+from verisight.analysis import failure_analysis as fa
 from verisight.utils.file_utils import read_file
 from verisight.utils.logger import get_logger
 
@@ -130,16 +131,48 @@ def parse_log(filepath: str) -> LogKnowledge:
     # Parse protocol violations
     _parse_protocol_violations(content, log)
 
-    # Generate summary
-    log.summary = _generate_summary(content, log)
+    # Detect simulator-native compile/elaboration errors (non-UVM). These carry
+    # no UVM severity token and were previously dropped, causing a compile/elab
+    # failure to be mis-reported as PASS.
+    tool_errors = fa.detect_tool_errors(lines)
+    log.tool_errors = [ToolError(**te) for te in tool_errors]
+
+    # Generate summary (now aware of the failure stage).
+    log.summary = _generate_summary(content, log, tool_errors)
+
+    # Select the earliest causally-relevant failure as the root-cause anchor,
+    # instead of letting downstream code assume errors[0] is primary.
+    primary = fa.select_primary_event(log, tool_errors)
+    if primary:
+        log.primary_event = FailureEvent(**{k: v for k, v in primary.items() if k in FailureEvent.model_fields})
+        log.cascade_events = [
+            FailureEvent(**{k: v for k, v in ev.items() if k in FailureEvent.model_fields})
+            for ev in fa.build_cascade(log, primary)
+        ]
 
     logger.info(
         f"Log parsed: {log.summary.total_errors} errors, "
         f"{log.summary.total_fatals} fatals, "
         f"{len(log.assertion_failures)} assertion failures, "
-        f"{len(log.scoreboard_mismatches)} mismatches"
+        f"{len(log.scoreboard_mismatches)} mismatches, "
+        f"{len(log.tool_errors)} compile/elab errors, "
+        f"stage={log.summary.failure_stage}"
     )
     return log
+
+
+def _fmt_timestamp(line: str, value: str) -> str:
+    """Format a timestamp preserving the ACTUAL time unit from the line.
+
+    The original parser hardcoded ' ns' for every match, corrupting ordering
+    across mixed-unit logs (a '500 ps' event and a '500 ns' event both became
+    '500 ns'). Here we recover the real unit so downstream time math is correct.
+    """
+    if not value:
+        return ""
+    m = re.search(rf"@\s*{re.escape(value)}\s*(fs|ps|ns|us|ms|s)\b", line)
+    unit = m.group(1) if m else "ns"
+    return f"{value} {unit}"
 
 
 def _parse_uvm_entries(content: str, lines: List[str], log: LogKnowledge) -> None:
@@ -153,13 +186,15 @@ def _parse_uvm_entries(content: str, lines: List[str], log: LogKnowledge) -> Non
             src_line = int(match.group(3)) if match.group(3) else 0
             timestamp = match.group(4) or ""
             component = match.group(5) or ""
+            msg_id = match.group(6) or ""
             msg = match.group(7) or ""
 
             entry = LogEntry(
                 severity=severity,
-                timestamp=f"{timestamp} ns" if timestamp else "",
+                timestamp=_fmt_timestamp(line, timestamp),
                 component=component,
                 message=msg.strip(),
+                message_id=msg_id,
                 file=src_file,
                 line=src_line,
                 raw_line=line.strip(),
@@ -184,7 +219,7 @@ def _parse_uvm_entries(content: str, lines: List[str], log: LogKnowledge) -> Non
 
             entry = LogEntry(
                 severity=severity,
-                timestamp=f"{timestamp} ns" if timestamp else "",
+                timestamp=_fmt_timestamp(line, timestamp),
                 message=msg.strip(),
                 raw_line=line.strip(),
                 line_number_in_log=i + 1,
@@ -367,16 +402,27 @@ def _parse_protocol_violations(content: str, log: LogKnowledge) -> None:
         ))
 
 
-def _generate_summary(content: str, log: LogKnowledge) -> SimulationSummary:
+def _generate_summary(content: str, log: LogKnowledge,
+                      tool_errors: Optional[List[dict]] = None) -> SimulationSummary:
     """Generate simulation summary from parsed data."""
+    tool_errors = tool_errors or []
     # Count severities
     total_info = sum(1 for e in log.entries if e.severity == "UVM_INFO")
     total_warnings = len(log.warnings)
     total_errors = len(log.errors)
     total_fatals = len(log.fatals)
 
-    # Determine pass/fail
-    if total_fatals > 0 or total_errors > 0:
+    # Determine the failure stage. A compile/elaboration error means the run
+    # failed even with zero UVM_ERROR lines — this closes the false-PASS hole.
+    runtime_failed = (
+        total_fatals > 0 or total_errors > 0
+        or bool(log.assertion_failures) or bool(log.scoreboard_mismatches)
+    )
+    build_marker = fa.has_build_failure_marker(content)
+    failure_stage = fa.determine_failure_stage(tool_errors, runtime_failed, build_marker)
+
+    # Determine pass/fail (now considers compile/elab failures too).
+    if failure_stage != "none":
         pass_fail = "FAIL"
     else:
         pass_fail = "PASS"
@@ -422,5 +468,6 @@ def _generate_summary(content: str, log: LogKnowledge) -> SimulationSummary:
         total_fatals=total_fatals,
         simulation_time=sim_time,
         pass_fail=pass_fail,
+        failure_stage=failure_stage,
         seed=seed,
     )

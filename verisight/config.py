@@ -14,7 +14,11 @@ from typing import List, Optional
 from dotenv import load_dotenv
 
 # Load .env file from project root
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+env_file = Path(__file__).resolve().parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(dotenv_path=env_file, override=True)
+elif Path(".env").exists():
+    load_dotenv(dotenv_path=Path(".env"), override=True)
 
 
 @dataclass
@@ -54,6 +58,10 @@ class LLMConfig:
                 self.provider = env_provider.lower()
             elif self.airgap:
                 self.provider = "ollama"
+            elif os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+                self.provider = "gemini"
+            elif os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY"):
+                self.provider = "anthropic"
             else:
                 self.provider = "gemini"
         else:
@@ -68,8 +76,8 @@ class LLMConfig:
         # Auto-detect provider if model name starts with claude
         if self.model_name and self.model_name.lower().startswith("claude"):
             self.provider = "anthropic"
-        # Auto-switch to anthropic if ANTHROPIC_API_KEY is present and GEMINI_API_KEY is missing
-        elif self.provider == "gemini" and not os.getenv("GEMINI_API_KEY") and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")):
+        # Auto-switch to anthropic only if ANTHROPIC_API_KEY is present and NO Gemini key is configured
+        elif self.provider == "gemini" and not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")) and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")):
             self.provider = "anthropic"
 
         # Normalize aliases
@@ -85,14 +93,14 @@ class LLMConfig:
             elif self.provider == "anthropic":
                 self.model_name = "claude-sonnet-5"
             else:
-                self.model_name = "gemini-2.0-flash"
+                self.model_name = "gemini-3.5-flash"
 
         # Resolve API key based on provider
         if not self.api_key and self.provider not in ("ollama", "local", "vllm", "localai", "airgap"):
             if self.provider == "anthropic":
                 self.api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY", "")
             else:
-                self.api_key = os.getenv("GEMINI_API_KEY", "")
+                self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
 
 
 @dataclass
@@ -115,6 +123,14 @@ class PipelineConfig:
     save_intermediates: bool = True
     enable_rag: bool = True
     rag_n_results: int = 5
+    # Minimum cosine similarity (0-1) for a retrieved RAG document to be used.
+    # Below this, a "similar" neighbour is too dissimilar to be relevant and is
+    # dropped (the old code returned top-k regardless of distance).
+    rag_min_similarity: float = 0.25
+    # A run's conclusion is only written back to the knowledge base when its
+    # confidence is at least this (0-100) AND it is not 'Unknown'. Prevents
+    # low-confidence / abstained / fabricated conclusions from self-reinforcing.
+    rag_writeback_min_confidence: int = 70
     verbose: bool = False
     output_dir: str = "output"
 
@@ -132,11 +148,17 @@ class XTracerConfig:
     top_module: str = ""
     vcd_path: str = ""
     signal: str = ""
+    signals: List[str] = field(default_factory=list)
     time_ps: Optional[int] = None
     xtracer_path: str = ""
     max_depth: int = 100
 
     def __post_init__(self):
+        if not self.signals and self.signal:
+            self.signals = [s.strip() for s in self.signal.split(",") if s.strip()]
+        elif self.signals and not self.signal:
+            self.signal = self.signals[0]
+
         if not self.xtracer_path:
             env_path = os.getenv("VERISIGHT_XTRACER_PATH")
             if env_path:
@@ -155,9 +177,11 @@ class FixConfig:
     enabled=False makes Agent 5 a no-op, preserving the existing pipeline
     behaviour exactly. min_confidence is the evidence-weighted threshold
     below which the agent declines to emit a fix.
+    allow_tb_fix=False restricts fixes to RTL only by default.
     """
     enabled: bool = True
     min_confidence: float = 0.70
+    allow_tb_fix: bool = False
     fix_output_subdir: str = "fix"   # relative to pipeline output_dir
 
     def __post_init__(self):
@@ -172,6 +196,38 @@ class FixConfig:
             except ValueError:
                 pass
 
+        env_allow_tb = os.getenv("VERISIGHT_ALLOW_TB_FIX")
+        if env_allow_tb is not None:
+            self.allow_tb_fix = env_allow_tb.lower() in ("1", "true", "yes")
+
+
+@dataclass
+class DPOConfig:
+    """
+    Configuration for Direct Preference Optimization (DPO) with LoRA.
+    Allows Workflow 2 (Planning Engine) to utilize preference-aligned adapters.
+    """
+    enabled: bool = False
+    adapter_path: str = "models/verisight_plan_dpo_adapter"
+    beta: float = 0.1
+    dataset_path: str = "data/preferences/workflow2_dpo.jsonl"
+    lora_r: int = 16
+    lora_alpha: int = 32
+
+    def __post_init__(self):
+        env_enabled = os.getenv("VERISIGHT_DPO_ENABLED")
+        if env_enabled is not None:
+            self.enabled = env_enabled.lower() in ("1", "true", "yes")
+        env_adapter = os.getenv("VERISIGHT_DPO_ADAPTER_PATH")
+        if env_adapter:
+            self.adapter_path = env_adapter
+        env_beta = os.getenv("VERISIGHT_DPO_BETA")
+        if env_beta:
+            try:
+                self.beta = float(env_beta)
+            except ValueError:
+                pass
+
 
 @dataclass
 class VeriSightConfig:
@@ -181,6 +237,7 @@ class VeriSightConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     xtracer: XTracerConfig = field(default_factory=XTracerConfig)
     fix: FixConfig = field(default_factory=FixConfig)
+    dpo: DPOConfig = field(default_factory=DPOConfig)
     log_level: str = ""
 
     def __post_init__(self):

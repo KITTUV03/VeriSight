@@ -1,0 +1,19 @@
+{
+  "id": "compile_error_falsepass",
+  "title": "Verilator compile error (no UVM errors) must not be reported as a clean pass",
+  "category_tag": "compile_error_robustness",
+  "source": "Synthetic (eval/synthetic/compile_error). Exercises Phase-2 diagnosis C: non-UVM / compile errors dropped -> false PASS.",
+  "ground_truth_confidence": "high",
+  "inputs": {
+    "log": "eval/synthetic/compile_error/sim.log"
+  },
+  "ground_truth": {
+    "must_detect_failure": true,
+    "category_keywords": ["compil", "syntax", "elaborat", "build"],
+    "expect_insufficient_evidence": false,
+    "notes": "Log contains Verilator %Error compile diagnostics and 'Exiting due to 2 error(s)' but zero UVM_ERROR lines. The current parser finds 0 errors -> pass_fail=PASS -> Agent 2 declares 'no failure'. Correct behaviour: recognise a build/compile failure."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["apb_slave", "Protocol Violation", "X Propagation"]
+  }
+}

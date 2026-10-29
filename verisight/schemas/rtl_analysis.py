@@ -100,6 +100,20 @@ class XTraceResult(BaseModel):
         default="",
         description="Human-readable explanation of tool_status"
     )
+    parser_backend: str = Field(
+        default="",
+        description="Frontend used to parse the RTL (pyslang / regex-fallback)"
+    )
+    parser_degraded: bool = Field(
+        default=False,
+        description="True if RTL parsing was partial/degraded (fallback or "
+                    "unresolved dependencies) — static X analysis is then approximate"
+    )
+    limitations: List[str] = Field(
+        default_factory=list,
+        description="Explicit limitations of this analysis (e.g. static vs "
+                    "simulation, degraded parse, missing source context)"
+    )
 
 
 # ─── Module 2: Functional Analyzer ─────────────────────────────────
@@ -320,6 +334,14 @@ class RTLAnalysis(BaseModel):
     misc: MiscResult = Field(
         default_factory=MiscResult,
         description="Miscellaneous analysis"
+    )
+    traceweave: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="TraceWeave correlated failure-waveform-RTL evidence"
+    )
+    fault_localization: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Spectrum-Based Fault Localization (CirFix SBFL) ranking"
     )
     primary_root_cause: str = Field(
         default="",

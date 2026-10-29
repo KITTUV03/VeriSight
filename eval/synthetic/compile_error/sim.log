@@ -1,0 +1,10 @@
+# Verilator compile run (synthetic) — build FAILED before any simulation ran.
+# Ground truth: this is a COMPILATION error. No UVM phases executed, no test ran.
+# A correct tool must NOT report this as a passing / clean run.
+%Error: rtl/alu.sv:48: syntax error, unexpected ';', expecting ')' or ','
+   48 |         result <= alu_out[7:0]  ;
+      |                                 ^
+%Error: rtl/alu.sv:22: Define or directive not defined: '`DATA_W'
+%Error: Exiting due to 2 error(s)
+%Error: Command Failed /usr/local/bin/verilator_bin --cc --exe rtl/alu.sv
+make[1]: *** [Vtop] Error 1

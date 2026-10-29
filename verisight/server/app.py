@@ -42,7 +42,7 @@ class SimRequest(BaseModel):
     airgap: bool = True
     provider: Optional[str] = "gemini"
     api_key: Optional[str] = None
-    model_name: Optional[str] = "gemini-2.0-flash"
+    model_name: Optional[str] = "gemini-3.5-flash"
 
 
 class ApplyFixRequest(BaseModel):
@@ -53,6 +53,14 @@ class ApplyFixRequest(BaseModel):
 
 class RevertFixRequest(BaseModel):
     target_file: str
+
+
+class ExportEDAPlaygroundRequest(BaseModel):
+    rtl_path: str = "examples/rtl/alu.sv"
+    tb_path: str = "examples/tb/alu_tb.sv"
+    output_dir: str = "output/edaplayground"
+    preferred_simulator: str = "questa"
+    anonymize_rtl: bool = False
 
 
 def create_app() -> FastAPI:
@@ -328,6 +336,33 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.exception("Simulation execution failed")
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/export/edaplayground")
+    async def export_edaplayground_api(req: ExportEDAPlaygroundRequest):
+        """Export RTL and testbench into an EDA Playground bundle."""
+        from verisight.tools.eda_playground_exporter import export_to_edaplayground
+
+        rtl = str(WORKSPACE_DIR / req.rtl_path) if not Path(req.rtl_path).is_absolute() else req.rtl_path
+        tb = str(WORKSPACE_DIR / req.tb_path) if not Path(req.tb_path).is_absolute() else req.tb_path
+        out = str(WORKSPACE_DIR / req.output_dir) if not Path(req.output_dir).is_absolute() else req.output_dir
+
+        if not Path(rtl).exists():
+            raise HTTPException(status_code=400, detail=f"RTL path does not exist: {req.rtl_path}")
+        if not Path(tb).exists():
+            raise HTTPException(status_code=400, detail=f"Testbench path does not exist: {req.tb_path}")
+
+        try:
+            res = export_to_edaplayground(
+                rtl_path=rtl,
+                tb_path=tb,
+                output_dir=out,
+                preferred_simulator=req.preferred_simulator,
+                anonymize_rtl=req.anonymize_rtl,
+            )
+            return JSONResponse(res)
+        except Exception as e:
+            logger.exception("EDA Playground export failed")
+            raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
     @app.get("/api/waveform")
     async def get_waveform_data(path: Optional[str] = None):

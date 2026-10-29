@@ -22,7 +22,7 @@ from verisight.tools.sim_runner import SimulatorNotFoundError, SimulationError
 from verisight.utils.logger import setup_logging, console
 
 
-def parse_args():
+def parse_args(args=None):
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="verisight",
@@ -55,7 +55,18 @@ Examples:
         "command",
         nargs="?",
         default=None,
-        help="Optional command: 'start' (guided wizard), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), or 'serve' (live interactive web cockpit)",
+        choices=[
+            "start", "wizard", "train", "train-kb", "learn", "plan",
+            "sim", "simulate", "serve", "server", "web", "cockpit", "ui",
+            "export-edaplayground", "edaplayground", "edaplay",
+            "tb", "testbench", "gentb", "uvm", "dpo", "train-dpo",
+        ],
+        help="Optional command: 'start' (guided wizard), 'tb' (spec-driven testbench generation agent), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), 'serve' (live interactive web cockpit), or 'export-edaplayground' (bundle for EDA Playground cloud simulation)",
+    )
+    parser.add_argument(
+        "--export-edaplayground",
+        action="store_true",
+        help="Export RTL and testbench into an EDA Playground cloud simulation bundle (design.sv, testbench.sv, and launch dashboard)",
     )
     parser.add_argument(
         "--interactive", "-i",
@@ -106,6 +117,11 @@ Examples:
         type=str,
         help="Path to coverage report file (optional)",
     )
+    parser.add_argument(
+        "--generate-uvm",
+        action="store_true",
+        help="With 'plan': also generate a full UVM testbench environment whose coverage subscriber reuses the plan's own covergroups",
+    )
 
     # Output
     parser.add_argument(
@@ -145,6 +161,11 @@ Examples:
             "emits a fix. Default: 0.70. Fixes below this threshold are declined."
         ),
     )
+    parser.add_argument(
+        "--allow-tb-fix",
+        action="store_true",
+        help="Allow automated fixes to testbench code (default: false, RTL only)",
+    )
 
     # Simulation (--simulate) — all optional
     sim_group = parser.add_argument_group("Simulation")
@@ -157,10 +178,9 @@ Examples:
     sim_group.add_argument(
         "--simulator",
         type=str,
-        choices=["iverilog", "verilator"],
-        default="iverilog",
-        help="Simulator backend for --simulate (default: iverilog — best UVM-lite "
-             "compatibility, size, and ease of use; verilator is experimental)",
+        choices=["auto", "verilator", "iverilog", "xsim", "dsim", "vcs", "questa", "xcelium"],
+        default="auto",
+        help="Simulator backend for --simulate (default: auto; choices: auto, verilator, iverilog, xsim, dsim, vcs, questa, xcelium)",
     )
     sim_group.add_argument(
         "--sim-top",
@@ -206,14 +226,13 @@ Examples:
     xtrace_group.add_argument(
         "--xtrace-signal",
         type=str,
-        help="Explicit signal path to trace (e.g. tb.dut.y[0]), overrides "
-             "auto-derivation from the sim log. Must be given with --xtrace-time",
+        help="Explicit signal path(s) to trace (comma-separated, e.g. tb.dut.valid,tb.dut.ready), overrides "
+             "auto-derivation from the sim log",
     )
     xtrace_group.add_argument(
         "--xtrace-time",
         type=int,
-        help="Explicit query time in picoseconds, overrides auto-derivation. "
-             "Must be given with --xtrace-signal",
+        help="Explicit query time in picoseconds, overrides auto-derivation",
     )
     xtrace_group.add_argument(
         "--xtracer-path",
@@ -242,7 +261,7 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        help="LLM model name (e.g. gemini-2.0-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
+        help="LLM model name (e.g. gemini-3.5-flash, claude-sonnet-5, deepseek-coder:33b, qwen2.5-coder:32b)",
     )
     parser.add_argument(
         "--airgap",
@@ -260,8 +279,19 @@ Examples:
         action="store_true",
         help="Sanitize and mask proprietary module and signal identifiers before model ingestion for confidential IP protection.",
     )
+    parser.add_argument(
+        "--dpo",
+        action="store_true",
+        help="Enable Direct Preference Optimization (DPO) LoRA adapter for Workflow 2 verification planning",
+    )
+    parser.add_argument(
+        "--dpo-adapter",
+        type=str,
+        default="models/verisight_plan_dpo_adapter",
+        help="Path to trained DPO LoRA adapter directory (default: models/verisight_plan_dpo_adapter)",
+    )
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def validate_inputs(args) -> bool:
@@ -290,14 +320,13 @@ def validate_inputs(args) -> bool:
             valid = False
 
     if args.vcd and not Path(args.vcd).exists():
-        console.print(f"[red]Error:[/red] VCD file not found: {args.vcd}")
-        valid = False
-
-    if bool(args.xtrace_signal) != bool(args.xtrace_time is not None):
-        console.print(
-            "[red]Error:[/red] --xtrace-signal and --xtrace-time must be given together"
-        )
-        valid = False
+        if args.simulate:
+            pass
+        elif args.xtrace:
+            console.print(f"[red]Error:[/red] VCD file not found for X-Tracer: {args.vcd}")
+            valid = False
+        else:
+            console.print(f"[yellow]Warning:[/yellow] VCD file not found: {args.vcd}. Proceeding without waveform evidence.")
 
     if args.simulate:
         if not (args.rtl and args.tb):
@@ -309,13 +338,13 @@ def validate_inputs(args) -> bool:
                 "the freshly generated simulation log will be used instead"
             )
     elif not any([args.spec, args.rtl, args.tb, args.log]):
-        if getattr(args, "command", None) in ("start", "wizard") or getattr(args, "interactive", False):
+        if getattr(args, "command", None) in ("start", "wizard", "train", "train-kb", "learn", "dpo", "train-dpo") or getattr(args, "interactive", False):
             return True
         console.print("[red]Error:[/red] At least one input must be provided (or run 'python main.py start' for interactive mode)")
         console.print("  Use --spec, --rtl, --tb, or --log")
         valid = False
 
-    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
+    if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui", "export-edaplayground", "edaplayground", "edaplay") or getattr(args, "export_edaplayground", False):
         return True
 
     if getattr(args, "command", None) == "plan":
@@ -335,6 +364,41 @@ def main():
         return
 
     args = parse_args()
+
+    # Handle 'export-edaplayground' / 'edaplayground'
+    if getattr(args, "command", None) in ("export-edaplayground", "edaplayground", "edaplay") or getattr(args, "export_edaplayground", False):
+        from verisight.tools.eda_playground_exporter import export_to_edaplayground
+        from verisight.wizard import _open_html_in_browser
+
+        rtl_in = args.rtl or "examples/rtl/alu.sv"
+        tb_in = args.tb or "examples/tb/alu_tb.sv"
+        out_dir = args.output if args.output != "output" else "output/edaplayground"
+
+        console.print("\n[bold cyan]📦 VeriSight — EDA Playground Cloud Bundle Exporter[/bold cyan]")
+        console.print(f"  [dim]RTL Source:[/]       {rtl_in}")
+        console.print(f"  [dim]Testbench:[/]        {tb_in}")
+        console.print(f"  [dim]Output Directory:[/] {out_dir}\n")
+
+        res = export_to_edaplayground(
+            rtl_path=rtl_in,
+            tb_path=tb_in,
+            output_dir=out_dir,
+            preferred_simulator=args.simulator if args.simulator != "auto" else "questa",
+            anonymize_rtl=bool(args.anonymize_rtl),
+        )
+
+        console.print("[bold green]✓ EDA Playground bundle created successfully![/bold green]\n")
+        console.print(f"  • [bold]design.sv:[/]             {res['design_sv']}")
+        console.print(f"  • [bold]testbench.sv:[/]          {res['testbench_sv']}")
+        console.print(f"  • [bold]Launch Studio (HTML):[/] {res['launch_html']}")
+        console.print(f"  • [bold]Configuration (JSON):[/] {res['config_json']}")
+        console.print(f"  • [bold]Guide (Markdown):[/]     {res['readme_md']}\n")
+        console.print("[bold white]To run in the cloud with Questa / VCS:[/bold white]")
+        console.print(f"  Open [bold cyan]{res['launch_html']}[/bold cyan] or visit [bold cyan]https://www.edaplayground.com[/bold cyan]\n")
+
+        if not args.no_browser:
+            _open_html_in_browser(Path(res["launch_html"]))
+        return
 
     if getattr(args, "command", None) in ("serve", "server", "web", "cockpit", "ui"):
         from verisight.server.app import start_server
@@ -389,7 +453,53 @@ def main():
                 kb = None
 
         planner = VeriSightPlanner(output_dir=plan_output, knowledge_base=kb)
-        planner.run(spec_path=args.spec, rtl_path=args.rtl, coverage_path=args.coverage)
+        planner.run(
+            spec_path=args.spec,
+            rtl_path=args.rtl,
+            coverage_path=args.coverage,
+            generate_uvm=args.generate_uvm,
+        )
+        return
+
+    # Handle 'tb' / 'testbench' / 'gentb' / 'uvm' command: Spec-Driven Testbench Generation Agent (Workflow 4)
+    if args.command in ("tb", "testbench", "gentb", "uvm"):
+        from verisight.agents.spec_driven_tb_agent import SpecDrivenTestbenchAgent
+        if not args.spec or not args.rtl:
+            console.print("[red]Error:[/red] Spec-Driven Testbench Generation requires both --spec and --rtl.")
+            console.print("  Example: python main.py tb --spec projects/ram/specs/spec.md --rtl projects/ram/rtl/ram_rtl.sv --output output/spec_driven_uvm")
+            sys.exit(1)
+        tb_output = args.output if args.output != "output" else "output/spec_driven_uvm"
+        agent = SpecDrivenTestbenchAgent(output_dir=tb_output)
+        res = agent.generate_testbench(spec_path=args.spec, rtl_path=args.rtl, output_dir=tb_output, run_sim=True)
+        console.print(f"[bold green]✓ Spec-Driven UVM Testbench generated successfully in:[/] {res.output_dir}")
+        return
+
+    # Handle 'train' command: Knowledge Base Training & Dataset Population
+    if args.command in ("train", "train-kb", "learn"):
+        from verisight.rag.train_knowledge_base import train_knowledge_base
+        train_knowledge_base()
+        return
+
+    # Handle 'dpo' command: Direct Preference Optimization Trainer
+    if args.command in ("dpo", "train-dpo"):
+        from verisight.dpo.dpo_trainer import train_dpo_lora, DEFAULT_MODEL, DEFAULT_DATASET, DEFAULT_OUTPUT_DIR
+        from verisight.dpo.preference_miner import VerificationPreferenceMiner
+
+        miner = VerificationPreferenceMiner()
+        stats = miner.get_statistics()
+        console.print(f"[bold cyan]🎯 VeriSight Workflow 2: DPO with LoRA Engine[/bold cyan]")
+        console.print(f"  • Preference Dataset: [yellow]{stats['dataset_path']}[/yellow] ({stats['total_pairs']} pairs)")
+        for cat, count in stats["categories"].items():
+            console.print(f"      - {cat}: {count} pairs")
+
+        adapter_path = Path(args.dpo_adapter) if hasattr(args, "dpo_adapter") and args.dpo_adapter else DEFAULT_OUTPUT_DIR
+        res = train_dpo_lora(
+            base_model_name=args.model or DEFAULT_MODEL,
+            dataset_path=DEFAULT_DATASET,
+            output_dir=adapter_path,
+            dry_run=True,
+        )
+        console.print(f"\n[bold green]✓ DPO Verification Adapter Ready at:[/] {adapter_path}")
         return
 
     # Handle 'sim' / 'simulate' command: One-Click Closed-Loop Runner
@@ -430,8 +540,7 @@ def main():
         console.print("=" * 62)
         console.print(f"  [bold]Simulator Backend:[/]   {sim_res.simulator} (Exit Code: {sim_res.returncode})")
         console.print(f"  [bold]Simulation Time:[/]     {sim_res.duration_s}s")
-        console.print(f"  [bold]Errors Caught:[/]       {sim_res.error_count}")
-        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification} (Confidence: {int(dbg.confidence*100)}%)")
+        console.print(f"  [bold]RCA Classification:[/]  {dbg.classification}")
         console.print(f"  [bold]Root Cause:[/]          {dbg.root_cause[:70]}...")
         console.print()
         console.print("  [bold cyan]Interactive HTML Dashboards:[/bold cyan]")
@@ -479,9 +588,13 @@ def main():
             sys.exit(1)
 
         args.log = str(sim_result.log_path)
-        vcd_for_knowledge = args.vcd or str(sim_result.vcd_path)
+        if sim_result.vcd_path and (Path(sim_result.vcd_path).exists() or str(sim_result.vcd_path)):
+            vcd_for_knowledge = str(sim_result.vcd_path)
+        elif args.vcd:
+            vcd_for_knowledge = args.vcd
+
         if args.xtrace or args.netlist:
-            args.vcd = args.vcd or str(sim_result.vcd_path)
+            args.vcd = vcd_for_knowledge
         if not args.top and not args.sim_top:
             args.top = sim_result.top_module
 
@@ -509,12 +622,14 @@ def main():
 
     llm_config = LLMConfig(**kwargs)
 
+    xtrace_signals = [s.strip() for s in (args.xtrace_signal or "").split(",") if s.strip()]
     xtracer_config = XTracerConfig(
-        enabled=bool(args.xtrace or args.vcd or args.netlist),
+        enabled=bool(args.xtrace or args.netlist),
         netlist_paths=args.netlist or [],
         top_module=args.top or "",
-        vcd_path=args.vcd or "",
-        signal=args.xtrace_signal or "",
+        vcd_path=vcd_for_knowledge or args.vcd or "",
+        signal=xtrace_signals[0] if xtrace_signals else (args.xtrace_signal or ""),
+        signals=xtrace_signals,
         time_ps=args.xtrace_time,
         xtracer_path=args.xtracer_path or "",
         max_depth=args.xtrace_max_depth,
@@ -537,6 +652,7 @@ def main():
                 if args.min_confidence is not None
                 else 0.70
             ),
+            allow_tb_fix=bool(getattr(args, "allow_tb_fix", False)),
         ),
         log_level=log_level,
     )
@@ -569,7 +685,7 @@ def main():
             tb_path=args.tb,
             log_path=args.log,
             coverage_path=args.coverage,
-            vcd_path=vcd_for_knowledge,
+            vcd_path=vcd_for_knowledge or "",
         )
 
         # Print final summary
@@ -577,7 +693,6 @@ def main():
         console.print("[bold green]Pipeline completed successfully![/]")
         console.print()
         console.print(f"  [bold]Classification:[/] {report.classification}")
-        console.print(f"  [bold]Confidence:[/]     {report.confidence}%")
         console.print(f"  [bold]Root Cause:[/]     {report.root_cause[:80]}")
         console.print(f"  [bold]Module:[/]         {report.module}")
         console.print(f"  [bold]Category:[/]       {report.category}")

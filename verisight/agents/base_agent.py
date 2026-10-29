@@ -197,6 +197,20 @@ class LLMAdapter:
             )
             return response.text
         except Exception as e:
+            err_str = str(e).lower()
+            if self.model_name != "gemini-3.5-flash" and any(k in err_str for k in ("404", "504", "deadline", "timed out", "not found", "no longer available")):
+                logger.warning(f"Gemini model '{self.model_name}' failed ({e}). Falling back to 'gemini-3.5-flash'...")
+                import google.generativeai as genai
+                self.model_name = "gemini-3.5-flash"
+                self._model = genai.GenerativeModel(self.model_name)
+                response = self._model.generate_content(
+                    full_prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=self.temperature,
+                        max_output_tokens=self.max_output_tokens,
+                    )
+                )
+                return response.text
             logger.error(f"Gemini API call failed: {e}")
             raise
 
@@ -336,13 +350,16 @@ class BaseAgent(ABC):
 
             except Exception as e:
                 err_str = str(e).lower()
-                is_auth_error = any(
+                is_fatal_error = any(
                     k in err_str
-                    for k in ("api_key_invalid", "api key not valid", "401", "unauthorized", "airgapviolation", "forbidden")
+                    for k in (
+                        "api_key_invalid", "api key not valid", "401", "unauthorized",
+                        "airgapviolation", "forbidden", "429", "quota", "resource_exhausted"
+                    )
                 )
-                if is_auth_error:
+                if is_fatal_error:
                     self.logger.warning(
-                        f"Authentication or Air-Gap policy prevented LLM call: {e}. "
+                        f"Authentication, Quota (429), or Air-Gap policy prevented LLM call: {e}. "
                         "Skipping redundant retries and falling back gracefully."
                     )
                     raise

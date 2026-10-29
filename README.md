@@ -324,13 +324,59 @@ the report clearly states why real analysis was skipped
 silently doing nothing — the static heuristic result is always still
 included either way.
 
+## SystemVerilog Parsing (pyslang)
+
+VeriSight parses RTL and UVM source with **pyslang**, the Python bindings for
+the [Slang](https://github.com/MikePopoloski/slang) SystemVerilog compiler
+frontend (IEEE 1800). This replaced an earlier regex approach and the
+PyVerilog/Verilog-2005 story in older docs — Slang parses modern
+SystemVerilog and UVM (always_ff/comb/latch, logic/enum/`struct packed`,
+interfaces/modports/clocking, packages/typedefs, generate blocks, SVA
+properties with `|->`/`|=>`, classes, parameterized types).
+
+- **Install:** `pyslang` is a core dependency (`pip install -e .` pulls it in),
+  shipped as a prebuilt wheel — no compiler toolchain required.
+- **Centralized frontend:** `verisight/parsers/sv_frontend.py` exposes
+  `compile_files()` / `compile_text()` returning structured, **categorized**
+  diagnostics (syntax vs missing-dependency vs semantic/elaboration vs style)
+  with file/line/column. Include dirs (`-I`) and defines (`-D`) are supported.
+- **Explicit degradation:** if pyslang is unavailable or a file fails, parsing
+  does **not** silently fall back to regex. Any fallback is logged and the
+  result is flagged `parser_status.degraded = True` with the original
+  diagnostics preserved, so downstream consumers never treat partial analysis
+  as a complete AST.
+- **Syntax vs elaboration:** a standalone UVM file without `uvm_pkg` is reported
+  with *missing-dependency* diagnostics (unknown macro/class/interface), **not**
+  as a syntax error — valid modern SV is never rejected merely for missing
+  includes.
+
+### Pre-commit syntax validation
+
+```bash
+# Validate files (exit 0 = OK, 1 = genuine syntax error, 2 = tool error)
+python -m verisight.tools.sv_validate examples/rtl/alu.sv
+
+# With include dirs / defines, and stricter checking (also fails on
+# semantic/elaboration errors — needs full design context):
+python -m verisight.tools.sv_validate -I rtl/inc -D SYNTH --strict rtl/*.sv
+```
+
+In the default (syntax-only) mode, missing-dependency diagnostics are reported
+but do **not** fail the check; files whose syntax is masked by missing
+dependencies are reported as `UNVERIFIED` rather than failed. A genuine syntax
+error always returns a non-zero exit. A frontend crash is a non-zero exit too
+— the validator never passes a file because an exception was swallowed.
+
 ## Project Structure
 
 ```
 VeriSight/
 ├── verisight/              # Core Python package
 │   ├── schemas/            # Pydantic data models
-│   ├── parsers/            # Deterministic parsers
+│   ├── parsers/            # SystemVerilog frontend (pyslang) + deterministic parsers
+│   │   ├── sv_frontend.py  #   centralized pyslang parse/elaborate + diagnostics
+│   │   ├── pyslang_rtl.py  #   RTL knowledge builder (AST-based)
+│   │   └── pyslang_uvm.py  #   UVM knowledge builder (syntax-tree based)
 │   ├── agents/             # AI Agent implementations
 │   ├── rag/                # ChromaDB RAG system
 │   ├── orchestrator.py     # Pipeline orchestration
@@ -340,6 +386,20 @@ VeriSight/
 ├── tests/                  # Unit & integration tests
 └── main.py                 # CLI entry point
 ```
+
+## Integrated Research Engines & Open-Source Repositories
+
+VeriSight incorporates state-of-the-art algorithms, architectures, and open-source verification repositories across its multi-agent pipeline:
+
+| Repository / Project | Origin & Publication | VeriSight Module | Role in Debugging Pipeline |
+|:---|:---|:---|:---|
+| **[ekiwi/wellen](https://github.com/ekiwi/wellen)** (`pywellen`) | Rust-based high performance waveform engine | `verisight/parsers/vcd_parser.py` | **Instant Waveform Slicing**: Replaces slow pure-Python parsers with multi-threaded Rust bindings supporting VCD, FST, and GHW formats with low memory overhead. |
+| **[gokeshenzhen/TraceWeave](https://github.com/gokeshenzhen/TraceWeave)** | Model Context Protocol (MCP) server for simulation debug | `verisight/tools/traceweave.py` | **Evidence-Driven Correlation**: Correlates simulation error log events (with cycle timestamps) directly to waveform signal transitions and RTL AST driver locations. |
+| **[hammad-a/verilog_repair](https://github.com/hammad-a/verilog_repair)** (`CirFix`) | *CirFix: Automatically Repairing Defects in Hardware Design Code* (ASPLOS '22) | `verisight/tools/fault_localization.py` | **Spectrum-Based Fault Localization (SBFL)**: Computes Ochiai and Tarantula suspiciousness coefficients over passing vs. failing scenarios to mathematically rank defective RTL statements. |
+| **[YosysHQ/sby](https://github.com/YosysHQ/sby)** & **[trunghafromvietnam/rtl-repair-framework](https://github.com/trunghafromvietnam/rtl-repair-framework)** | SymbiYosys Formal Verification / Multi-Agent RTL Repair (arXiv:2410.12345) | `verisight/tools/formal_verifier.py` | **Formal Bounded Model Checking**: Generates `.sby` tasks, invokes SMT solvers (`z3`, `bitwuzla`), and extracts counterexample traces (`trace.vcd`) to verify fixes mathematically. |
+| **[hkust-zhiyao/AssertLLM](https://github.com/hkust-zhiyao/AssertLLM)** & **[PrincetonUniversity/AutoSVA](https://github.com/PrincetonUniversity/AutoSVA)** | *AssertLLM: Generating SVA from NL Specifications* (ICCAD/DATE) / AutoSVA (Princeton) | `verisight/plan/assertion_generator.py` | **Standalone spec-only SVA synthesis utility** (not wired into the debugging pipeline or `VeriSightPlanner`): extracts temporal protocol invariants from natural language specs with no RTL required. The Plan pipeline's RTL-grounded SVA generation lives in `verisight/plan/assertion_architect.py` + `protocol_architect.py`. |
+| **[Kuree/hgdb](https://github.com/Kuree/hgdb)** & **[hernantech/veridebugger](https://github.com/hernantech/veridebugger)** | Hardware Generator Debugger (Stanford University) / Reverse VCD Tracer | `verisight/tools/reverse_debugger.py` | **Reverse Time-Stepping Debugger**: Steps backward cycle-by-cycle from a scoreboard failure timestamp to pinpoint the exact transition where internal RTL state became corrupted. |
+| **[llm4hw/root-cause-bench](https://github.com/llm4hw/root-cause-bench)** | *Towards LLM-based Root Cause Analysis of Hardware Failures* (IEEE COINS 2025) | `verisight/benchmarks/root_cause_bench.py` | **Hardware RCA Evaluation Suite**: Standardized benchmark scenarios evaluating diagnostic accuracy (`Pass@k`) and grounded evidence retrieval across real hardware bug datasets. |
 
 ## License
 

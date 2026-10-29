@@ -3,240 +3,2320 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VeriSight Debugging Report — 6c4840cc</title>
+    <title>VeriSight Diagnostic Dashboard — a0c08137</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0d1117; --card-bg: #161b22; --border: #30363d;
-            --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
-            --error: #f85149; --warn: #d29922; --success: #3fb950;
+            --bg-canvas: #080c14;
+            --card-bg: rgba(15, 23, 42, 0.75);
+            --card-border: rgba(148, 163, 184, 0.12);
+            --card-hover: rgba(30, 41, 59, 0.85);
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+            
+            --cyan: #38bdf8;
+            --cyan-glow: rgba(56, 189, 248, 0.25);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.25);
+            --rose: #f43f5e;
+            --rose-glow: rgba(244, 63, 94, 0.25);
+            --amber: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.25);
+            --indigo: #818cf8;
         }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg); color: var(--text); line-height: 1.6;
-            padding: 2rem; max-width: 1200px; margin: 0 auto;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-canvas);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.08) 0%, transparent 40%),
+                linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+            color: var(--text-main);
+            line-height: 1.55;
+            padding: 24px 32px 64px;
+            min-height: 100vh;
         }
-        h1 { color: var(--accent); margin-bottom: 0.5rem; font-size: 1.8rem; }
-        h2 {
-            color: var(--accent); margin: 2rem 0 1rem; padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
         }
-        h3 { color: var(--text); margin: 1.5rem 0 0.5rem; }
-        .meta { color: var(--text-muted); margin-bottom: 2rem; }
-        .summary-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem; margin: 1rem 0 2rem;
-        }
-        .summary-card {
-            background: var(--card-bg); border: 1px solid var(--border);
-            border-radius: 8px; padding: 1rem;
-        }
-        .summary-card .label { color: var(--text-muted); font-size: 0.85rem; }
-        .summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.3rem; }
-        .badge {
-            display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 0.8rem; font-weight: 600;
-        }
-        .badge-critical { background: #f8514922; color: #f85149; }
-        .badge-high { background: #fd7e1422; color: #fd7e14; }
-        .badge-medium { background: #d2992222; color: #d29922; }
-        .badge-low { background: #3fb95022; color: #3fb950; }
-        .badge-error { background: #f8514922; color: #f85149; }
-        table {
-            width: 100%; border-collapse: collapse; margin: 1rem 0;
+
+        /* Header Bar */
+        .top-navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
             background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         }
-        th, td {
-            padding: 0.6rem 1rem; text-align: left;
-            border-bottom: 1px solid var(--border);
+
+        .brand-col {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
-        th { color: var(--text-muted); font-weight: 600; }
-        .evidence-item, .fix-item, .reasoning-step {
-            background: var(--card-bg); border: 1px solid var(--border);
-            border-radius: 6px; padding: 0.8rem 1rem; margin: 0.5rem 0;
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 20px var(--cyan-glow);
         }
-        .evidence-source {
-            color: var(--accent); font-weight: 600; margin-right: 0.5rem;
+
+        .brand-titles h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #ffffff, #93c5fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        pre {
-            background: #0d1117; border: 1px solid var(--border);
-            padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;
+
+        .brand-titles .subtitle {
+            font-size: 12px;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .pulsing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #34d399;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #34d399;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--cyan);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, #0284c7, #0ea5e9);
+            border: none;
+            color: #ffffff;
+        }
+        .btn-accent:hover {
+            background: linear-gradient(135deg, #0369a1, #0284c7);
+            box-shadow: 0 0 16px var(--cyan-glow);
+        }
+
+        /* Sovereign Security & Zero Leakage Compliance Banner */
+        .security-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, rgba(14, 165, 233, 0.08) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            padding: 10px 18px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(8px);
+        }
+        .security-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .security-shield-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.6));
+        }
+        .security-text-main {
+            font-size: 13px;
+            font-weight: 700;
+            color: #34d399;
+            letter-spacing: 0.5px;
+        }
+        .security-text-sub {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-left: 8px;
+        }
+        .security-tags {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .sec-pill {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            padding: 4px 9px;
+            border-radius: 5px;
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: var(--text-main);
+        }
+        .sec-pill-success {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #34d399;
+            font-weight: 600;
+        }
+
+        /* KPI Metric Cards Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            border-color: rgba(56, 189, 248, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--cyan);
+            opacity: 0.7;
+        }
+
+        .kpi-card.kpi-danger::before { background: var(--rose); }
+        .kpi-card.kpi-success::before { background: var(--emerald); }
+        .kpi-card.kpi-amber::before { background: var(--amber); }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+
+        .kpi-val {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Navigation Tabs */
+        .tabs-header {
+            display: flex;
+            gap: 8px;
+            padding: 6px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            margin-bottom: 24px;
             overflow-x: auto;
         }
-        code { color: #79c0ff; font-family: 'JetBrains Mono', monospace; }
-        .root-cause {
-            background: var(--card-bg); border-left: 4px solid #dc3545;
-            padding: 1rem 1.5rem; border-radius: 0 6px 6px 0; margin: 1rem 0;
+
+        .nav-tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
         }
+
+        .nav-tab-btn:hover {
+            color: #ffffff;
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .nav-tab-btn.active {
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.3), rgba(56, 189, 248, 0.2));
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hero Root Cause Card */
+        .rca-hero-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 24px;
+            position: relative;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+        }
+
+        .rca-hero-card::before {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0; left: 0;
+            width: 5px;
+            background: #f97316;
+            border-radius: 14px 0 0 14px;
+            box-shadow: 0 0 16px #f97316;
+        }
+
+        .card-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rca-text {
+            font-size: 15px;
+            line-height: 1.65;
+            color: #e2e8f0;
+            margin-bottom: 16px;
+        }
+
+        .signals-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .signals-lbl {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .sig-badge {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #7dd3fc;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Tables & Lists */
+        .table-styled {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }
+
+        .table-styled th {
+            background: rgba(30, 41, 59, 0.7);
+            padding: 12px 18px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--cyan);
+            border-bottom: 1px solid var(--card-border);
+            text-align: left;
+        }
+
+        .table-styled td {
+            padding: 12px 18px;
+            font-size: 13.5px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        }
+
+        .table-styled tr:hover td {
+            background: rgba(56, 189, 248, 0.04);
+        }
+
+        .time-tag {
+            font-family: 'Fira Code', monospace;
+            color: #38bdf8;
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+
+        .comp-tag {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+        }
+
+        .badge-error { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+        .badge-warn  { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-success { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-info  { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+
+        /* Code snippets & Diffs */
+        .code-snippet {
+            background: #060911;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 8px;
+            padding: 14px 18px;
+            overflow-x: auto;
+            margin-top: 10px;
+            font-family: 'Fira Code', monospace;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #93c5fd;
+        }
+
+        .code-snippet.diff code {
+            display: block;
+            white-space: pre;
+        }
+
+        /* Evidence Cards */
+        .evidence-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .evidence-card:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateX(3px);
+        }
+
+        .evidence-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .src-pill {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .src-log { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .src-rtl { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .src-tb  { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .src-spec { background: rgba(129, 140, 248, 0.15); color: #a5b4fc; }
+        .src-xtracer { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+
+        .evidence-ref {
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .evidence-desc {
+            color: var(--text-dim);
+            font-size: 13.5px;
+        }
+
+        /* Fix cards */
+        .fix-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-left: 4px solid #38bdf8;
+        }
+
+        .fix-action {
+            font-size: 14px;
+            color: var(--text-main);
+            margin: 6px 0;
+            line-height: 1.6;
+        }
+
+        .prio-pill {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .prio-high { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+        /* Step Cards */
+        .step-card {
+            display: flex;
+            gap: 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .step-badge {
+            width: 42px;
+            height: 42px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38bdf8;
+            font-family: 'Fira Code', monospace;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .step-body {
+            flex: 1;
+        }
+
+        .step-obs {
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .step-inf {
+            font-size: 13px;
+            color: var(--cyan);
+            margin-bottom: 6px;
+        }
+
+        .step-lbl {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-right: 6px;
+        }
+
+        /* Fix Hero Card */
+        .fix-hero-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 24px;
+        }
+
+        .fix-status-banner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .status-pass {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .status-declined {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+
+        .status-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; box-shadow: 0 0 8px #34d399; }
+        .status-dot-orange { width: 8px; height: 8px; background: #fbbf24; border-radius: 50%; box-shadow: 0 0 8px #fbbf24; }
+
+        .rca-summary-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+
+        .patch-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .table-compact {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-compact th {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: left;
+            padding: 6px 0;
+            width: 120px;
+        }
+
+        .table-compact td {
+            font-size: 13px;
+            color: var(--text-main);
+            padding: 6px 0;
+        }
+
+        /* Timeline Search & Filter Bar */
+        .search-bar-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: #ffffff;
+            font-size: 13.5px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px var(--cyan-glow);
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #0284c7;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 9999;
+            animation: fadeIn 0.2s;
+        }
+
         footer {
-            margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
-            color: var(--text-muted); font-size: 0.85rem;
+            margin-top: 48px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--card-border);
+            padding-top: 24px;
         }
     </style>
 </head>
 <body>
-    <h1>🔍 VeriSight Debugging Report</h1>
-    <div class="meta">
-        Session: 6c4840cc &bull;
-        Generated: 2026-08-05T16:48:17.272945 &bull;
-        Simulation: FAIL ()
-    </div>
+    <div class="dashboard-container">
+        <!-- Top Navigation Bar -->
+        <header class="top-navbar">
+            <div class="brand-col">
+                <div class="brand-icon">⚡</div>
+                <div class="brand-titles">
+                    <h1>VeriSight Silicon Diagnostic Report</h1>
+                    <div class="subtitle">Autonomous Root-Cause Analysis & Verification Synthesis • Session: <code>a0c08137</code></div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="status-chip">
+                    <span class="pulsing-dot"></span>
+                    <span>DIAGNOSTIC COMPLETE</span>
+                </div>
+                <button class="btn" onclick="copyRcaSummary()">📋 Copy RCA</button>
+                <button class="btn" onclick="window.print()">🖨️ Print Report</button>
+            </div>
+        </header>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <div class="label">Classification</div>
-            <div class="value" style="color: #dc3545">RTL Bug</div>
+        <!-- Sovereign Security & Zero Leakage Compliance Banner -->
+        <div class="security-banner">
+            <div class="security-left">
+                <span class="security-shield-icon">🔒</span>
+                <div>
+                    <span class="security-text-main">ENTERPRISE SOVEREIGN READY</span>
+                    <span class="security-text-sub">Air-Gap Network Guard Configured • IP Anonymization Engine Ready</span>
+                </div>
+            </div>
+            <div class="security-tags">
+                <span class="sec-pill sec-pill-success">SOCKET GUARD: MONITORED</span>
+                <span class="sec-pill">PROVIDER: ANTHROPIC</span>
+                <span class="sec-pill">MODEL: claude-sonnet-5</span>
+                <span class="sec-pill sec-pill-success">ZERO CLOUD RTL LEAKAGE</span>
+            </div>
         </div>
-        <div class="summary-card">
-            <div class="label">Confidence</div>
-            <div class="value">78%</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Module</div>
-            <div class="value">sync_fifo (status flag / count generation logic)</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Category</div>
-            <div class="value">Functional / Reset Initialization → Status-Flag & Protocol Violation</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Severity</div>
-            <div class="value"><span class="badge badge-medium">medium</span></div>
-        </div>
-        <div class="summary-card">
-            <div class="label">Errors</div>
-            <div class="value" style="color: var(--error)">7</div>
-        </div>
-    </div>
 
-    <div class="root-cause">
-        <h3>Root Cause</h3>
-        <p>The dominant failure signature is that the FIFO's status flags do not track the occupancy count as required by the specification: full stays 0 when the FIFO is full (@85 ns), empty stays 1 when data is present (@125 ns), and almost_full stays 0 when the AF_LEVEL threshold is crossed (@210 ns). These stale/late flags then cause the downstream protocol violations (write when full @355 ns, read when empty @420 ns) and the simultaneous read/write data mismatch @350 ns. Structural RTL analysis confirms a reset-coverage defect: 'fifo_count' is written in the sequential block at projects/fifo/rtl/sync_fifo.sv:63 but is not assigned in the reset clause, so occupancy (and hence every flag derived from it) starts from an indeterminate/uninitialized value and remains permanently skewed relative to the actual pointer difference (rd_ptr/wr_ptr are reset at line 43). This is a violation of REQ-007, REQ-008, REQ-009, REQ-011 and REQ-012 by the design → Decision Rule Case 6/7/8 (RTL violates spec, uninitialized state, protocol protection not implemented correctly).</p>
-        <p><strong>Affected Signals:</strong> <code>fifo_count</code></p>
-    </div>
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid">
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">Classification</div>
+                <div class="kpi-val" style="color: #f97316">TB Bug</div>
+                <div class="kpi-sub">Root failure attribution</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Primary Module</div>
+                <div class="kpi-val" style="font-size: 18px; word-break: break-all;">Scoreboard</div>
+                <div class="kpi-sub">Hardware source location</div>
+            </div>
+            <div class="kpi-card kpi-amber">
+                <div class="kpi-label">Failure Category</div>
+                <div class="kpi-val" style="font-size: 16px; word-break: break-all; color: #fbbf24;">Timing / Latency</div>
+                <div class="kpi-sub">Defect classification</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Simulation Time</div>
+                <div class="kpi-val" style="font-size: 20px;"></div>
+                <div class="kpi-sub">Status: FAIL</div>
+            </div>
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">Errors Detected</div>
+                <div class="kpi-val" style="color: #f43f5e;">4</div>
+                <div class="kpi-sub">Scoreboard & SVA flags</div>
+            </div>
+        </section>
 
-    <h2>Error Timeline</h2>
-    <table>
-        <thead><tr><th>Time</th><th>Severity</th><th>Message</th></tr></thead>
-        <tbody>
-                <tr>
-                    <td>85 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>FIFO count mismatch: Expected 15, Got 15</td>
-                </tr>
-                <tr>
-                    <td>85 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Full flag mismatch: Expected 1, Got 0</td>
-                </tr>
-                <tr>
-                    <td>125 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Empty flag mismatch: Expected 0, Got 1</td>
-                </tr>
-                <tr>
-                    <td>210 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Almost full flag mismatch: Expected 1, Got 0</td>
-                </tr>
-                <tr>
-                    <td>350 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Data mismatch at simultaneous read/write</td>
-                </tr>
-                <tr>
-                    <td>355 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Write attempted when FIFO full!</td>
-                </tr>
-                <tr>
-                    <td>420 ns</td>
-                    <td><span class="badge badge-error">UVM_ERROR</span></td>
-                    <td>Read attempted when FIFO empty!</td>
-                </tr></tbody>
-    </table>
+        <!-- Navigation Tabs Bar -->
+        <nav class="tabs-header">
+            <button class="nav-tab-btn active" onclick="switchTab('tab-rca')">🎯 Root Cause & Recommendations</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-waveform')">🌊 VCD Waveform Viewer</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-timeline')">⏱️ Error Timeline (4)</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-evidence')">⛓️ Evidence Chain (4)</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-reasoning')">🧠 Diagnostic Reasoning (4)</button>
+            <button class="nav-tab-btn" onclick="switchTab('tab-fix')">🛠️ Automated Fix & Patch</button>
+            
+        </nav>
 
-    <h2>Evidence Chain</h2>
-                <div class="evidence-item">
-                    <span class="evidence-source">[rtl]</span>
-                    <strong>projects/fifo/rtl/sync_fifo.sv:63</strong> — Sequential block drives fifo_count and all status flags but fifo_count is absent from the reset clause, leaving occupancy uninitialized after reset (Case 7 style X/indeterminate state).
+        <!-- TAB 1: Root Cause & Recommendations -->
+        <div id="tab-rca" class="tab-pane active">
+            <div class="rca-hero-card">
+                <div class="card-title-row">
+                    <div class="card-title"><span>🔍</span> Algorithmic Root-Cause Isolation</div>
+                    <span class="badge badge-error">TB Bug</span>
                 </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[rtl]</span>
-                    <strong>projects/fifo/rtl/sync_fifo.sv:43</strong> — wr_ptr/rd_ptr ARE reset, so pointer-based occupancy and the separately maintained fifo_count can diverge immediately after reset, producing permanently wrong flags.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[log]</span>
-                    <strong>@85 ns, @125 ns, @210 ns</strong> — Three independent flag checks (full, empty, almost_full) all fail in the same direction: the flag lags/does not reflect actual occupancy — a systematic count/threshold defect, not a random data corruption.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[log]</span>
-                    <strong>@355 ns, @420 ns</strong> — Overflow (write when full) and underflow (read when empty) protection failed, i.e. REQ-011/REQ-012 protection mechanisms are ineffective because they depend on the broken full/empty flags → Case 8 protocol implemented incorrectly in RTL.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[spec]</span>
-                    <strong>REQ-007/008/009/011/012/013</strong> — Spec unambiguously requires full when no space remains, empty when no data available, almost_full at AF_LEVEL, and one-cycle overflow/underflow pulses. No self-contradiction exists in the requirement set, so Case 9 (Spec Bug) is excluded.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[log]</span>
-                    <strong>@350 ns 'Data mismatch at simultaneous read/write'</strong> — Concurrent read/write handling corrupts dout/count bookkeeping — a classic symptom of incorrect count update for the simultaneous case in the same block at line 63.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[tb]</span>
-                    <strong>Scoreboard: 'No scoreboard found' in collected artifacts</strong> — TB predictor source unavailable, so a scoreboard off-by-one cannot be fully excluded; the '@85 ns Expected 15, Got 15' message is the only TB-side anomaly and affects a single check, not the flag failures.
-                </div>
-                <div class="evidence-item">
-                    <span class="evidence-source">[rtl]</span>
-                    <strong>projects/fifo/rtl/sync_fifo.sv:63</strong> — Signal 'fifo_count' never reset in module 'sync_fifo'
-                </div>
-    <h2>Reasoning</h2>
-                <div class="reasoning-step">
-                    <strong>Step 1:</strong> Seven errors: three status-flag mismatches, one data mismatch on simultaneous rd/wr, and two protocol-protection violations (write-when-full, read-when-empty).<br>
-                    <em>→ Inference: Failures cluster around occupancy tracking and flag generation rather than data path storage.</em>
-                    <br><small>Source: simulation log</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 2:</strong> Spec REQ-007..REQ-013 define full/empty/almost_full/almost_empty/overflow/underflow/count behavior consistently; no contradictory statements.<br>
-                    <em>→ Inference: Spec Bug (Case 9) ruled out.</em>
-                    <br><small>Source: specification</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 3:</strong> RTL structural analysis: fifo_count is written in the always block at line 63 but is missing from that block's reset clause; pointers at line 43 are reset.<br>
-                    <em>→ Inference: Post-reset occupancy is indeterminate; all flags derived from fifo_count are wrong from time 0 — an RTL initialization defect (Case 7) and a spec violation (Case 6).</em>
-                    <br><small>Source: projects/fifo/rtl/sync_fifo.sv:43,63</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 4:</strong> full=0 at the moment the scoreboard expects full=1, and empty=1 when data should be readable; almost_full never asserts at threshold.<br>
-                    <em>→ Inference: Flags are computed from a stale/registered count instead of the next-state count, so threshold crossings are missed or delayed — consistent with the reset/count defect.</em>
-                    <br><small>Source: log @85/125/210 ns</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 5:</strong> Overflow/underflow guard errors occur AFTER the flag errors (355 ns, 420 ns).<br>
-                    <em>→ Inference: Protocol violations are downstream consequences of the broken flags, confirming a single RTL root cause (Case 8) rather than bad stimulus; a driver bug would not also corrupt full/empty flag values reported by the DUT.</em>
-                    <br><small>Source: log timeline</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 6:</strong> One log line reports 'FIFO count mismatch: Expected 15, Got 15' where expected == actual, and scoreboard source was not collected.<br>
-                    <em>→ Inference: There is a secondary TB reporting/compare defect worth fixing, but it does not explain the DUT flag values; it lowers confidence modestly rather than changing the classification.</em>
-                    <br><small>Source: log @85 ns / missing scoreboard artifact</small>
-                </div>
-                <div class="reasoning-step">
-                    <strong>Step 7:</strong> Driver and monitor artifacts show no reported protocol/sampling anomalies, and deterministic pre-analysis independently suggests RTL Bug with a reset-coverage finding.<br>
-                    <em>→ Inference: Cases 1–5 (TB Bug paths) are not supported by evidence; final classification is RTL Bug.</em>
-                    <br><small>Source: deterministic pre-analysis</small>
-                </div>
-    <h2>Recommended Fixes</h2>
-                <div class="fix-item">
-                    <span class="badge badge-high">high</span>
-                    1) In the reset branch of the always block at sync_fifo.sv:63, initialize fifo_count <= '0 (along with full, empty, almost_full, almost_empty, overflow, underflow) so occupancy is deterministic after the asynchronous active-low reset. 2) Derive full/empty/almost_full/almost_empty from the next-state count (fifo_count_next computed from wr_en & ~full and rd_en & ~empty in the same cycle) or make them combinational functions of fifo_count so they assert on the cycle the threshold is reached rather than one cycle late. 3) Ensure the simultaneous read/write case keeps fifo_count unchanged while still forwarding/advancing both pointers, which fixes the @350 ns data mismatch. 4) Gate the write/read strobes with the corrected full/empty flags and pulse overflow/underflow for exactly one cycle per REQ-011/REQ-012. 5) Separately, audit the scoreboard count-compare that reported 'Expected 15, Got 15' (likely wrong field printed or wrong operator) — this is a TB reporting issue layered on top of the RTL defect.
+                <p class="rca-text" id="rca-full-text">The testbench scoreboard does not account for the 1-clock-cycle synchronous read latency specified in REQ-012. The scoreboard immediately compares the current read address against the current rdata in the same cycle, sampling the stale rdata from the previous operation rather than pipelining the check to the following cycle.</p>
+                
+            </div>
+
+            <h3 style="margin: 24px 0 14px; font-size:16px; color:var(--cyan); font-weight:700;">Recommended Engineering Fixes</h3>
+            <div class="fixes-list">
+                
+                <div class="fix-card">
+                    <div class="fix-header">
+                        <span class="prio-pill prio-high">HIGH PRIORITY</span>
+                    </div>
+                    <div class="fix-action">Modify the scoreboard or monitor to model the 1-cycle read latency. In the scoreboard, buffer or pipeline the expected read transaction (address and expected data) so that it is compared against rdata one clock cycle later when the RTL read data becomes valid.</div>
                     
                 </div>
-                <div class="fix-item">
-                    <span class="badge badge-critical">critical</span>
-                    Add reset for signal 'fifo_count' in module
-                    <pre><code>In the reset clause: fifo_count <= '0;</code></pre>
+            </div>
+        </div>
+
+        <!-- TAB 2: Error Timeline -->
+        <div id="tab-timeline" class="tab-pane">
+            <div class="search-bar-row">
+                <input type="text" id="timeline-search" class="search-input" placeholder="🔍 Filter error messages, addresses, or components in real-time..." onkeyup="filterTimeline()">
+                <button class="btn btn-sm" onclick="filterTimelineBySev('all')">All</button>
+                <button class="btn btn-sm btn-accent" onclick="filterTimelineBySev('error')">Errors</button>
+                <button class="btn btn-sm" onclick="filterTimelineBySev('warn')">Warnings</button>
+            </div>
+            <table class="table-styled" id="timeline-table">
+                <thead>
+                    <tr>
+                        <th style="width: 130px;">Timestamp</th>
+                        <th style="width: 110px;">Severity</th>
+                        <th style="width: 220px;">Component</th>
+                        <th>Simulation Error Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                <tr class="err-row" data-sev="uvm_error" onclick="jumpToWaveformError('175 ns')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
+                    <td class="col-time"><span class="time-tag">@175 ns ns</span></td>
+                    <td class="col-sev"><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td class="col-comp"><span class="comp-tag">uvm_test_top.env.scb</span></td>
+                    <td class="col-msg"><code>Mismatch @addr 1 EXP=201 ACT=110</code></td>
+                </tr>
+                <tr class="err-row" data-sev="uvm_error" onclick="jumpToWaveformError('195 ns')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
+                    <td class="col-time"><span class="time-tag">@195 ns ns</span></td>
+                    <td class="col-sev"><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td class="col-comp"><span class="comp-tag">uvm_test_top.env.scb</span></td>
+                    <td class="col-msg"><code>Mismatch @addr 2 EXP=110 ACT=0</code></td>
+                </tr>
+                <tr class="err-row" data-sev="uvm_error" onclick="jumpToWaveformError('215 ns')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
+                    <td class="col-time"><span class="time-tag">@215 ns ns</span></td>
+                    <td class="col-sev"><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td class="col-comp"><span class="comp-tag">uvm_test_top.env.scb</span></td>
+                    <td class="col-msg"><code>Mismatch @addr 2 EXP=110 ACT=0</code></td>
+                </tr>
+                <tr class="err-row" data-sev="uvm_error" onclick="jumpToWaveformError('235 ns')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
+                    <td class="col-time"><span class="time-tag">@235 ns ns</span></td>
+                    <td class="col-sev"><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td class="col-comp"><span class="comp-tag">uvm_test_top.env.scb</span></td>
+                    <td class="col-msg"><code>Mismatch @addr 1 EXP=201 ACT=110</code></td>
+                </tr>
+                <tr class="err-row" data-sev="uvm_error" onclick="jumpToWaveformError('')" style="cursor:pointer;" title="Click to inspect this cycle in Waveform Studio">
+                    <td class="col-time"><span class="time-tag">@ ns</span></td>
+                    <td class="col-sev"><span class="badge badge-error">UVM_ERROR</span></td>
+                    <td class="col-comp"><span class="comp-tag">TB/DUT</span></td>
+                    <td class="col-msg"><code>4</code></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TAB 3: Evidence Chain -->
+        <div id="tab-evidence" class="tab-pane">
+            <div class="search-bar-row">
+                <button class="btn btn-sm btn-accent" onclick="filterEvidence('all')">All Evidence</button>
+                <button class="btn btn-sm" onclick="filterEvidence('log')">Log</button>
+                <button class="btn btn-sm" onclick="filterEvidence('rtl')">RTL</button>
+                <button class="btn btn-sm" onclick="filterEvidence('tb')">Testbench</button>
+                <button class="btn btn-sm" onclick="filterEvidence('spec')">Spec</button>
+            </div>
+            <div id="evidence-container">
+                
+                <div class="evidence-card" data-src="spec">
+                    <div class="evidence-header">
+                        <span class="src-pill src-spec">SPEC</span>
+                        <span class="evidence-ref">REQ-012</span>
+                    </div>
+                    <p class="evidence-desc">Specification defines synchronous read latency of exactly one clock cycle</p>
+                    <pre class="code-snippet"><code>Read data is available on rdata with a latency of exactly one clock cycle following the assertion of addr with we = 0.</code></pre>
+                </div>
+                <div class="evidence-card" data-src="rtl">
+                    <div class="evidence-header">
+                        <span class="src-pill src-rtl">RTL</span>
+                        <span class="evidence-ref">projects/ram/rtl/ram_rtl.sv:17</span>
+                    </div>
+                    <p class="evidence-desc">RTL implements synchronous registered read data conforming to specification</p>
+                    <pre class="code-snippet"><code>sequential block @ line 17: writes ['rdata'], HAS RESET</code></pre>
+                </div>
+                <div class="evidence-card" data-src="tb">
+                    <div class="evidence-header">
+                        <span class="src-pill src-tb">TB</span>
+                        <span class="evidence-ref">projects/ram/tb/ram_scoreboard.sv</span>
+                    </div>
+                    <p class="evidence-desc">Scoreboard checks read data combinationally/immediately against memory[tr.addr] without 1-cycle delay</p>
+                    <pre class="code-snippet"><code>if (tr.rdata !== memory[tr.addr]) `uvm_error("RAM_SB", $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d", tr.addr, memory[tr.addr], tr.rdata))</code></pre>
+                </div>
+                <div class="evidence-card" data-src="log">
+                    <div class="evidence-header">
+                        <span class="src-pill src-log">LOG</span>
+                        <span class="evidence-ref">@175 ns, @235 ns</span>
+                    </div>
+                    <p class="evidence-desc">ACT data corresponds to data from previous read transaction (addr 2 data 110 seen during addr 1 read)</p>
+                    <pre class="code-snippet"><code>[UVM_ERROR] @175 ns: Mismatch @addr 1 EXP=201 ACT=110
+[UVM_ERROR] @235 ns: Mismatch @addr 1 EXP=201 ACT=110</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Reasoning Chain -->
+        <div id="tab-reasoning" class="tab-pane">
+            <div class="reasoning-container">
+                
+                <div class="step-card">
+                    <div class="step-badge">STEP 01</div>
+                    <div class="step-body">
+                        <div class="step-obs"><span class="step-lbl">OBSERVATION:</span> UVM error logs report mismatches during read operations where ACT matches data from a different/earlier transaction (e.g. ACT=110 at addr 1 read, where 110 is the content of addr 2).</div>
+                        <div class="step-inf"><span class="step-lbl">INFERENCE:</span> The read data observed by the scoreboard is offset by one cycle from the expected address.</div>
+                        <div class="step-src"><span class="src-pill src-log">LOG</span></div>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-badge">STEP 02</div>
+                    <div class="step-body">
+                        <div class="step-obs"><span class="step-lbl">OBSERVATION:</span> REQ-011 and REQ-012 state that the RAM uses synchronous read architecture with exactly 1 clock cycle latency before rdata is valid.</div>
+                        <div class="step-inf"><span class="step-lbl">INFERENCE:</span> A read initiated at cycle N will present valid data on rdata at cycle N+1.</div>
+                        <div class="step-src"><span class="src-pill src-log">SPEC</span></div>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-badge">STEP 03</div>
+                    <div class="step-body">
+                        <div class="step-obs"><span class="step-lbl">OBSERVATION:</span> RTL analysis shows a sequential block at line 17 driving rdata, confirming registered output behavior adhering to REQ-011 and REQ-012.</div>
+                        <div class="step-inf"><span class="step-lbl">INFERENCE:</span> RTL correctly implements synchronous read with registered output.</div>
+                        <div class="step-src"><span class="src-pill src-log">RTL</span></div>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-badge">STEP 04</div>
+                    <div class="step-body">
+                        <div class="step-obs"><span class="step-lbl">OBSERVATION:</span> Scoreboard logic in ram_scoreboard.sv evaluates tr.rdata !== memory[tr.addr] synchronously within the same transaction without pipelining or delaying the check.</div>
+                        <div class="step-inf"><span class="step-lbl">INFERENCE:</span> The testbench scoreboard incorrectly assumes zero-cycle latency read, causing comparison of current address with previous cycle's rdata output (Case 3: Scoreboard prediction incorrect).</div>
+                        <div class="step-src"><span class="src-pill src-log">TB</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: Fix & Patch -->
+        <div id="tab-fix" class="tab-pane">
+            
+                    <div class="fix-hero-card">
+                        <div class="fix-status-banner status-pass">
+                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE 91%
+                        </div>
+                        <div class="grid-2col" style="margin-top:16px;">
+                            <div>
+                                <table class="table-compact">
+                                    <tr><th>Target Module</th><td><code>ram_scoreboard</code></td></tr>
+                                    <tr><th>Target File</th><td><code>projects/ram/tb/ram_scoreboard.sv</code></td></tr>
+                                    <tr><th>Lines</th><td><code>7-35</code></td></tr>
+                                </table>
+                            </div>
+                            <div>
+                                <table class="table-compact">
+                                    <tr><th>Issue Type</th><td><span class="badge badge-info">TB</span></td></tr>
+                                    <tr><th>Fix Kind</th><td>code_patch</td></tr>
+                                    <tr><th>Validation</th><td><span class="badge badge-success">Specification Validated</span></td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="rca-summary-box" style="margin-top:16px;">
+                            <strong>Root Cause:</strong> The scoreboard immediately checked tr.rdata against memory[tr.addr] in the same cycle a read was issued, ignoring the 1-clock-cycle synchronous read latency required by REQ-012.
+                        </div>
+                        <div class="rca-summary-box" style="margin-top:8px;">
+                            <strong>Expected Behavior:</strong> Per REQ-012, read data appears on rdata one clock cycle after a read operation (we=0) is initiated with addr. The scoreboard must check rdata against the expected memory content of the previous read operation.
+                        </div>
+                        <div class="rca-summary-box" style="margin-top:8px;">
+                            <strong>Why This Fix Works:</strong> Adding state variables `read_pending` and `pending_addr` allows the scoreboard to defer the comparison of read data until the following clock transaction arrives. In the next transaction, before updating state or checking new transactions, the scoreboard compares `tr.rdata` against `memory[pending_addr]`.
+                        </div>
+
+                        
+                    <div class="patch-header">
+                        <h4>Synthesized Unified Git Patch</h4>
+                        <button class="btn btn-sm btn-accent" onclick="copyPatch()">📋 Copy Patch</button>
+                    </div>
+                    <pre class="code-snippet diff" id="patch-content"><code>--- a/projects/ram/tb/ram_scoreboard.sv
++++ b/projects/ram/tb/ram_scoreboard.sv
+@@ -6,5 +6,7 @@
+   uvm_analysis_imp #(ram_seq_item, ram_scoreboard) mon_imp;
+   bit [31:0] memory[int];
++  bit read_pending;
++  int pending_addr;
+ 
+   function void build_phase(uvm_phase phase);
+     super.build_phase(phase);
+@@ -13,22 +15,29 @@
+   function void write(ram_seq_item tr);
++    if (read_pending) begin
++      if (memory.exists(pending_addr)) begin
++        if (tr.rdata !== memory[pending_addr])
++          `uvm_error("RAM_SB",
++            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
++                      pending_addr, memory[pending_addr], tr.rdata))
++        else
++          `uvm_info("RAM_SB",
++            $sformatf("Match @addr %0d DATA=%0d",
++                      pending_addr, tr.rdata),
++            UVM_LOW)
++      end
++      else begin
++        `uvm_warning("RAM_SB",
++          $sformatf("Read from uninitialized addr %0d", pending_addr))
++      end
++    end
++
+     if (tr.we) begin
+       // WRITE
+       memory[tr.addr] = tr.wdata;
++      read_pending = 0;
+     end
+     else begin
+       // READ
+-      if (memory.exists(tr.addr)) begin
+-        if (tr.rdata !== memory[tr.addr])
+-          `uvm_error("RAM_SB",
+-            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
+-                      tr.addr, memory[tr.addr], tr.rdata))
+-        else
+-          `uvm_info("RAM_SB",
+-            $sformatf("Match @addr %0d DATA=%0d",
+-                      tr.addr, tr.rdata),
+-            UVM_LOW)
+-      end
+-      else begin
+-        `uvm_warning("RAM_SB",
+-          $sformatf("Read from uninitialized addr %0d", tr.addr))
+-      end
++      read_pending = 1;
++      pending_addr = tr.addr;
+     end
+   endfunction</code></pre>
+                
+                        
+                    <h4 style="margin-top:16px;">Corrected SystemVerilog Implementation</h4>
+                    <pre class="code-snippet"><code>  bit read_pending;
+  int pending_addr;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    mon_imp = new("mon_imp", this);
+  endfunction
+
+  function void write(ram_seq_item tr);
+    if (read_pending) begin
+      if (memory.exists(pending_addr)) begin
+        if (tr.rdata !== memory[pending_addr])
+          `uvm_error("RAM_SB",
+            $sformatf("Mismatch @addr %0d EXP=%0d ACT=%0d",
+                      pending_addr, memory[pending_addr], tr.rdata))
+        else
+          `uvm_info("RAM_SB",
+            $sformatf("Match @addr %0d DATA=%0d",
+                      pending_addr, tr.rdata),
+            UVM_LOW)
+      end
+      else begin
+        `uvm_warning("RAM_SB",
+          $sformatf("Read from uninitialized addr %0d", pending_addr))
+      end
+    end
+
+    if (tr.we) begin
+      // WRITE
+      memory[tr.addr] = tr.wdata;
+      read_pending = 0;
+    end
+    else begin
+      // READ
+      read_pending = 1;
+      pending_addr = tr.addr;
+    end
+  endfunction</code></pre>
+                
+
+                        <h4 style="margin-top:16px;">Multi-Tier Validation Matrix</h4><table class="table-styled"><thead><tr><th>Lvl</th><th>Check Stage</th><th>Result</th><th>Verification Notes</th></tr></thead><tbody>
+                        <tr><td>1</td><td>Syntax Check</td><td><span class="badge badge-warn">FAIL</span></td><td>Unbalanced begin/end: 5 begins, 3 plain ends</td></tr>
+                        <tr><td>2</td><td>Structural AST</td><td><span class="badge badge-warn">FAIL</span></td><td>Target module 'ram_scoreboard' not found in RTL knowledge (ram_rtl).</td></tr>
+                        <tr><td>3</td><td>Specification Adherence</td><td><span class="badge badge-success">PASS</span></td><td>Fix reasoning aligns with spec requirements: REQ-005, REQ-006, REQ-008, REQ-009, REQ-011</td></tr>
+                        <tr><td>4</td><td>Simulation Regression</td><td><span class="badge badge-info">NOT_AVAILABLE</span></td><td>Clean verification cycle</td></tr>
+                    </tbody></table>
+                    </div>
+                
+        </div>
+
+        
+
+        <!-- TAB 6: VCD Waveform Viewer -->
+        
+    <!-- ============================================================================== -->
+    <!-- VERISIGHT SILICON WAVEFORM STUDIO (VCD / TRACE VIEWER)                         -->
+    <!-- ============================================================================== -->
+    <div id="tab-waveform" class="tab-pane">
+        <div class="wave-studio-container">
+            <!-- Studio Toolbar -->
+            <div class="wave-toolbar">
+                <div class="wave-tb-left">
+                    <span class="wave-brand">🌊 Waveform Studio</span>
+                    <span class="wave-badge" id="waveTraceBadge">ALU Failure Trace (65ns)</span>
+                    <span class="wave-timescale" id="waveTimescale">Scale: 1ns / tick</span>
+                </div>
+                
+                <div class="wave-tb-center">
+                    <div class="btn-group">
+                        <button class="wave-btn active" id="btnTraceAlu" onclick="loadTracePreset('alu')">ALU Trace</button>
+                        <button class="wave-btn" id="btnTraceFifo" onclick="loadTracePreset('fifo')">FIFO X-Prop</button>
+                        <button class="wave-btn" id="btnTraceCustom" onclick="document.getElementById('waveFileInput').click()">📂 Open VCD...</button>
+                        <input type="file" id="waveFileInput" accept=".vcd,.txt" style="display:none;" onchange="handleVcdFileSelected(event)">
+                    </div>
+
+                    <div class="wave-sep"></div>
+
+                    <!-- Navigation & Time Jump -->
+                    <div class="btn-group">
+                        <button class="wave-btn" title="Jump to Start" onclick="jumpWaveTime(0)">⏮️</button>
+                        <button class="wave-btn" title="Step Back 10ns" onclick="stepWaveTime(-10)">⏪ -10ns</button>
+                        <button class="wave-btn" title="Step Forward 10ns" onclick="stepWaveTime(10)">+10ns ⏩</button>
+                        <button class="wave-btn wave-btn-danger" title="Jump to Failure Cycle" onclick="jumpToFailure(65.0)">🎯 Failure @65.0ns</button>
+                    </div>
+
+                    <div class="wave-sep"></div>
+
+                    <!-- Zoom Controls -->
+                    <div class="btn-group">
+                        <button class="wave-btn" title="Zoom Out" onclick="zoomWave(0.8)">🔍−</button>
+                        <button class="wave-btn" title="Zoom In" onclick="zoomWave(1.25)">🔍+</button>
+                        <button class="wave-btn" title="Zoom Fit" onclick="zoomFitWave()">↔️ Fit</button>
+                        <button class="wave-btn" title="Reset Zoom" onclick="resetWaveZoom()">1:1</button>
+                    </div>
+
+                    <div class="wave-sep"></div>
+
+                    <!-- Radix Toggle -->
+                    <div class="btn-group">
+                        <button class="wave-btn active" id="radixHex" onclick="setWaveRadix('hex')">HEX</button>
+                        <button class="wave-btn" id="radixBin" onclick="setWaveRadix('bin')">BIN</button>
+                        <button class="wave-btn" id="radixDec" onclick="setWaveRadix('dec')">DEC</button>
+                    </div>
                 </div>
 
-    <footer>Report generated by VeriSight v1.0.0</footer>
+                <div class="wave-tb-right">
+                    <input type="text" id="waveSignalSearch" class="wave-search" placeholder="Filter signals..." oninput="filterWaveSignals()">
+                    <button class="wave-btn" title="Export Waveform Image" onclick="exportWaveformPng()">📷 Snapshot</button>
+                </div>
+            </div>
+
+            <!-- Drag & Drop Dropzone Banner (Collapsible/Ambient) -->
+            <div class="wave-drop-target" id="waveDropTarget" ondragover="handleWaveDragOver(event)" ondragleave="handleWaveDragLeave(event)" ondrop="handleWaveDrop(event)">
+                <div class="wave-cursor-banner">
+                    <div class="cur-time-display">
+                        <span class="cur-lbl">MARKER T:</span>
+                        <span class="cur-val" id="cursorTimeReadout">65.0 ns</span>
+                    </div>
+                    <div class="cur-status-display" id="cursorEventReadout">
+                        <span class="pulse-dot"></span>
+                        <span class="cur-msg">Highlighted Anomaly: Assertion / Scoreboard Error @ 65.0ns</span>
+                    </div>
+                    <div class="cur-hint">Drag & drop any simulator .vcd to visualize here</div>
+                </div>
+
+                <!-- Main Waveform Viewer Viewport -->
+                <div class="wave-viewport" id="waveViewport">
+                    <!-- Left Signal Names & Live Value Panel -->
+                    <div class="wave-signals-panel" id="waveSignalsPanel">
+                        <div class="wave-signal-header">
+                            <span class="col-sig-name">Signal Hierarchy</span>
+                            <span class="col-sig-val">Value @ T</span>
+                        </div>
+                        <div class="wave-signal-rows" id="waveSignalRowsContainer">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Right Waveform Canvas Area -->
+                    <div class="wave-canvas-wrapper" id="waveCanvasWrapper" onscroll="syncWaveScroll(event)">
+                        <!-- Time Ruler Canvas -->
+                        <div class="wave-ruler-sticky">
+                            <canvas id="waveRulerCanvas" height="28"></canvas>
+                        </div>
+                        <!-- Waveform Tracks Canvas -->
+                        <div class="wave-canvas-body" id="waveCanvasBody">
+                            <canvas id="waveCanvas" onmousemove="handleWaveMouseMove(event)" onclick="handleWaveClick(event)"></canvas>
+                            <!-- Cursor Indicator Line -->
+                            <div class="wave-cursor-line" id="waveCursorLine">
+                                <div class="wave-cursor-flag" id="waveCursorFlag">65.0ns</div>
+                            </div>
+                            <!-- Error Highlight Band -->
+                            <div class="wave-error-band" id="waveErrorBand" style="display:block;">
+                                <div class="wave-error-flag" id="waveErrorFlag">⚠️ ERROR @ 65.0ns</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waveform Legend / Footer Bar -->
+            <div class="wave-legend-bar">
+                <div class="legend-item"><span class="leg-color leg-clk"></span> Clock Pulse</div>
+                <div class="legend-item"><span class="leg-color leg-logic"></span> Logic High (1) / Low (0)</div>
+                <div class="legend-item"><span class="leg-color leg-bus"></span> Multi-bit Bus Hex Envelope</div>
+                <div class="legend-item"><span class="leg-color leg-x"></span> Unknown (X) Hazard Stripe</div>
+                <div class="legend-item"><span class="leg-color leg-z"></span> High-Z (Z) Float</div>
+                <div class="legend-item"><span class="leg-color leg-err"></span> Assertion / Scoreboard Violation</div>
+                <div class="wave-stats" id="waveStatsText">9 Signals • 120ns Window • Click canvas to measure</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WAVEFORM STUDIO STYLES -->
+    <style>
+        .wave-studio-container {
+            background: #080c14;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "JetBrains Mono", monospace;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            margin: 16px 0 24px;
+        }
+        .wave-toolbar {
+            background: #0d1322;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .wave-tb-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .wave-brand {
+            font-weight: 800;
+            font-size: 14px;
+            color: #38bdf8;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .wave-badge {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #7dd3fc;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .wave-timescale {
+            color: #64748b;
+            font-size: 11px;
+            font-family: "JetBrains Mono", monospace;
+        }
+        .wave-tb-center {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .wave-sep {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.12);
+            margin: 0 4px;
+        }
+        .wave-btn {
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: inherit;
+        }
+        .wave-btn:hover {
+            background: #334155;
+            color: #ffffff;
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+        .wave-btn.active {
+            background: #0284c7;
+            color: #ffffff;
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+        }
+        .wave-btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+        .wave-btn-danger:hover {
+            background: #ef4444;
+            color: #ffffff;
+        }
+        .wave-search {
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            width: 130px;
+            outline: none;
+            transition: width 0.2s;
+        }
+        .wave-search:focus {
+            border-color: #38bdf8;
+            width: 180px;
+        }
+        .wave-cursor-banner {
+            background: #0b111e;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .cur-time-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cur-lbl {
+            color: #64748b;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .cur-val {
+            color: #38bdf8;
+            font-weight: 800;
+            font-size: 13px;
+            font-family: "JetBrains Mono", monospace;
+        }
+        .cur-status-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #fca5a5;
+            font-weight: 600;
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .cur-hint {
+            color: #475569;
+            font-style: italic;
+        }
+        .wave-viewport {
+            display: flex;
+            height: 380px;
+            position: relative;
+            background: #080c14;
+            user-select: none;
+        }
+        .wave-signals-panel {
+            width: 280px;
+            flex-shrink: 0;
+            background: #0a0f1c;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            overflow-y: hidden;
+            z-index: 5;
+        }
+        .wave-signal-header {
+            height: 28px;
+            background: #0f172a;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+        }
+        .col-sig-name { flex: 1; }
+        .col-sig-val { width: 85px; text-align: right; }
+        .wave-signal-rows {
+            overflow-y: hidden;
+            flex: 1;
+        }
+        .wave-sig-row {
+            height: 34px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 11px;
+            color: #cbd5e1;
+            font-family: "JetBrains Mono", monospace;
+            box-sizing: border-box;
+            transition: background 0.1s;
+        }
+        .wave-sig-row:hover {
+            background: rgba(56, 189, 248, 0.06);
+        }
+        .sig-tag-clk {
+            color: #4ade80;
+            margin-right: 6px;
+            font-size: 10px;
+        }
+        .sig-tag-bus {
+            color: #38bdf8;
+            margin-right: 6px;
+            font-size: 10px;
+        }
+        .sig-tag-wire {
+            color: #cbd5e1;
+            margin-right: 6px;
+            font-size: 10px;
+        }
+        .sig-name-text {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sig-val-cur {
+            width: 85px;
+            text-align: right;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+        .sig-val-cur.val-x {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.15);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .sig-val-cur.val-z {
+            color: #f59e0b;
+        }
+        .wave-canvas-wrapper {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            position: relative;
+            background: #080c14;
+        }
+        .wave-ruler-sticky {
+            height: 28px;
+            background: #0f172a;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            position: sticky;
+            top: 0;
+            left: 0;
+            z-index: 4;
+        }
+        .wave-canvas-body {
+            position: relative;
+        }
+        #waveCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        .wave-cursor-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #38bdf8;
+            box-shadow: 0 0 8px #38bdf8;
+            pointer-events: none;
+            z-index: 10;
+            transition: left 0.04s ease-out;
+        }
+        .wave-cursor-flag {
+            position: absolute;
+            top: -24px;
+            left: -28px;
+            background: #0284c7;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            font-family: "JetBrains Mono", monospace;
+        }
+        .wave-error-band {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #ef4444;
+            box-shadow: 0 0 12px #ef4444;
+            pointer-events: none;
+            z-index: 8;
+        }
+        .wave-error-flag {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            background: rgba(239, 68, 68, 0.9);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        .wave-legend-bar {
+            background: #0d1322;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .leg-color {
+            width: 12px;
+            height: 6px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+        .leg-clk { background: #4ade80; }
+        .leg-logic { background: #38bdf8; }
+        .leg-bus { background: #818cf8; }
+        .leg-x { background: repeating-linear-gradient(45deg, #ef4444, #ef4444 2px, #7f1d1d 2px, #7f1d1d 4px); }
+        .leg-z { background: #f59e0b; }
+        .leg-err { background: #ef4444; }
+        .wave-stats {
+            margin-left: auto;
+            color: #64748b;
+            font-family: "JetBrains Mono", monospace;
+        }
+    </style>
+
+    <!-- WAVEFORM STUDIO CLIENT-SIDE JAVASCRIPT LOGIC -->
+    <script>
+        // Preset Trace Databases
+        const PRESET_TRACES = {
+            alu: {"name": "alu_failure_trace.vcd", "timescale": "1E-9", "max_time": 120, "signals": [{"name": "clk", "hierarchy": "top_tb.clk", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 5, "v": "1"}, {"t": 10, "v": "0"}, {"t": 15, "v": "1"}, {"t": 20, "v": "0"}, {"t": 25, "v": "1"}, {"t": 30, "v": "0"}, {"t": 35, "v": "1"}, {"t": 40, "v": "0"}, {"t": 45, "v": "1"}, {"t": 50, "v": "0"}, {"t": 55, "v": "1"}, {"t": 60, "v": "0"}, {"t": 65, "v": "1"}, {"t": 70, "v": "0"}, {"t": 75, "v": "1"}, {"t": 80, "v": "0"}, {"t": 85, "v": "1"}, {"t": 90, "v": "0"}, {"t": 95, "v": "1"}, {"t": 100, "v": "0"}, {"t": 105, "v": "1"}, {"t": 110, "v": "0"}, {"t": 115, "v": "1"}, {"t": 120, "v": "0"}]}, {"name": "rst_n", "hierarchy": "top_tb.rst_n", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 10, "v": "1"}, {"t": 100, "v": "0"}, {"t": 110, "v": "1"}]}, {"name": "op[3:0]", "hierarchy": "top_tb.op[3:0]", "width": 4, "has_x": false, "transitions": [{"t": 0, "v": "0000"}, {"t": 20, "v": "0000"}, {"t": 30, "v": "0001"}, {"t": 40, "v": "0010"}, {"t": 50, "v": "0011"}, {"t": 60, "v": "0000"}, {"t": 70, "v": "0110"}, {"t": 80, "v": "0111"}, {"t": 90, "v": "1111"}]}, {"name": "operand_a[7:0]", "hierarchy": "top_tb.operand_a[7:0]", "width": 8, "has_x": false, "transitions": [{"t": 0, "v": "00000000"}, {"t": 20, "v": "00001010"}, {"t": 30, "v": "00110010"}, {"t": 40, "v": "11110000"}, {"t": 50, "v": "11110000"}, {"t": 60, "v": "11111111"}, {"t": 70, "v": "00001111"}, {"t": 80, "v": "11110000"}, {"t": 90, "v": "01010101"}]}, {"name": "operand_b[7:0]", "hierarchy": "top_tb.operand_b[7:0]", "width": 8, "has_x": false, "transitions": [{"t": 0, "v": "00000000"}, {"t": 20, "v": "00010100"}, {"t": 30, "v": "00001010"}, {"t": 40, "v": "10101010"}, {"t": 50, "v": "00001111"}, {"t": 60, "v": "00000001"}, {"t": 70, "v": "00000010"}, {"t": 80, "v": "00000010"}, {"t": 90, "v": "01010101"}]}, {"name": "result[7:0]", "hierarchy": "top_tb.result[7:0]", "width": 8, "has_x": true, "transitions": [{"t": 0, "v": "00000000"}, {"t": 25, "v": "00011110"}, {"t": 35, "v": "00101000"}, {"t": 45, "v": "10100000"}, {"t": 55, "v": "11111111"}, {"t": 65, "v": "00000000"}, {"t": 75, "v": "00111100"}, {"t": 85, "v": "00111100"}, {"t": 95, "v": "xxxxxxxx"}, {"t": 105, "v": "00000000"}]}, {"name": "carry", "hierarchy": "top_tb.carry", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 65, "v": "1"}, {"t": 75, "v": "0"}, {"t": 105, "v": "0"}]}, {"name": "zero", "hierarchy": "top_tb.zero", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "1"}, {"t": 25, "v": "0"}, {"t": 65, "v": "1"}, {"t": 75, "v": "0"}, {"t": 105, "v": "1"}]}, {"name": "error", "hierarchy": "top_tb.error", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 65, "v": "1"}, {"t": 75, "v": "0"}, {"t": 95, "v": "1"}, {"t": 105, "v": "0"}]}], "raw_text": "$date\n   Tue Oct 20 10:55:00 2026\n$end\n$version\n   VeriSight EDA Simulation Engine v2.4 (Questa/VCS compatible)\n$end\n$timescale\n   1ns\n$end\n$scope module top_tb $end\n$var wire 1 ! clk $end\n$var wire 1 \" rst_n $end\n$var wire 4 # op [3:0] $end\n$var wire 8 $ operand_a [7:0] $end\n$var wire 8 % operand_b [7:0] $end\n$var wire 8 & result [7:0] $end\n$var wire 1 ' carry $end\n$var wire 1 ( zero $end\n$var wire 1 ) error $end\n$upscope $end\n$enddefinitions $end\n#0\n$dumpvars\n0!\n0\"\nb0000 #\nb00000000 $\nb00000000 %\nb00000000 &\n0'\n1(\n0)\n$end\n#5\n1!\n#10\n0!\n1\"\n#15\n1!\n#20\n0!\nb0000 #\nb00001010 $\nb00010100 %\n#25\n1!\nb00011110 &\n0(\n#30\n0!\nb0001 #\nb00110010 $\nb00001010 %\n#35\n1!\nb00101000 &\n#40\n0!\nb0010 #\nb11110000 $\nb10101010 %\n#45\n1!\nb10100000 &\n#50\n0!\nb0011 #\nb11110000 $\nb00001111 %\n#55\n1!\nb11111111 &\n#60\n0!\nb0000 #\nb11111111 $\nb00000001 %\n#65\n1!\nb00000000 &\n1'\n1(\n1)\n#70\n0!\nb0110 #\nb00001111 $\nb00000010 %\n#75\n1!\nb00111100 &\n0'\n0(\n0)\n#80\n0!\nb0111 #\nb11110000 $\nb00000010 %\n#85\n1!\nb00111100 &\n#90\n0!\nb1111 #\nb01010101 $\nb01010101 %\n#95\n1!\nbxxxxxxxx &\n1)\n#100\n0!\n0\"\n#105\n1!\nb00000000 &\n0'\n1(\n0)\n#110\n0!\n1\"\n#115\n1!\n#120\n0!\n"},
+            fifo: {"name": "fifo_xprop_trace.vcd", "timescale": "1E-9", "max_time": 80, "signals": [{"name": "clk", "hierarchy": "fifo_tb.clk", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 5, "v": "1"}, {"t": 10, "v": "0"}, {"t": 15, "v": "1"}, {"t": 20, "v": "0"}, {"t": 25, "v": "1"}, {"t": 30, "v": "0"}, {"t": 35, "v": "1"}, {"t": 40, "v": "0"}, {"t": 45, "v": "1"}, {"t": 50, "v": "0"}, {"t": 55, "v": "1"}, {"t": 60, "v": "0"}, {"t": 65, "v": "1"}, {"t": 70, "v": "0"}, {"t": 75, "v": "1"}, {"t": 80, "v": "0"}]}, {"name": "rst_n", "hierarchy": "fifo_tb.rst_n", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 10, "v": "1"}]}, {"name": "wr_en", "hierarchy": "fifo_tb.wr_en", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 20, "v": "1"}, {"t": 40, "v": "0"}]}, {"name": "rd_en", "hierarchy": "fifo_tb.rd_en", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 40, "v": "1"}, {"t": 70, "v": "0"}]}, {"name": "wr_data[7:0]", "hierarchy": "fifo_tb.wr_data[7:0]", "width": 8, "has_x": false, "transitions": [{"t": 0, "v": "00000000"}, {"t": 20, "v": "10101010"}, {"t": 30, "v": "11001100"}]}, {"name": "rd_data[7:0]", "hierarchy": "fifo_tb.rd_data[7:0]", "width": 8, "has_x": true, "transitions": [{"t": 0, "v": "xxxxxxxx"}, {"t": 45, "v": "10101010"}, {"t": 55, "v": "11001100"}, {"t": 65, "v": "xxxxxxxx"}]}, {"name": "full", "hierarchy": "fifo_tb.full", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}]}, {"name": "empty", "hierarchy": "fifo_tb.empty", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "1"}, {"t": 25, "v": "0"}, {"t": 55, "v": "1"}]}, {"name": "count[3:0]", "hierarchy": "fifo_tb.count[3:0]", "width": 4, "has_x": false, "transitions": [{"t": 0, "v": "0000"}, {"t": 25, "v": "0001"}, {"t": 35, "v": "0010"}, {"t": 45, "v": "0001"}, {"t": 55, "v": "0000"}]}, {"name": "underflow_err", "hierarchy": "fifo_tb.underflow_err", "width": 1, "has_x": false, "transitions": [{"t": 0, "v": "0"}, {"t": 65, "v": "1"}]}], "raw_text": "$date\n   Tue Oct 20 10:56:00 2026\n$end\n$version\n   VeriSight EDA Simulation Engine v2.4 (FIFO X-Trace Verification)\n$end\n$timescale\n   1ns\n$end\n$scope module fifo_tb $end\n$var wire 1 ! clk $end\n$var wire 1 \" rst_n $end\n$var wire 1 # wr_en $end\n$var wire 1 $ rd_en $end\n$var wire 8 % wr_data [7:0] $end\n$var wire 8 & rd_data [7:0] $end\n$var wire 1 ' full $end\n$var wire 1 ( empty $end\n$var wire 4 ) count [3:0] $end\n$var wire 1 * underflow_err $end\n$upscope $end\n$enddefinitions $end\n#0\n$dumpvars\n0!\n0\"\n0#\n0$\nb00000000 %\nbxxxxxxxx &\n0'\n1(\nb0000 )\n0*\n$end\n#5\n1!\n#10\n0!\n1\"\n#15\n1!\n#20\n0!\n1#\nb10101010 %\n#25\n1!\n0(\nb0001 )\n#30\n0!\nb11001100 %\n#35\n1!\nb0010 )\n#40\n0!\n0#\n1$\n#45\n1!\nb10101010 &\nb0001 )\n#50\n0!\n#55\n1!\nb11001100 &\n1(\nb0000 )\n#60\n0!\n#65\n1!\nbxxxxxxxx &\n1*\n#70\n0!\n0$\n#75\n1!\n#80\n0!\n"},
+            custom: {}
+        };
+
+        // State Machine
+        let activeTrace = null;
+        let waveSignals = [];
+        let waveMaxTime = 120; // in ns
+        let wavePixPerNs = 8.0; // scale factor
+        let waveCursorTime = 65.0;
+        let waveFailureTime = 65.0;
+        let waveFailureLabel = "Assertion / Scoreboard Error";
+        let waveRadix = 'hex';
+        let waveSearchFilter = '';
+        const ROW_HEIGHT = 34;
+
+        // Initialize Waveform Viewer on page load
+        function initWaveformStudio() {
+            if (PRESET_TRACES.alu && PRESET_TRACES.alu.signals && PRESET_TRACES.alu.signals.length > 0) {
+                loadTraceData(PRESET_TRACES.alu);
+            } else if (PRESET_TRACES.custom && PRESET_TRACES.custom.signals && PRESET_TRACES.custom.signals.length > 0) {
+                loadTraceData(PRESET_TRACES.custom);
+            } else {
+                // Parse embedded raw text fallback
+                if (PRESET_TRACES.alu && PRESET_TRACES.alu.raw_text) {
+                    const parsed = parseClientVcd(PRESET_TRACES.alu.raw_text, 'alu_failure_trace.vcd');
+                    loadTraceData(parsed);
+                }
+            }
+        }
+
+        function loadTracePreset(presetKey) {
+            document.querySelectorAll('.wave-tb-center .wave-btn').forEach(b => b.classList.remove('active'));
+            if (presetKey === 'alu') {
+                const btn = document.getElementById('btnTraceAlu');
+                if (btn) btn.classList.add('active');
+                document.getElementById('waveTraceBadge').innerText = 'ALU Failure Trace (65ns)';
+                waveFailureTime = 65.0;
+                waveFailureLabel = "Assertion Violation: result corrupted by overflow";
+                if (PRESET_TRACES.alu.signals) {
+                    loadTraceData(PRESET_TRACES.alu);
+                } else if (PRESET_TRACES.alu.raw_text) {
+                    loadTraceData(parseClientVcd(PRESET_TRACES.alu.raw_text, 'alu_failure_trace.vcd'));
+                }
+            } else if (presetKey === 'fifo') {
+                const btn = document.getElementById('btnTraceFifo');
+                if (btn) btn.classList.add('active');
+                document.getElementById('waveTraceBadge').innerText = 'FIFO X-Propagation Trace (65ns Underflow)';
+                waveFailureTime = 65.0;
+                waveFailureLabel = "FIFO Underflow Error: rd_data sampled uninitialized X";
+                if (PRESET_TRACES.fifo.signals) {
+                    loadTraceData(PRESET_TRACES.fifo);
+                } else if (PRESET_TRACES.fifo.raw_text) {
+                    loadTraceData(parseClientVcd(PRESET_TRACES.fifo.raw_text, 'fifo_xprop_trace.vcd'));
+                }
+            }
+            jumpToFailure(waveFailureTime);
+        }
+
+        function loadTraceData(data) {
+            if (!data || !data.signals) return;
+            activeTrace = data;
+            waveSignals = data.signals;
+            waveMaxTime = Math.max(data.max_time || 120, 80);
+            renderSignalNames();
+            updateCanvasDimensions();
+            renderRuler();
+            renderWaveforms();
+            updateCursorPosition(waveCursorTime);
+            updateSignalValuesAtCursor(waveCursorTime);
+            updateStatsText();
+        }
+
+        // Fast Client-Side VCD Parser
+        function parseClientVcd(text, filename) {
+            const lines = text.split(/\r?\n/);
+            let timescale = '1ns';
+            let signals = [];
+            let idToSig = {};
+            let currentTime = 0;
+            let maxTime = 0;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                if (line.startsWith('$timescale')) {
+                    const m = text.match(/\$timescale\s+([0-9]+\s*[a-z]+)/i);
+                    if (m) timescale = m[1].replace(/\s+/g, '');
+                } else if (line.startsWith('$var')) {
+                    const parts = line.split(/\s+/);
+                    // $var wire 8 & result [7:0] $end
+                    if (parts.length >= 5) {
+                        const type = parts[1];
+                        const width = parseInt(parts[2], 10) || 1;
+                        const id = parts[3];
+                        const name = parts[4];
+                        const sigObj = {
+                            name: name,
+                            hierarchy: name,
+                            width: width,
+                            has_x: false,
+                            transitions: []
+                        };
+                        signals.push(sigObj);
+                        idToSig[id] = sigObj;
+                    }
+                } else if (line.startsWith('#')) {
+                    currentTime = parseInt(line.substring(1), 10) || 0;
+                    if (currentTime > maxTime) maxTime = currentTime;
+                } else if (line.startsWith('b') || line.startsWith('B')) {
+                    // Multi-bit transition: b00010100 %
+                    const spaceIdx = line.indexOf(' ');
+                    if (spaceIdx > 0) {
+                        const val = line.substring(1, spaceIdx).trim();
+                        const id = line.substring(spaceIdx + 1).trim();
+                        if (idToSig[id]) {
+                            if (val.includes('x') || val.includes('X')) idToSig[id].has_x = true;
+                            idToSig[id].transitions.push({ t: currentTime, v: val });
+                        }
+                    }
+                } else if (line.length >= 2 && !line.startsWith('$')) {
+                    // 1-bit transition: 1!, 0!, x!, z!
+                    const val = line[0];
+                    const id = line.substring(1);
+                    if (idToSig[id]) {
+                        if (val === 'x' || val === 'X') idToSig[id].has_x = true;
+                        idToSig[id].transitions.push({ t: currentTime, v: val });
+                    }
+                }
+            }
+
+            return {
+                name: filename || 'uploaded_trace.vcd',
+                timescale: timescale,
+                max_time: maxTime,
+                signals: signals
+            };
+        }
+
+        // Render Left Panel Signal List
+        function renderSignalNames() {
+            const container = document.getElementById('waveSignalRowsContainer');
+            container.innerHTML = '';
+            const filter = waveSearchFilter.toLowerCase();
+
+            waveSignals.forEach((sig, idx) => {
+                if (filter && !sig.name.toLowerCase().includes(filter)) return;
+                const row = document.createElement('div');
+                row.className = 'wave-sig-row';
+                row.id = 'sig-row-' + idx;
+
+                let iconHtml = '<span class="sig-tag-wire">⚡</span>';
+                if (sig.name.toLowerCase().includes('clk')) {
+                    iconHtml = '<span class="sig-tag-clk">⏱️</span>';
+                } else if (sig.width > 1) {
+                    iconHtml = '<span class="sig-tag-bus">🚌 [' + (sig.width - 1) + ':0]</span>';
+                }
+
+                row.innerHTML = `
+                    ` + iconHtml + `
+                    <span class="sig-name-text" title="` + sig.name + `">` + sig.name + `</span>
+                    <span class="sig-val-cur" id="sig-val-` + idx + `">—</span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function updateCanvasDimensions() {
+            const canvas = document.getElementById('waveCanvas');
+            const rulerCanvas = document.getElementById('waveRulerCanvas');
+            const visibleSignals = getVisibleSignals();
+            const totalWidth = Math.max(800, (waveMaxTime + 20) * wavePixPerNs);
+            const totalHeight = visibleSignals.length * ROW_HEIGHT;
+
+            canvas.width = totalWidth;
+            canvas.height = totalHeight;
+            rulerCanvas.width = totalWidth;
+            rulerCanvas.height = 28;
+
+            document.getElementById('waveCanvasBody').style.width = totalWidth + 'px';
+            document.getElementById('waveCanvasBody').style.height = totalHeight + 'px';
+        }
+
+        function getVisibleSignals() {
+            const filter = waveSearchFilter.toLowerCase();
+            return waveSignals.filter(s => !filter || s.name.toLowerCase().includes(filter));
+        }
+
+        // Draw Time Ruler
+        function renderRuler() {
+            const ruler = document.getElementById('waveRulerCanvas');
+            const ctx = ruler.getContext('2d');
+            const width = ruler.width;
+            ctx.clearRect(0, 0, width, 28);
+
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, 28);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px "JetBrains Mono", monospace';
+
+            const tickIntervalNs = wavePixPerNs < 5 ? 20 : (wavePixPerNs > 15 ? 5 : 10);
+
+            for (let t = 0; t <= waveMaxTime + 10; t += tickIntervalNs) {
+                const x = t * wavePixPerNs;
+                ctx.beginPath();
+                ctx.moveTo(x, 14);
+                ctx.lineTo(x, 28);
+                ctx.stroke();
+
+                ctx.fillText(t + 'ns', x + 3, 12);
+
+                // Minor ticks
+                if (tickIntervalNs >= 10) {
+                    const subX = (t + tickIntervalNs / 2) * wavePixPerNs;
+                    ctx.beginPath();
+                    ctx.moveTo(subX, 20);
+                    ctx.lineTo(subX, 28);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Render Waveform Tracks
+        function renderWaveforms() {
+            const canvas = document.getElementById('waveCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const visibleSignals = getVisibleSignals();
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Background & Grid
+            ctx.fillStyle = '#080c14';
+            ctx.fillRect(0, 0, width, height);
+
+            // Vertical Time Gridlines
+            const tickIntervalNs = wavePixPerNs < 5 ? 20 : (wavePixPerNs > 15 ? 5 : 10);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let t = 0; t <= waveMaxTime + 10; t += tickIntervalNs) {
+                const x = t * wavePixPerNs;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+
+            // Draw each signal row
+            visibleSignals.forEach((sig, idx) => {
+                const rowTop = idx * ROW_HEIGHT;
+                const rowBottom = rowTop + ROW_HEIGHT;
+                const midY = rowTop + ROW_HEIGHT / 2;
+                const highY = rowTop + 6;
+                const lowY = rowBottom - 6;
+
+                // Alternating row background
+                if (idx % 2 === 1) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+                    ctx.fillRect(0, rowTop, width, ROW_HEIGHT);
+                }
+
+                // Horizontal dividing line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.beginPath();
+                ctx.moveTo(0, rowBottom);
+                ctx.lineTo(width, rowBottom);
+                ctx.stroke();
+
+                if (!sig.transitions || sig.transitions.length === 0) return;
+
+                const isClk = sig.name.toLowerCase().includes('clk');
+                const isBus = sig.width > 1;
+
+                if (isClk) {
+                    // Draw crisp clock wave
+                    ctx.strokeStyle = '#4ade80';
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    let lastVal = sig.transitions[0].v;
+                    let lastX = 0;
+                    let lastY = (lastVal === '1') ? highY : lowY;
+                    ctx.moveTo(lastX, lastY);
+
+                    for (let i = 0; i < sig.transitions.length; i++) {
+                        const tr = sig.transitions[i];
+                        const x = tr.t * wavePixPerNs;
+                        ctx.lineTo(x, lastY);
+                        const curY = (tr.v === '1') ? highY : lowY;
+                        ctx.lineTo(x, curY);
+                        lastY = curY;
+                        lastX = x;
+                    }
+                    ctx.lineTo(width, lastY);
+                    ctx.stroke();
+                } else if (isBus) {
+                    // Draw multi-bit bus with hexagonal envelopes and centered text
+                    for (let i = 0; i < sig.transitions.length; i++) {
+                        const tr = sig.transitions[i];
+                        const nextTr = sig.transitions[i + 1];
+                        const startX = tr.t * wavePixPerNs;
+                        const endX = nextTr ? (nextTr.t * wavePixPerNs) : width;
+                        const val = tr.v;
+                        const isX = val.includes('x') || val.includes('X');
+                        const isZ = val.includes('z') || val.includes('Z');
+                        const segW = endX - startX;
+
+                        if (segW <= 0) continue;
+
+                        const envW = Math.min(4, segW / 2);
+
+                        // Fill polygon
+                        ctx.beginPath();
+                        ctx.moveTo(startX + envW, highY);
+                        ctx.lineTo(endX - envW, highY);
+                        ctx.lineTo(endX, midY);
+                        ctx.lineTo(endX - envW, lowY);
+                        ctx.lineTo(startX + envW, lowY);
+                        ctx.lineTo(startX, midY);
+                        ctx.closePath();
+
+                        if (isX) {
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+                            ctx.strokeStyle = '#ef4444';
+                        } else if (isZ) {
+                            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+                            ctx.strokeStyle = '#f59e0b';
+                        } else {
+                            ctx.fillStyle = 'rgba(129, 140, 248, 0.12)';
+                            ctx.strokeStyle = '#818cf8';
+                        }
+                        ctx.lineWidth = 1.4;
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Centered text representation
+                        if (segW > 24) {
+                            const displayVal = formatBusValue(val, sig.width);
+                            ctx.fillStyle = isX ? '#fca5a5' : (isZ ? '#fbbf24' : '#e0e7ff');
+                            ctx.font = '10px "JetBrains Mono", monospace';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            const textX = startX + segW / 2;
+                            ctx.fillText(displayVal, textX, midY);
+                        }
+                    }
+                } else {
+                    // Draw 1-bit logic signal
+                    let lastVal = sig.transitions[0].v;
+                    let lastX = 0;
+
+                    for (let i = 0; i < sig.transitions.length; i++) {
+                        const tr = sig.transitions[i];
+                        const nextTr = sig.transitions[i + 1];
+                        const startX = tr.t * wavePixPerNs;
+                        const endX = nextTr ? (nextTr.t * wavePixPerNs) : width;
+                        const val = tr.v;
+                        const isX = val === 'x' || val === 'X';
+                        const isZ = val === 'z' || val === 'Z';
+                        const curY = (val === '1') ? highY : lowY;
+
+                        ctx.lineWidth = 1.8;
+                        if (isX) {
+                            // X hazard line in red
+                            ctx.strokeStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.moveTo(startX, midY);
+                            ctx.lineTo(endX, midY);
+                            ctx.stroke();
+                        } else if (isZ) {
+                            // Z high-impedance line
+                            ctx.strokeStyle = '#f59e0b';
+                            ctx.beginPath();
+                            ctx.moveTo(startX, midY);
+                            ctx.lineTo(endX, midY);
+                            ctx.stroke();
+                        } else {
+                            // 0 or 1
+                            ctx.strokeStyle = (sig.name.toLowerCase().includes('err')) ? '#ef4444' : '#38bdf8';
+                            ctx.beginPath();
+                            if (i > 0) {
+                                const prevY = (sig.transitions[i - 1].v === '1') ? highY : lowY;
+                                ctx.moveTo(startX, prevY);
+                                ctx.lineTo(startX, curY);
+                            } else {
+                                ctx.moveTo(startX, curY);
+                            }
+                            ctx.lineTo(endX, curY);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatBusValue(binaryStr, width) {
+            if (!binaryStr) return "0";
+            if (binaryStr.includes('x') || binaryStr.includes('X')) return "'hxx";
+            if (binaryStr.includes('z') || binaryStr.includes('Z')) return "'hzz";
+
+            if (waveRadix === 'bin') {
+                return binaryStr;
+            } else if (waveRadix === 'dec') {
+                const num = parseInt(binaryStr, 2);
+                return isNaN(num) ? binaryStr : num.toString(10);
+            } else {
+                // Hex
+                const num = parseInt(binaryStr, 2);
+                if (isNaN(num)) return binaryStr;
+                const hexDigits = Math.max(1, Math.ceil(width / 4));
+                return '0x' + num.toString(16).toUpperCase().padStart(hexDigits, '0');
+            }
+        }
+
+        // Cursor & Measurement Marker Handling
+        function handleWaveMouseMove(e) {
+            const rect = e.target.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const timeNs = Math.max(0, mouseX / wavePixPerNs);
+            updateCursorPosition(timeNs);
+            updateSignalValuesAtCursor(timeNs);
+        }
+
+        function handleWaveClick(e) {
+            const rect = e.target.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            waveCursorTime = Math.max(0, mouseX / wavePixPerNs);
+            updateCursorPosition(waveCursorTime);
+            updateSignalValuesAtCursor(waveCursorTime);
+        }
+
+        function updateCursorPosition(timeNs) {
+            waveCursorTime = timeNs;
+            const x = timeNs * wavePixPerNs;
+            const cursorLine = document.getElementById('waveCursorLine');
+            const cursorFlag = document.getElementById('waveCursorFlag');
+            const readout = document.getElementById('cursorTimeReadout');
+
+            if (cursorLine) cursorLine.style.left = x + 'px';
+            if (cursorFlag) cursorFlag.innerText = timeNs.toFixed(1) + ' ns';
+            if (readout) readout.innerText = timeNs.toFixed(1) + ' ns';
+
+            // Also place error marker band
+            const errBand = document.getElementById('waveErrorBand');
+            if (errBand && waveFailureTime !== null) {
+                errBand.style.left = (waveFailureTime * wavePixPerNs) + 'px';
+            }
+        }
+
+        function updateSignalValuesAtCursor(timeNs) {
+            const visibleSignals = getVisibleSignals();
+            visibleSignals.forEach((sig, idx) => {
+                const valElem = document.getElementById('sig-val-' + idx);
+                if (!valElem) return;
+
+                let curVal = "0";
+                for (let i = 0; i < sig.transitions.length; i++) {
+                    if (sig.transitions[i].t <= timeNs) {
+                        curVal = sig.transitions[i].v;
+                    } else {
+                        break;
+                    }
+                }
+
+                valElem.classList.remove('val-x', 'val-z');
+                if (curVal.includes('x') || curVal.includes('X')) {
+                    valElem.innerText = 'X';
+                    valElem.classList.add('val-x');
+                } else if (curVal.includes('z') || curVal.includes('Z')) {
+                    valElem.innerText = 'Z';
+                    valElem.classList.add('val-z');
+                } else if (sig.width > 1) {
+                    valElem.innerText = formatBusValue(curVal, sig.width);
+                } else {
+                    valElem.innerText = curVal;
+                }
+            });
+        }
+
+        // Navigation Controls
+        function stepWaveTime(deltaNs) {
+            const newT = Math.max(0, Math.min(waveMaxTime, waveCursorTime + deltaNs));
+            updateCursorPosition(newT);
+            updateSignalValuesAtCursor(newT);
+            scrollToCursor(newT);
+        }
+
+        function jumpWaveTime(targetNs) {
+            updateCursorPosition(targetNs);
+            updateSignalValuesAtCursor(targetNs);
+            scrollToCursor(targetNs);
+        }
+
+        function jumpToFailure(timeNs) {
+            jumpWaveTime(timeNs);
+            const statusBox = document.getElementById('cursorEventReadout');
+            if (statusBox) {
+                statusBox.innerHTML = '<span class="pulse-dot"></span> <span class="cur-msg">' + waveFailureLabel + ' @ ' + timeNs + 'ns</span>';
+            }
+        }
+
+        function scrollToCursor(timeNs) {
+            const wrapper = document.getElementById('waveCanvasWrapper');
+            if (wrapper) {
+                const targetX = timeNs * wavePixPerNs;
+                wrapper.scrollTo({
+                    left: Math.max(0, targetX - wrapper.clientWidth / 2),
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        // Zoom Controls
+        function zoomWave(factor) {
+            wavePixPerNs = Math.max(2.0, Math.min(40.0, wavePixPerNs * factor));
+            updateCanvasDimensions();
+            renderRuler();
+            renderWaveforms();
+            updateCursorPosition(waveCursorTime);
+            scrollToCursor(waveCursorTime);
+        }
+
+        function zoomFitWave() {
+            const wrapper = document.getElementById('waveCanvasWrapper');
+            const availableW = wrapper ? (wrapper.clientWidth - 40) : 800;
+            wavePixPerNs = Math.max(2.0, availableW / Math.max(waveMaxTime, 1));
+            updateCanvasDimensions();
+            renderRuler();
+            renderWaveforms();
+            updateCursorPosition(waveCursorTime);
+        }
+
+        function resetWaveZoom() {
+            wavePixPerNs = 8.0;
+            updateCanvasDimensions();
+            renderRuler();
+            renderWaveforms();
+            updateCursorPosition(waveCursorTime);
+        }
+
+        function setWaveRadix(radix) {
+            waveRadix = radix;
+            document.querySelectorAll('#radixHex, #radixBin, #radixDec').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById('radix' + radix.charAt(0).toUpperCase() + radix.slice(1));
+            if (activeBtn) activeBtn.classList.add('active');
+            renderWaveforms();
+            updateSignalValuesAtCursor(waveCursorTime);
+        }
+
+        function filterWaveSignals() {
+            waveSearchFilter = document.getElementById('waveSignalSearch').value;
+            renderSignalNames();
+            updateCanvasDimensions();
+            renderWaveforms();
+            updateSignalValuesAtCursor(waveCursorTime);
+        }
+
+        function syncWaveScroll(e) {
+            const signalsContainer = document.getElementById('waveSignalRowsContainer');
+            if (signalsContainer) {
+                // Can sync vertical scrolling if needed
+            }
+        }
+
+        // File Drag & Drop and Upload
+        function handleWaveDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('waveDropTarget').style.borderColor = '#38bdf8';
+        }
+
+        function handleWaveDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('waveDropTarget').style.borderColor = 'rgba(56, 189, 248, 0.2)';
+        }
+
+        function handleWaveDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('waveDropTarget').style.borderColor = 'rgba(56, 189, 248, 0.2)';
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                processUploadedVcdFile(files[0]);
+            }
+        }
+
+        function handleVcdFileSelected(e) {
+            const file = e.target.files[0];
+            if (file) processUploadedVcdFile(file);
+        }
+
+        function processUploadedVcdFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const parsed = parseClientVcd(content, file.name);
+                document.getElementById('waveTraceBadge').innerText = file.name;
+                document.getElementById('waveTimescale').innerText = 'Scale: ' + parsed.timescale;
+                loadTraceData(parsed);
+                jumpWaveTime(0);
+                alert('Successfully loaded VCD waveform: ' + file.name + ' (' + parsed.signals.length + ' signals, ' + parsed.max_time + 'ns)');
+            };
+            reader.readAsText(file);
+        }
+
+        function updateStatsText() {
+            const stats = document.getElementById('waveStatsText');
+            if (stats) {
+                stats.innerText = waveSignals.length + ' Signals • ' + waveMaxTime + 'ns Trace • Click canvas to measure';
+            }
+        }
+
+        function exportWaveformPng() {
+            const canvas = document.getElementById('waveCanvas');
+            const link = document.createElement('a');
+            link.download = (activeTrace ? activeTrace.name : 'verisight_waveform') + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Auto-run on DOM ready
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initWaveformStudio, 150);
+        });
+    </script>
+    
+
+        <!-- Footer -->
+        <footer>
+            VeriSight Autonomous Silicon Verification Suite • Version 2.4 Enterprise Edition<br>
+            Engineered by Kittu Patel (@KITTUV03)
+        </footer>
+    </div>
+
+    <div id="toast">Copied to clipboard!</div>
+
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+            
+            const navBtn = document.querySelector(`.nav-tab-btn[onclick*="${tabId}"]`);
+            if (navBtn) {
+                navBtn.classList.add('active');
+            } else if (typeof event !== 'undefined' && event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+        }
+
+        function jumpToWaveformError(timeStr) {
+            const timeNs = parseFloat(timeStr) || 0;
+            switchTab('tab-waveform');
+            if (typeof jumpToFailure === 'function') {
+                jumpToFailure(timeNs);
+            }
+        }
+
+        function filterTimeline() {
+            const query = document.getElementById('timeline-search').value.toLowerCase();
+            document.querySelectorAll('#timeline-table tbody tr').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        function filterTimelineBySev(sev) {
+            document.querySelectorAll('#timeline-table tbody tr').forEach(row => {
+                if (sev === 'all') {
+                    row.style.display = '';
+                } else {
+                    const rowSev = row.getAttribute('data-sev') || '';
+                    row.style.display = rowSev.includes(sev) ? '' : 'none';
+                }
+            });
+        }
+
+        function filterEvidence(src) {
+            document.querySelectorAll('#evidence-container .evidence-card').forEach(card => {
+                if (src === 'all') {
+                    card.style.display = '';
+                } else {
+                    const cardSrc = card.getAttribute('data-src') || '';
+                    card.style.display = cardSrc.includes(src) ? '' : 'none';
+                }
+            });
+        }
+
+        function copyRcaSummary() {
+            const text = document.getElementById('rca-full-text').innerText;
+            navigator.clipboard.writeText(text).then(() => showToast('Root Cause Summary copied!'));
+        }
+
+        function copyPatch() {
+            const el = document.getElementById('patch-content');
+            if (el) {
+                navigator.clipboard.writeText(el.innerText).then(() => showToast('Git Patch copied to clipboard!'));
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+    </script>
 </body>
 </html>

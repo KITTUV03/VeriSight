@@ -314,7 +314,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"|-------|-------|",
             f"| **Classification** | {report.classification} |",
             f"| **Module** | {report.module} |",
-            f"| **Confidence** | {report.confidence}% |",
             f"| **Category** | {report.category} |",
             f"| **Severity** | {report.severity} |",
             f"",
@@ -595,20 +594,20 @@ class ReportGeneratorAgent(BaseAgent):
         rtl_analysis = context.get("rtl_analysis")
 
         severity_colors = {
-            "critical": "#ef4444",
-            "high": "#f97316",
-            "medium": "#eab308",
-            "low": "#22c55e",
+            "critical": "#bf2b4c",
+            "high": "#d4a373",
+            "medium": "#93a395",
+            "low": "#c2cfc3",
         }
-        severity_color = severity_colors.get(report.severity.lower() if report.severity else "medium", "#38bdf8")
+        severity_color = severity_colors.get(report.severity.lower() if report.severity else "medium", "#f4efe6")
 
         classification_colors = {
-            "RTL Bug": "#ef4444",
-            "TB Bug": "#f97316",
-            "Spec Bug": "#eab308",
-            "Unknown": "#94a3b8",
+            "RTL Bug": "#bf2b4c",
+            "TB Bug": "#d4a373",
+            "Spec Bug": "#93a395",
+            "Unknown": "#cfc6b5",
         }
-        class_color = classification_colors.get(report.classification, "#38bdf8")
+        class_color = classification_colors.get(report.classification, "#f4efe6")
 
         # Sovereign Security & Air-Gap Compliance status
         from verisight.config import get_config
@@ -625,7 +624,7 @@ class ReportGeneratorAgent(BaseAgent):
             sec_guard_status = "MONITORED"
             sec_shield = "🔒"
         sec_provider = (cfg.llm.provider or "gemini").upper()
-        sec_model = cfg.llm.model_name or "gemini-2.0-flash"
+        sec_model = cfg.llm.model_name or "gemini-3.8-flash"
 
         # Determine failure timestamp for waveform studio
         failure_ts = 65.0
@@ -761,9 +760,9 @@ class ReportGeneratorAgent(BaseAgent):
                     """
 
                 fix_section_html = f"""
-                    <div class="fix-hero-card">
+                    <div class="fix-hero-card fix-recommendation">
                         <div class="fix-status-banner status-pass">
-                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct}
+                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct} • Fix Recommendation (Agent 5)
                         </div>
                         <div class="grid-2col" style="margin-top:16px;">
                             <div>
@@ -832,23 +831,23 @@ class ReportGeneratorAgent(BaseAgent):
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {{
-            --bg-canvas: #080c14;
-            --card-bg: rgba(15, 23, 42, 0.75);
-            --card-border: rgba(148, 163, 184, 0.12);
-            --card-hover: rgba(30, 41, 59, 0.85);
-            --text-main: #f1f5f9;
-            --text-dim: #94a3b8;
-            --text-muted: #64748b;
+            --bg-canvas: #0c0e0d;
+            --card-bg: rgba(21, 26, 23, 0.82);
+            --card-border: rgba(147, 163, 149, 0.18);
+            --card-hover: rgba(29, 36, 32, 0.92);
+            --text-main: #f4efe6;
+            --text-dim: #cfc6b5;
+            --text-muted: #93a395;
             
-            --cyan: #38bdf8;
-            --cyan-glow: rgba(56, 189, 248, 0.25);
-            --emerald: #10b981;
-            --emerald-glow: rgba(16, 185, 129, 0.25);
-            --rose: #f43f5e;
-            --rose-glow: rgba(244, 63, 94, 0.25);
-            --amber: #f59e0b;
-            --amber-glow: rgba(245, 158, 11, 0.25);
-            --indigo: #818cf8;
+            --cyan: #f4efe6;
+            --cyan-glow: rgba(244, 239, 230, 0.22);
+            --emerald: #93a395;
+            --emerald-glow: rgba(147, 163, 149, 0.28);
+            --rose: #bf2b4c;
+            --rose-glow: rgba(191, 43, 76, 0.35);
+            --amber: #d4a373;
+            --amber-glow: rgba(212, 163, 115, 0.25);
+            --indigo: #861a33;
         }}
 
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -857,10 +856,10 @@ class ReportGeneratorAgent(BaseAgent):
             font-family: 'Inter', -apple-system, sans-serif;
             background-color: var(--bg-canvas);
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.08) 0%, transparent 40%),
-                linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+                radial-gradient(circle at 18% 12%, rgba(134, 26, 51, 0.16) 0%, transparent 48%),
+                radial-gradient(circle at 82% 82%, rgba(147, 163, 149, 0.12) 0%, transparent 48%),
+                linear-gradient(rgba(244, 239, 230, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(244, 239, 230, 0.04) 1px, transparent 1px);
             background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
             color: var(--text-main);
             line-height: 1.55;
@@ -896,27 +895,27 @@ class ReportGeneratorAgent(BaseAgent):
         .brand-icon {{
             width: 44px;
             height: 44px;
-            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            background: linear-gradient(135deg, #861a33, #bf2b4c);
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 22px;
-            box-shadow: 0 0 20px var(--cyan-glow);
+            box-shadow: 0 0 20px rgba(134, 26, 51, 0.4);
         }}
 
         .brand-titles h1 {{
             font-size: 20px;
             font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #ffffff, #93c5fd);
+            background: linear-gradient(90deg, #ffffff, #f4efe6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }}
 
         .brand-titles .subtitle {{
             font-size: 12px;
-            color: var(--text-dim);
+            color: #93a395;
             font-weight: 500;
         }}
 
@@ -1606,11 +1605,6 @@ class ReportGeneratorAgent(BaseAgent):
                 <div class="kpi-val" style="color: {class_color}">{report.classification}</div>
                 <div class="kpi-sub">Root failure attribution</div>
             </div>
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">Diagnostic Confidence</div>
-                <div class="kpi-val" style="color: #34d399;">{report.confidence}%</div>
-                <div class="kpi-sub">Multi-agent consensus</div>
-            </div>
             <div class="kpi-card">
                 <div class="kpi-label">Primary Module</div>
                 <div class="kpi-val" style="font-size: 18px; word-break: break-all;">{report.module or 'apb_slave.sv'}</div>
@@ -1815,7 +1809,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"Simulation:     {context['simulation_status']} ({context['simulation_time']})",
             "",
             f"Classification: {report.classification}",
-            f"Confidence:     {report.confidence}%",
             f"Module:         {report.module}",
             f"Category:       {report.category}",
             f"Severity:       {report.severity}",
@@ -1892,8 +1885,28 @@ class ReportGeneratorAgent(BaseAgent):
         knowledge: UnifiedKnowledge,
         session_id: str,
     ) -> None:
-        """Store the debugging session in ChromaDB for future RAG."""
+        """Store the debugging session in ChromaDB for future RAG.
+
+        Writeback is GATED: only confident, non-'Unknown' conclusions are stored,
+        and always as verified=False (model-generated, not expert-confirmed). This
+        prevents the self-reinforcement loop where a low-confidence or abstained —
+        possibly wrong — conclusion is written back and then retrieved as
+        "evidence" on the next run.
+        """
         try:
+            from verisight.config import get_config
+            min_conf = get_config().pipeline.rag_writeback_min_confidence
+
+            if report.classification == "Unknown":
+                self.logger.info("RAG writeback skipped: classification is 'Unknown' (not stored to avoid reinforcing an abstention).")
+                return
+            if int(getattr(report, "confidence", 0) or 0) < min_conf:
+                self.logger.info(
+                    f"RAG writeback skipped: confidence {report.confidence} < "
+                    f"{min_conf} threshold (avoids reinforcing an unverified low-confidence conclusion)."
+                )
+                return
+
             # Build problem description from log errors
             error_msgs = [e.message for e in knowledge.logs.errors[:5]]
             problem = "; ".join(error_msgs) if error_msgs else report.root_cause
@@ -1914,8 +1927,9 @@ class ReportGeneratorAgent(BaseAgent):
                     "confidence": str(report.confidence),
                     "severity": report.severity,
                 },
+                verified=False,
             )
-            self.logger.info(f"Session stored in RAG knowledge base: {session_id}")
+            self.logger.info(f"Session stored in RAG knowledge base (verified=False): {session_id}")
 
         except Exception as e:
             self.logger.warning(f"Failed to store session in RAG: {e}")

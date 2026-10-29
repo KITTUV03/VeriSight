@@ -5,12 +5,19 @@ Parses UVM testbench SystemVerilog source files and extracts structured
 knowledge including component types, transaction flows, TLM connections,
 factory overrides, config DB usage, and coverage models.
 
-This is a deterministic parser — no LLM calls.
+Primary backend: pyslang (via ``sv_frontend`` + ``pyslang_uvm``), which
+discovers classes/interfaces/packages from a real syntax tree. The
+macro-driven parts (config_db, factory, TLM) are extracted by the per-class
+helpers in this module, because UVM macros cannot be expanded without the UVM
+library. When pyslang is unavailable the original regex parser is used and the
+result is explicitly flagged ``degraded``.
+
+No LLM calls.
 """
 
 import re
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional, Sequence
 
 from verisight.schemas.tb_schema import (
     TBKnowledge, Transaction, TransactionField, SequenceInfo,
@@ -18,9 +25,11 @@ from verisight.schemas.tb_schema import (
     TLMConnection, FactoryOverride, ConfigDBEntry,
     UVMComponentInfo, AssertionInfo, InterfaceInfo,
 )
+from verisight.schemas.parser_schema import ParserStatus
 from verisight.utils.file_utils import read_file, discover_files, TB_EXTENSIONS
 from verisight.utils.sv_lexer import strip_comments
 from verisight.utils.logger import get_logger
+from verisight.parsers import sv_frontend
 
 logger = get_logger("uvm_parser")
 
@@ -41,24 +50,121 @@ UVM_COMPONENT_TYPES = {
 }
 
 
-def parse_uvm(path: str) -> TBKnowledge:
+def parse_uvm(
+    path: str,
+    include_dirs: Optional[Sequence[str]] = None,
+    defines: Optional[Sequence[str]] = None,
+    allow_fallback: bool = True,
+) -> TBKnowledge:
     """
     Parse UVM testbench source files from a file or directory.
 
+    Uses the pyslang frontend first (syntax-tree based class discovery); falls
+    back to the legacy regex parser only when pyslang is unavailable or finds
+    no components, flagging the result ``degraded`` in that case.
+
     Args:
         path: Path to a single .sv file or directory containing TB files.
+        include_dirs: Optional `include search directories (defaults to the TB
+            directory so package includes resolve).
+        defines: Optional macro defines.
+        allow_fallback: Whether to fall back to the regex parser.
 
     Returns:
-        TBKnowledge Pydantic model.
+        TBKnowledge Pydantic model, with ``parser_status`` populated.
     """
     logger.info(f"Parsing UVM testbench: {path}")
     p = Path(path)
 
     if p.is_file():
-        files = [p]
+        sibling_files = discover_files(p.parent, TB_EXTENSIONS) if p.parent.exists() else []
+        if len(sibling_files) > 1:
+            files = [p] + [f for f in sibling_files if f != p]
+        else:
+            files = [p]
     else:
         files = discover_files(p, TB_EXTENSIONS)
 
+    file_strs = [str(f) for f in files]
+    # Default include dir: the directory containing the TB files, so `include
+    # directives (e.g. package `include "x.sv") resolve.
+    inc = list(include_dirs or [])
+    if not inc:
+        base_dir = str(p if p.is_dir() else p.parent)
+        inc = [base_dir]
+    defines = list(defines or [])
+
+    # ─── Primary path: pyslang frontend ───────────────────────────────
+    if sv_frontend.is_available() and file_strs:
+        try:
+            from verisight.parsers.pyslang_uvm import build_tb_knowledge
+            result = sv_frontend.compile_files(file_strs, inc, defines)
+            if result.syntax_trees:
+                tb = build_tb_knowledge(result, file_strs)
+                has_components = bool(
+                    tb.drivers or tb.monitors or tb.scoreboards
+                    or tb.sequences or tb.transactions or tb.components
+                    or tb.interfaces
+                )
+                if has_components or not allow_fallback:
+                    logger.info(
+                        f"UVM parsed (pyslang): {len(tb.drivers)} drivers, "
+                        f"{len(tb.monitors)} monitors, {len(tb.scoreboards)} scoreboards, "
+                        f"{len(tb.sequences)} sequences, {len(tb.transactions)} transactions, "
+                        f"degraded={result.status.degraded}"
+                    )
+                    return tb
+                logger.warning(
+                    "pyslang found no UVM components — regex fallback (degraded)."
+                )
+                tb = _parse_uvm_regex(files)
+                _mark_degraded(tb, result.status, "pyslang found no UVM components")
+                return tb
+            elif not allow_fallback:
+                tb = TBKnowledge(file_list=file_strs)
+                tb.parser_status = result.status
+                return tb
+            else:
+                logger.warning("pyslang produced no syntax trees — regex fallback (degraded).")
+                tb = _parse_uvm_regex(files)
+                _mark_degraded(tb, result.status, "pyslang produced no syntax trees")
+                return tb
+        except Exception as exc:
+            logger.warning(f"pyslang UVM parse raised {exc!r} — regex fallback (degraded).")
+            if not allow_fallback:
+                raise
+            tb = _parse_uvm_regex(files)
+            _mark_degraded(tb, None, f"pyslang exception: {exc!r}")
+            return tb
+
+    # ─── pyslang unavailable ──────────────────────────────────────────
+    if not sv_frontend.is_available():
+        logger.warning(
+            f"pyslang unavailable ({sv_frontend.unavailable_reason()}) — regex fallback (degraded)."
+        )
+    tb = _parse_uvm_regex(files)
+    _mark_degraded(tb, None, f"pyslang unavailable: {sv_frontend.unavailable_reason()}")
+    return tb
+
+
+def _mark_degraded(tb: TBKnowledge, pyslang_status, reason: str) -> None:
+    """Label a regex-fallback TB result as degraded, preserving diagnostics."""
+    status = ParserStatus(
+        backend="regex-fallback", degraded=True, elaborated=False, syntax_ok=True,
+        notes=[
+            f"Regex fallback used: {reason}.",
+            "UVM analysis is approximate: class discovery via regex, no syntax "
+            "validation. Do not treat as a fully elaborated testbench.",
+        ],
+    )
+    if pyslang_status is not None:
+        status.diagnostics = list(pyslang_status.diagnostics)
+        status.notes = pyslang_status.notes + status.notes
+    tb.parser_status = status
+
+
+def _parse_uvm_regex(files) -> TBKnowledge:
+    """Legacy regex UVM parser (fallback only)."""
     tb = TBKnowledge()
     file_list = []
 
@@ -72,7 +178,7 @@ def parse_uvm(path: str) -> TBKnowledge:
     tb.file_list = file_list
 
     logger.info(
-        f"UVM parsed: {len(tb.drivers)} drivers, {len(tb.monitors)} monitors, "
+        f"UVM parsed (regex): {len(tb.drivers)} drivers, {len(tb.monitors)} monitors, "
         f"{len(tb.scoreboards)} scoreboards, {len(tb.sequences)} sequences, "
         f"{len(tb.transactions)} transactions"
     )

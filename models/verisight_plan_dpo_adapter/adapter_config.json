@@ -1,0 +1,15 @@
+{
+  "status": "dry_run_verified",
+  "base_model": "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "beta": 0.1,
+  "dataset_pairs": 8,
+  "metrics": {
+    "loss": 0.42420677219516223,
+    "chosen_reward_mean": 0.19375,
+    "rejected_reward_mean": -0.44500000000000006,
+    "reward_margin_mean": 0.63875,
+    "accuracy": 1.0
+  }
+}

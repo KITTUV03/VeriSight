@@ -15,6 +15,7 @@ authors = [
 
 dependencies = [
     "pydantic>=2.0",
+    "pyslang>=7.0",        # Slang SystemVerilog frontend (tested with 12.0.0)
     "chromadb>=0.5",
     "google-generativeai>=0.8",
     "anthropic>=0.18.0",
@@ -45,3 +46,5 @@ include = ["verisight*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["."]
+

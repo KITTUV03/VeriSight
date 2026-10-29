@@ -277,6 +277,8 @@ class TestFixGeneratorTB:
         return FixGeneratorAgent(str(tmp_path), "fix")
 
     def test_tb_fix_generated(self, monkeypatch, tmp_path):
+        from verisight.config import get_config
+        get_config().fix.allow_tb_fix = True
         agent = self._get_agent(tmp_path)
         monkeypatch.setattr(agent.llm, "generate",
                             lambda prompt, system: _make_good_tb_llm_response())
@@ -284,6 +286,16 @@ class TestFixGeneratorTB:
         assert result.fix_available is True
         assert result.issue_type == "TB"
         assert result.rtl_available is False
+
+    def test_tb_fix_declined_by_default(self, monkeypatch, tmp_path):
+        from verisight.config import get_config
+        get_config().fix.allow_tb_fix = False
+        agent = self._get_agent(tmp_path)
+        monkeypatch.setattr(agent.llm, "generate",
+                            lambda prompt, system: _make_good_tb_llm_response())
+        result = agent.execute(_make_knowledge(), _make_tb_classification())
+        assert result.fix_available is False
+        assert "allow-tb-fix" in result.decline_reason
 
 
 # ─── Decline Tests ──────────────────────────────────────────────────

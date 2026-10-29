@@ -51,29 +51,44 @@ class CoverageCorrelator:
         if not coverage_db and coverage_path:
             coverage_db = self.ingester.ingest(coverage_path)
 
-        # If no coverage DB was provided or found, generate a baseline realistic simulator demonstration
+        # If no real coverage DB was provided or found, do not fabricate simulation
+        # results. Leave actual_coverage/coverage_status at their schema defaults
+        # (None/unset) so consumers can tell "not yet simulated" apart from "0% hit".
         if not coverage_db or coverage_db.total_bins == 0:
-            logger.info("No external simulator DB provided; generating baseline planned closure model.")
-            coverage_db = self._generate_simulated_coverage_run(report)
+            logger.info(
+                "No external simulator coverage database provided or supplied DB has "
+                "0 bins; skipping coverage correlation. Plan remains as-designed — no "
+                "actual coverage percentages are reported until a real coverage DB is ingested."
+            )
+            report.coverage_db_source = "Not Simulated (no coverage database provided)"
+            report.coverage_evidence_level = "no_simulation_data"
+            return report
 
         report.coverage_db_source = coverage_db.source_path or "Simulator UCDB/vDB Ingest"
+        report.coverage_evidence_level = "simulator_data_ingested"
 
         # Build lookup table for ingested coverpoints and bins
-        # Normalize keys: lowercase, alphanumeric
+        # Normalize keys: lowercase, alphanumeric, with hierarchical leaf stripping
         ingested_cp_map: Dict[str, Any] = {}
         ingested_bin_map: Dict[str, Any] = {}
 
         for cg_name, cg in coverage_db.covergroups.items():
             for cp_name, cp in cg.coverpoints.items():
                 norm_cp = self._norm(cp_name)
+                norm_cp_raw = re.sub(r"[^a-zA-Z0-9]", "", cp_name).lower()
                 ingested_cp_map[norm_cp] = cp
+                ingested_cp_map[norm_cp_raw] = cp
                 for b_name, b in cp.bins.items():
                     norm_b = self._norm(b_name)
+                    norm_b_raw = re.sub(r"[^a-zA-Z0-9]", "", b_name).lower()
                     ingested_bin_map[f"{norm_cp}::{norm_b}"] = b
+                    ingested_bin_map[f"{norm_cp_raw}::{norm_b_raw}"] = b
                     ingested_bin_map[norm_b] = b
+                    ingested_bin_map[norm_b_raw] = b
 
         total_planned_bins = 0
         total_hit_bins = 0
+        total_unreported_bins = 0
         all_holes: List[Dict[str, Any]] = []
         sim_unhit_list = list(coverage_db.unhit_bins_list)
         assigned_holes: set = set()
@@ -94,6 +109,7 @@ class CoverageCorrelator:
                 cp_total = len(cp.bins) or 1
                 cp_hit = 0
                 unhit_bin_names = []
+                unreported_bin_names = []
 
                 for b in cp.bins:
                     total_planned_bins += 1
@@ -131,20 +147,27 @@ class CoverageCorrelator:
                             b.hit_status = "Unhit"
                             unhit_bin_names.append(b.bin_name)
                         else:
-                            b.hits = 54
-                            b.hit_status = "Covered"
-                            cp_hit += 1
-                            total_hit_bins += 1
+                            # No matching entry in the ingested simulator DB for this
+                            # bin — there is no evidence of whether it was hit, so do
+                            # not invent a hit count. Report it as unreported rather
+                            # than silently counting it as "Covered".
+                            b.hits = None
+                            b.hit_status = "Not_Reported"
+                            unreported_bin_names.append(b.bin_name)
+
+                cp_reported = cp_total - len(unreported_bin_names)
 
                 cp.total_bins_count = cp_total
                 cp.hit_bins_count = cp_hit
                 cp.unhit_bins = unhit_bin_names
-                cp.actual_coverage = round((cp_hit / max(cp_total, 1)) * 100.0, 1)
+                cp.not_reported_bins = unreported_bin_names
+                cp.actual_coverage = round((cp_hit / cp_reported) * 100.0, 1) if cp_reported > 0 else None
 
-                cg_total += cp_total
+                cg_total += cp_reported
                 cg_hit += cp_hit
+                total_unreported_bins += len(unreported_bin_names)
 
-            cg.actual_coverage = round((cg_hit / max(cg_total, 1)) * 100.0, 1)
+            cg.actual_coverage = round((cg_hit / cg_total) * 100.0, 1) if cg_total > 0 else None
 
         # 2. Correlate Feature hit percentage & remaining bins
         # Map feature_id -> list of coverpoints
@@ -157,11 +180,14 @@ class CoverageCorrelator:
         for feat in report.features:
             cps = feat_to_cps.get(feat.feature_id, [])
             feat_tot_bins = 0
+            feat_reported_bins = 0
             feat_hit_bins = 0
             feat_unhit_bins: List[Dict[str, Any]] = []
 
             for cp in cps:
-                feat_tot_bins += cp.total_bins_count or len(cp.bins)
+                cp_total = cp.total_bins_count or len(cp.bins)
+                feat_tot_bins += cp_total
+                feat_reported_bins += cp_total - len(cp.not_reported_bins or [])
                 feat_hit_bins += cp.hit_bins_count or 0
                 for b in cp.bins:
                     if b.hit_status == "Unhit" or (b.hits is not None and b.hits == 0):
@@ -215,22 +241,21 @@ class CoverageCorrelator:
                         all_holes.append(hole_dict)
                         break  # 1 hole per feature
 
-            # Compute actual percentage hit per feature
-            if feat_unhit_bins:
-                if feat_tot_bins > 0 and feat_hit_bins < feat_tot_bins:
-                    feat_pct = round((feat_hit_bins / max(feat_tot_bins, 1)) * 100.0, 1)
-                else:
-                    feat_pct = 92.0 if len(feat_unhit_bins) == 1 else max(50.0, round(100.0 - len(feat_unhit_bins) * 8.0, 1))
-            elif feat_tot_bins > 0:
-                feat_pct = round((feat_hit_bins / max(feat_tot_bins, 1)) * 100.0, 1)
+            # Compute actual percentage hit per feature, strictly from bins with real
+            # simulator evidence (feat_reported_bins). Never invent a percentage for
+            # bins/coverpoints we have no simulator data for.
+            if feat_reported_bins > 0:
+                feat_pct = round((feat_hit_bins / feat_reported_bins) * 100.0, 1)
             else:
-                feat_pct = 100.0
+                feat_pct = None
 
             feat.actual_coverage = feat_pct
             feat.unhit_bins = feat_unhit_bins
 
             # Status determination
-            if feat_pct >= 100.0:
+            if feat_pct is None:
+                feat.coverage_status = "No_Coverage_Data"
+            elif feat_pct >= 100.0:
                 feat.coverage_status = "Closed"
             elif feat_pct >= 90.0:
                 feat.coverage_status = "Near Closure"
@@ -263,20 +288,31 @@ class CoverageCorrelator:
 
         # 4. Update overall report metrics
         report.unhit_bins_count = len(all_holes)
+        report.unreported_bins_count = total_unreported_bins
         report.coverage_holes = all_holes
+        total_reported_bins = total_planned_bins - total_unreported_bins
         if total_planned_bins > 0:
             report.total_bins = total_planned_bins
-            report.hit_bins = max(0, total_planned_bins - len(all_holes))
+            report.hit_bins = total_hit_bins
         else:
             report.total_bins = coverage_db.total_bins
             report.hit_bins = coverage_db.hit_bins
 
         if coverage_db.overall_coverage_pct is not None:
             report.actual_coverage_overall = coverage_db.overall_coverage_pct
-        elif total_planned_bins > 0:
-            report.actual_coverage_overall = round((report.hit_bins / total_planned_bins) * 100.0, 1)
+        elif total_reported_bins > 0:
+            report.actual_coverage_overall = round((total_hit_bins / total_reported_bins) * 100.0, 1)
         else:
-            report.actual_coverage_overall = 91.7
+            # No bin in the plan has any corroborating simulator evidence — do not
+            # fabricate an overall percentage.
+            report.actual_coverage_overall = None
+
+        if total_unreported_bins > 0:
+            logger.info(
+                f"{total_unreported_bins} planned bin(s) had no matching entry in the "
+                f"ingested simulator coverage DB and are reported as Not_Reported, not "
+                f"assumed covered."
+            )
 
         logger.info(
             f"Coverage Closure Correlated: {report.actual_coverage_overall}% hit "
@@ -322,10 +358,15 @@ class CoverageCorrelator:
 
         steps_code = "".join(stimulus_steps)
 
+        deficit_str = (
+            f"{round(100.0 - feat.actual_coverage, 1)}%"
+            if feat.actual_coverage is not None
+            else "Unknown (no simulator evidence for this feature's coverpoints)"
+        )
         code = f"""// ==============================================================================
 // VeriSight AI Directed Coverage Closure Sequence
 // Target Feature: {feat.feature_id} — {feat.title}
-// Remaining Deficit: {round(100.0 - (feat.actual_coverage or 92.0), 1)}% Unhit Bins
+// Remaining Deficit: {deficit_str} Unhit Bins
 // ==============================================================================
 {bin_comments}
 
@@ -346,100 +387,11 @@ endclass
 """
         return code
 
-    def _generate_simulated_coverage_run(self, report: VerificationPlanReport) -> SimulatorCoverageDB:
-        """
-        Generate realistic simulated coverage run data aligned with planned covergroups.
-        Ensures typical real-world test results: 88-94% hits with corner holes remaining.
-        """
-        from verisight.plan.coverage_ingest import IngestedCovergroup, IngestedCoverpoint, IngestedBin
-
-        cgs: Dict[str, IngestedCovergroup] = {}
-        all_unhit: List[IngestedBin] = []
-        tot_bins = 0
-        tot_hits = 0
-
-        for cg in report.covergroups:
-            ing_cg = IngestedCovergroup(name=cg.group_name)
-            for cp in cg.coverpoints:
-                ing_cp = IngestedCoverpoint(
-                    name=cp.name,
-                    covergroup_name=cg.group_name,
-                    target_signal=cp.target_signal,
-                )
-                bins_list = cp.bins
-                if not bins_list:
-                    # Default bins if none specified
-                    bins_list = [
-                        type("DummyBin", (), {"bin_name": f"{cp.name}_norm", "condition": "normal operation"})(),
-                        type("DummyBin", (), {"bin_name": f"{cp.name}_corner", "condition": "boundary condition"})(),
-                    ]
-
-                for idx, b in enumerate(bins_list):
-                    tot_bins += 1
-                    b_name = getattr(b, "bin_name", f"bin_{idx}")
-                    cond = getattr(b, "condition", "target condition")
-
-                    # Realistic distribution: 1 out of 10-12 bins is a corner hole (unhit)
-                    is_unhit_candidate = any(
-                        k in b_name.lower() or k in cond.lower()
-                        for k in ["overflow", "underflow", "err", "illegal", "corner", "stall", "timeout", "max", "full"]
-                    ) or (idx > 0 and idx == len(bins_list) - 1 and len(bins_list) >= 4)
-
-                    if is_unhit_candidate and len(all_unhit) < max(2, len(report.features) // 3):
-                        hits = 0
-                        is_hit = False
-                        ing_bin = IngestedBin(
-                            bin_name=b_name,
-                            coverpoint_name=cp.name,
-                            covergroup_name=cg.group_name,
-                            hits=0,
-                            is_hit=False,
-                            condition=cond,
-                        )
-                        all_unhit.append(ing_bin)
-                        ing_cp.unhit_bins.append(b_name)
-                    else:
-                        hits = 25 + (idx * 17) % 80
-                        is_hit = True
-                        tot_hits += 1
-                        ing_cp.hit_bins += 1
-                        ing_bin = IngestedBin(
-                            bin_name=b_name,
-                            coverpoint_name=cp.name,
-                            covergroup_name=cg.group_name,
-                            hits=hits,
-                            is_hit=True,
-                            condition=cond,
-                        )
-
-                    ing_cp.bins[b_name] = ing_bin
-                    ing_cp.total_bins += 1
-
-                if ing_cp.total_bins > 0:
-                    ing_cp.coverage_pct = round((ing_cp.hit_bins / ing_cp.total_bins) * 100.0, 2)
-                ing_cg.coverpoints[cp.name] = ing_cp
-                ing_cg.total_bins += ing_cp.total_bins
-                ing_cg.hit_bins += ing_cp.hit_bins
-
-            if ing_cg.total_bins > 0:
-                ing_cg.coverage_pct = round((ing_cg.hit_bins / ing_cg.total_bins) * 100.0, 2)
-            cgs[cg.group_name] = ing_cg
-
-        overall_pct = round((tot_hits / max(tot_bins, 1)) * 100.0, 1)
-
-        return SimulatorCoverageDB(
-            source_path="Default Simulator Run (Questa/VCS Baseline)",
-            simulator_format="Synopsys_VCS_URG",
-            overall_coverage_pct=overall_pct,
-            total_bins=tot_bins,
-            hit_bins=tot_hits,
-            unhit_bins_count=len(all_unhit),
-            covergroups=cgs,
-            unhit_bins_list=all_unhit,
-        )
-
     def _norm(self, s: Optional[str]) -> str:
-        """Normalize identifier for robust matching."""
+        """Normalize identifier for robust matching, stripping hierarchical scopes."""
         if not s:
             return ""
-        return re.sub(r"[^a-zA-Z0-9]", "", s).lower()
+        # Strip path or instance hierarchy e.g. /tb/dut_inst/cp_op or tb.dut.cp_op
+        leaf = s.strip().split(".")[-1].split("/")[-1]
+        return re.sub(r"[^a-zA-Z0-9]", "", leaf).lower()
+

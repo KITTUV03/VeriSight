@@ -9,18 +9,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0b4d32;
-            --primary-accent: #22c55e;
-            --top-bar: #33C55A;
-            --bg-gradient: linear-gradient(135deg, #eaf5ee 0%, #dbeef0 100%);
-            --card-bg: rgba(255, 255, 255, 0.95);
-            --card-border: #cbd5e1;
-            --dark: #0f172a;
-            --text: #334155;
-            --muted: #64748b;
-            --blue: #0284c7;
-            --amber: #d97706;
-            --red: #dc2626;
+            --primary: #861a33;
+            --primary-accent: #bf2b4c;
+            --top-bar: #861a33;
+            --bg-gradient: linear-gradient(135deg, #fbf9f5 0%, #f4efe6 50%, #e6ece7 100%);
+            --card-bg: rgba(255, 255, 255, 0.96);
+            --card-border: #d4ded6;
+            --dark: #121614;
+            --text: #2c3531;
+            --muted: #5e6f60;
+            --blue: #861a33;
+            --amber: #d4a373;
+            --red: #bf2b4c;
+            --sage: #93a395;
+            --cream: #f4efe6;
+            --burgundy: #861a33;
         }
 
         * {
@@ -75,7 +78,7 @@
         .brand-logo-text {
             font-size: 16px;
             font-weight: 700;
-            color: #0b6b47;
+            color: #861a33;
             letter-spacing: -0.3px;
         }
 
@@ -613,10 +616,10 @@
                     <div class="card-title" style="color: var(--blue);">X-Tracer Backward Cone Traversal</div>
                     <p style="margin-bottom: 12px;">Solves the notorious "X-state mystery" in 4-state simulation:</p>
                     <ol style="padding-left: 20px; font-size: 12px; line-height: 1.6;">
-                        <li>Parses netlist AST graph using PyVerilog.</li>
-                        <li>Identifies cycle <i>T</i> where signal transitions to X in VCD trace.</li>
-                        <li>Traverses backward fan-in cone across continuous assignments and gates.</li>
-                        <li>Isolates the exact uninitialized sequential flop missing from reset block.</li>
+                        <li>Parses & elaborates the RTL into a real AST using pyslang (Slang SystemVerilog frontend).</li>
+                        <li>Statically flags sequential registers written but not assigned in their reset branch (candidate X origins).</li>
+                        <li>Optionally, when a VCD is supplied, the external x-tracer tool traverses the gate-level fan-in cone back from cycle <i>T</i> to the origin flop.</li>
+                        <li>Static source analysis finds candidates; the simulation layer confirms the runtime propagation path.</li>
                     </ol>
                 </div>
             </div>
@@ -653,7 +656,7 @@
                     <div class="card amber-border">
                         <div class="card-title" style="color: var(--amber);">Telemetry & Web GUI</div>
                         <ul style="font-size: 12px;">
-                            <li><b>PyVerilog:</b> Lexical parsing and AST traversal.</li>
+                            <li><b>pyslang (Slang):</b> IEEE-1800 SystemVerilog parsing, elaboration & structured diagnostics.</li>
                             <li><b>FastAPI:</b> Asynchronous REST and WebSocket hub.</li>
                             <li><b>Vanilla Web Studio:</b> Zero-dependency browser dashboard with Live Coverage Cockpit & Waveform Studio.</li>
                             <li><b>Docker:</b> Hermetic multi-simulator sandboxing.</li>
@@ -880,7 +883,7 @@
                     <div class="card-title">The Zero-Touch Self-Healing Loop</div>
                     <ol style="font-size: 12px; line-height: 1.6; padding-left: 18px;">
                         <li><b>Minimal Unified Diff:</b> Synthesizes clean git patch modifying only the defective logic lines.</li>
-                        <li><b>PyVerilog AST Validation:</b> Verifies syntax and synthesizability prior to disk write.</li>
+                        <li><b>pyslang AST Validation:</b> Verifies genuine syntax validity prior to disk write, distinguishing syntax errors from missing-dependency/elaboration diagnostics.</li>
                         <li><b>Isolated Sandbox Re-Sim:</b> Copies design to temporary sandbox and executes regression tests.</li>
                         <li><b>Regression Clean Sign-Off:</b> Guarantees failing assertion is resolved with zero side effects.</li>
                     </ol>
@@ -910,8 +913,8 @@
                     </div>
                     <div class="card amber-border">
                         <div class="card-title" style="color: var(--amber);">AST Token Pruning</div>
-                        <div class="metric-big" style="color: var(--amber); margin: 8px 0;">84% Less Tokens</div>
-                        <p style="font-size: 12px;">PyVerilog AST extraction strips out irrelevant code comments and unrelated modules, feeding only critical fan-in logic cones to the AI context.</p>
+                        <div class="metric-big" style="color: var(--amber); margin: 8px 0;">Targeted Context</div>
+                        <p style="font-size: 12px;">pyslang AST extraction strips out irrelevant code comments and unrelated modules, feeding only critical fan-in logic cones to the AI context.</p>
                     </div>
                 </div>
             </div>

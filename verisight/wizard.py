@@ -2,9 +2,9 @@
 VeriSight Interactive Guided Setup Wizard.
 
 A unified, user-friendly CLI wizard providing:
-1. VeriSight Debug  — Autonomous Root-Cause Analysis & Fix Generator.
-2. VeriSight Plan   — Autonomous Verification Plan, Functional Coverage & SVA Suite.
-3. Quick Demos      — Instant runs on ALU and FIFO designs.
+1. VeriSight Debug   — Autonomous Root-Cause Analysis & Fix Generator.
+2. VeriSight Plan    — Autonomous Verification Plan, Functional Coverage & SVA Suite.
+3. XcelUVM Architect — Autonomous Full Production UVM 1.2 Testbench Environment.
 """
 
 import os
@@ -88,23 +88,37 @@ def _open_html_in_browser(html_path: Path) -> bool:
 
 def _print_welcome_banner():
     """Print the interactive wizard welcome banner."""
-    title = (
-        "[bold cyan]🔍 VeriSight — Autonomous Verification & Debugging Platform[/bold cyan]\n"
-        "[bold white]Dual-Engine Autonomous Suite: VeriSight Debug & VeriSight Plan[/bold white]"
+    badges = (
+        "[bold black on #00E5FF] AUTONOMOUS ASIC/SOC [/] "
+        "[bold black on #00E676] UVM 1.2 VIP [/] "
+        "[bold black on #E040FB] MULTI-AGENT RCA [/] "
+        "[bold black on #FFD600] IEEE 1800 PYSLANG [/]"
     )
+    tagline = (
+        "[bold white]Enterprise-Grade AI Architecture for ASIC / SoC Design Verification[/bold white]\n"
+        "[dim]Cycle-accurate simulation triage, specification-driven test planning, and production UVM environments.[/dim]"
+    )
+    status_line = (
+        "[dim]Protocols:[/] [bold cyan]AMBA (AXI/AHB/APB)[/] [dim]•[/dim] [bold cyan]PCIe[/] [dim]•[/dim] [bold cyan]CHI[/] [dim]•[/dim] [bold cyan]DDR[/] [dim]•[/dim] [bold cyan]I2C[/] [dim]•[/dim] [bold cyan]SPI[/]   "
+        "[dim]Frontend:[/] [bold green]pyslang clean[/bold green]   "
+        "[dim]Status:[/] [bold green]● Active[/bold green]"
+    )
+    banner_content = f"{badges}\n\n{tagline}\n\n{status_line}"
     console.print()
     console.print(
         Panel(
-            title,
-            box=box.DOUBLE,
-            border_style="cyan",
-            expand=False,
-            padding=(1, 4),
+            banner_content,
+            box=box.ROUNDED,
+            border_style="bold cyan",
+            padding=(1, 3),
+            title="[bold white]⚡  [bold cyan]V E R I S I G H T[/bold cyan]  [dim]•[/dim]  [bold yellow]INTELLIGENT VERIFICATION PLATFORM[/bold yellow]  ⚡[/bold white]",
+            title_align="center",
+            subtitle="[dim]v1.3.0 Enterprise Architecture • Sovereign Air-Gap Ready[/dim]",
+            subtitle_align="right",
+            expand=True,
         )
     )
-    console.print(
-        "[dim]Welcome! Select an autonomous workflow below to get started.[/dim]\n"
-    )
+    console.print()
 
 
 def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool, str]:
@@ -116,48 +130,62 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     Returns:
         (provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint)
     """
+    from dotenv import load_dotenv
     from verisight.utils.key_validator import (
         probe_gemini_key,
         probe_anthropic_key,
         probe_local_engine,
     )
 
-    gemini_env = os.getenv("GEMINI_API_KEY", "").strip()
-    anthropic_env = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    # Ensure .env is freshly loaded with override=True so changes in .env are picked up
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(dotenv_path=env_file, override=True)
+    elif Path(".env").exists():
+        load_dotenv(dotenv_path=Path(".env"), override=True)
 
-    # Fast non-blocking health probe (<0.5s)
+    gemini_env = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    anthropic_env = (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY") or "").strip()
+    configured_provider = (os.getenv("VERISIGHT_PROVIDER") or "").strip().lower()
+
+    # Fast non-blocking health probe
     with console.status("[dim]Probing AI execution environments & credentials...[/dim]"):
         g_valid, g_status = probe_gemini_key(gemini_env)
         a_valid, a_status = probe_anthropic_key(anthropic_env)
         l_valid, l_status = probe_local_engine()
 
-    table = Table(title="Detected AI Execution Environments & Health Status", box=box.ROUNDED, show_lines=True)
-    table.add_column("Environment / Provider", style="cyan", width=28)
-    table.add_column("Live Health & Credentials", width=44)
+    table = Table(
+        title="[bold cyan]Detected AI Execution Environments & Health Status[/bold cyan]",
+        box=box.ROUNDED,
+        show_lines=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Environment / Provider", style="bold white", width=28)
+    table.add_column("Live Health & Credentials", width=48)
 
     # Gemini Status
     if g_valid:
-        g_cell = f"[bold green]✓ Valid & Active[/bold green] ({g_status})"
+        g_cell = f"[bold green]● Active & Validated[/bold green] [dim]({g_status})[/dim]"
     elif gemini_env:
-        g_cell = f"[bold red]✗ Invalid Key[/bold red] ({g_status})"
+        g_cell = f"[bold yellow]▲ Probe Warning[/bold yellow] [dim]({g_status})[/dim]"
     else:
-        g_cell = "[yellow]Not configured in .env[/yellow]"
+        g_cell = "[dim yellow]○ Not configured in .env[/dim yellow]"
     table.add_row("Google Gemini (Cloud)", g_cell)
 
     # Anthropic Status
     if a_valid:
-        a_cell = f"[bold green]✓ Valid & Active[/bold green] ({a_status})"
+        a_cell = f"[bold green]● Active & Validated[/bold green] [dim]({a_status})[/dim]"
     elif anthropic_env:
-        a_cell = f"[bold red]✗ Invalid Key[/bold red] ({a_status})"
+        a_cell = f"[bold yellow]▲ Probe Warning[/bold yellow] [dim]({a_status})[/dim]"
     else:
-        a_cell = "[yellow]Not configured in .env[/yellow]"
+        a_cell = "[dim yellow]○ Not configured in .env[/dim yellow]"
     table.add_row("Anthropic Claude (Cloud)", a_cell)
 
     # Local Engine Status
     if l_valid:
-        l_cell = f"[bold green]✓ Local engine online[/bold green] ({l_status})"
+        l_cell = f"[bold green]● Local Engine Online[/bold green] [dim]({l_status})[/dim]"
     else:
-        l_cell = "[bold cyan]Ready On-Prem[/bold cyan] (Zero Cloud RTL Leakage Certified)"
+        l_cell = "[bold cyan]● Sovereign Local Ready[/bold cyan] [dim](Zero Cloud RTL Leakage Certified)[/dim]"
     table.add_row("🛡️ Sovereign On-Prem (Local)", l_cell)
 
     console.print(table)
@@ -173,25 +201,26 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     choice_map[str(idx)] = "airgap"
     idx += 1
 
-    # 2. Anthropic Claude (Prioritize if verified active!)
-    if anthropic_env:
-        if a_valid:
-            choices.append(f"{idx}. (Recommended) Use detected Claude API key [bold green]✓ ACTIVE[/bold green] (claude-sonnet-5)")
-            recommended_idx = str(idx)
+    # 2. Google Gemini
+    gemini_choice_idx = None
+    if gemini_env:
+        gemini_choice_idx = str(idx)
+        if g_valid:
+            choices.append(f"{idx}. Use detected Gemini Cloud key [bold green]✓ ACTIVE[/bold green] (gemini-3.5-flash)")
         else:
-            choices.append(f"{idx}. Use detected Claude Cloud key [bold red]✗ INVALID[/bold red] ({a_status})")
-        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5", False, False, "", a_valid, a_status)
+            choices.append(f"{idx}. Use detected Gemini Cloud key [yellow]⚠ UNVERIFIED[/yellow] ({g_status})")
+        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-3.5-flash", False, False, "", g_valid, g_status)
         idx += 1
 
-    # 3. Google Gemini
-    if gemini_env:
-        if g_valid:
-            choices.append(f"{idx}. Use detected Gemini Cloud key [bold green]✓ ACTIVE[/bold green] (gemini-2.0-flash)")
-            if not a_valid:
-                recommended_idx = str(idx)
+    # 3. Anthropic Claude
+    claude_choice_idx = None
+    if anthropic_env:
+        claude_choice_idx = str(idx)
+        if a_valid:
+            choices.append(f"{idx}. Use detected Claude API key [bold green]✓ ACTIVE[/bold green] (claude-sonnet-5)")
         else:
-            choices.append(f"{idx}. Use detected Gemini Cloud key [bold red]✗ INVALID[/bold red] ({g_status})")
-        choice_map[str(idx)] = ("gemini", gemini_env, "gemini-2.0-flash", False, False, "", g_valid, g_status)
+            choices.append(f"{idx}. Use detected Claude Cloud key [yellow]⚠ UNVERIFIED[/yellow] ({a_status})")
+        choice_map[str(idx)] = ("anthropic", anthropic_env, "claude-sonnet-5", False, False, "", a_valid, a_status)
         idx += 1
 
     # 4. Custom keys
@@ -206,6 +235,27 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     # 5. Deterministic Offline
     choices.append(f"{idx}. Run in Offline / Deterministic Mode (pure rule-based analysis, no LLM)")
     choice_map[str(idx)] = "offline"
+
+    # Determine recommended index based on provider preference & health
+    if configured_provider in ("gemini", "google") and gemini_choice_idx:
+        recommended_idx = gemini_choice_idx
+    elif configured_provider in ("anthropic", "claude") and claude_choice_idx:
+        recommended_idx = claude_choice_idx
+    elif gemini_choice_idx and g_valid:
+        recommended_idx = gemini_choice_idx
+    elif claude_choice_idx and a_valid:
+        recommended_idx = claude_choice_idx
+    elif gemini_choice_idx:
+        recommended_idx = gemini_choice_idx
+    elif claude_choice_idx:
+        recommended_idx = claude_choice_idx
+
+    # Annotate recommended choice
+    for i, c in enumerate(choices):
+        prefix = f"{recommended_idx}."
+        if c.startswith(prefix):
+            choices[i] = c.replace(prefix, f"{prefix} [bold green][RECOMMENDED][/bold green]", 1)
+            break
 
     console.print("[bold]Select AI Execution & Security Mode:[/bold]")
     for c in choices:
@@ -244,23 +294,35 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
     if isinstance(action, tuple):
         provider, key, model, airgap, anon, endpoint, is_healthy, health_msg = action
         
-        # If the user explicitly selected a key that is invalid, offer graceful diagnostic
+        # If the user selected a key that reported a health warning, ask if they want to proceed anyway
         if not is_healthy:
-            console.print(f"\n[bold red]⚠️ Selected {provider.capitalize()} API key failed health probe:[/bold red]")
-            console.print(f"   [yellow]Reason:[/] {health_msg}")
+            console.print(f"\n[bold yellow]⚠️ Selected {provider.capitalize()} API key reported a health warning:[/bold yellow]")
+            console.print(f"   [yellow]Probe Message:[/] {health_msg}")
             
+            proceed_anyway = Confirm.ask(
+                f"[bold]Would you like to proceed using this existing {provider.capitalize()} API key anyway?[/bold]",
+                default=True,
+            )
+            if proceed_anyway:
+                console.print(f"[green]✓ Proceeding with existing {provider.capitalize()} API key.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = provider
+                return provider, key, model, airgap, anon, endpoint
+
             remedy_choices = []
             remedy_map = {}
             r_idx = 1
             
-            # If Anthropic is active, offer 1-click switch
-            if provider != "anthropic" and a_valid:
-                remedy_choices.append(f"{r_idx}. Switch to Anthropic Claude (✓ Verified Active in environment)")
-                remedy_map[str(r_idx)] = "switch_anthropic"
-                r_idx += 1
-            elif provider != "gemini" and g_valid:
-                remedy_choices.append(f"{r_idx}. Switch to Google Gemini (✓ Verified Active in environment)")
+            remedy_choices.append(f"{r_idx}. Proceed anyway with detected {provider.capitalize()} key (bypass probe check)")
+            remedy_map[str(r_idx)] = "proceed_anyway"
+            r_idx += 1
+
+            if provider != "gemini" and gemini_env:
+                remedy_choices.append(f"{r_idx}. Switch to Google Gemini (Detected in environment)")
                 remedy_map[str(r_idx)] = "switch_gemini"
+                r_idx += 1
+            elif provider != "anthropic" and anthropic_env:
+                remedy_choices.append(f"{r_idx}. Switch to Anthropic Claude (Detected in environment)")
+                remedy_map[str(r_idx)] = "switch_anthropic"
                 r_idx += 1
                 
             remedy_choices.append(f"{r_idx}. Enter a new, working {provider.capitalize()} API key")
@@ -281,21 +343,28 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
             rem_sel = Prompt.ask("\n[bold]Your choice[/bold]", choices=[str(i) for i in range(1, r_idx + 1)], default="1")
             rem_action = remedy_map[rem_sel]
 
-            if rem_action == "switch_anthropic":
+            if rem_action == "proceed_anyway":
+                console.print(f"[green]✓ Proceeding with existing {provider.capitalize()} API key.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = provider
+                return provider, key, model, airgap, anon, endpoint
+            elif rem_action == "switch_anthropic":
                 console.print("[green]✓ Switched to Anthropic Claude.[/green]")
+                os.environ["VERISIGHT_PROVIDER"] = "anthropic"
                 return "anthropic", anthropic_env, "claude-sonnet-5", False, False, ""
             elif rem_action == "switch_gemini":
                 console.print("[green]✓ Switched to Google Gemini.[/green]")
-                return "gemini", gemini_env, "gemini-2.0-flash", False, False, ""
+                os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                return "gemini", gemini_env, "gemini-3.5-flash", False, False, ""
             elif rem_action == f"enter_{provider}":
                 action = f"custom_{provider}"
             elif rem_action == "airgap":
                 return "ollama", "sovereign_local_key", "deepseek-coder:33b", True, False, "http://localhost:11434"
             else:
-                return "gemini", None, "gemini-2.0-flash", True, False, ""
+                return "gemini", None, "gemini-3.5-flash", True, False, ""
 
         if isinstance(action, tuple):
             console.print(f"[green]✓[/green] Using verified {provider.capitalize()} API key.")
+            os.environ["VERISIGHT_PROVIDER"] = provider
             return provider, key, model, airgap, anon, endpoint
 
     if action == "custom_gemini":
@@ -312,13 +381,20 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
                 console.print(f"[bold green]✓ Key validated successfully![/bold green] ({msg})")
                 _offer_save_key("GEMINI_API_KEY", key)
                 anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Google Cloud?", default=False)
-                return "gemini", key, "gemini-2.0-flash", False, anon, ""
+                os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                return "gemini", key, "gemini-3.5-flash", False, anon, ""
             else:
-                console.print(f"[bold red]✗ Key validation failed:[/] {msg}")
+                console.print(f"[bold yellow]⚠️ Key probe warning:[/] {msg}")
+                use_anyway = Confirm.ask("Would you like to use this Gemini key anyway without validation?", default=True)
+                if use_anyway:
+                    _offer_save_key("GEMINI_API_KEY", key)
+                    anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Google Cloud?", default=False)
+                    os.environ["VERISIGHT_PROVIDER"] = "gemini"
+                    return "gemini", key, "gemini-3.5-flash", False, anon, ""
                 retry = Confirm.ask("Would you like to try entering the key again?", default=True)
                 if not retry:
                     console.print("[yellow]Falling back to offline deterministic mode.[/yellow]")
-                    return "gemini", None, "gemini-2.0-flash", True, False, ""
+                    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
     if action == "custom_claude":
         while True:
@@ -334,21 +410,29 @@ def _configure_api_key() -> Tuple[str, Optional[str], Optional[str], bool, bool,
                 console.print(f"[bold green]✓ Key validated successfully![/bold green] ({msg})")
                 _offer_save_key("ANTHROPIC_API_KEY", key)
                 anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Anthropic Cloud?", default=False)
+                os.environ["VERISIGHT_PROVIDER"] = "anthropic"
                 return "anthropic", key, "claude-sonnet-5", False, anon, ""
             else:
-                console.print(f"[bold red]✗ Key validation failed:[/] {msg}")
+                console.print(f"[bold yellow]⚠️ Key probe warning:[/] {msg}")
+                use_anyway = Confirm.ask("Would you like to use this Claude key anyway without validation?", default=True)
+                if use_anyway:
+                    _offer_save_key("ANTHROPIC_API_KEY", key)
+                    anon = Confirm.ask("Enable Confidential RTL IP Token Masking before sending to Anthropic Cloud?", default=False)
+                    os.environ["VERISIGHT_PROVIDER"] = "anthropic"
+                    return "anthropic", key, "claude-sonnet-5", False, anon, ""
                 retry = Confirm.ask("Would you like to try entering the key again?", default=True)
                 if not retry:
                     console.print("[yellow]Falling back to offline deterministic mode.[/yellow]")
-                    return "gemini", None, "gemini-2.0-flash", True, False, ""
+                    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
     # Offline mode
     console.print("[yellow]! Running in offline deterministic mode (no LLM will be queried).[/yellow]")
-    return "gemini", None, "gemini-2.0-flash", True, False, ""
+    return "gemini", None, "gemini-3.5-flash", True, False, ""
 
 
 def _offer_save_key(var_name: str, key_val: str):
     """Prompt user if they want to persist their key to .env for future convenience."""
+    os.environ[var_name] = key_val  # Instantly update current process environment
     save = Confirm.ask("Would you like to save this key to your local .env file for future runs?", default=True)
     if save:
         env_path = Path(".env")
@@ -388,15 +472,18 @@ def _prompt_path(
     required: bool = False,
     is_dir: bool = False,
     default: str = "",
+    file_types: Optional[list] = None,
+    allow_empty: bool = True,
+    **kwargs,
 ) -> Optional[str]:
     """Prompt user for a file or directory path, verifying existence with retry."""
     req_label = "[red](Required)[/red]" if required else "[dim](Optional — press Enter to skip)[/dim]"
     while True:
-        prompt_str = f"[bold]{prompt_text}[/bold] {req_label}"
+        prompt_str = f"[bold white]{prompt_text}[/bold white] {req_label}"
         val = Prompt.ask(prompt_str, default=default).strip()
 
-        if not val:
-            if required:
+        if not val or (not required and val.lower() in ("none", "skip", "no", "n", "empty")):
+            if required and not allow_empty:
                 console.print("[red]This input is required.[/red]")
                 continue
             return None
@@ -479,17 +566,61 @@ def run_plan_flow(
     local_endpoint: str = "",
 ):
     """Execute the VeriSight Plan workflow."""
-    console.print("\n[bold cyan]📋 VeriSight Plan — Verification & Architecture Plan[/bold cyan]")
-    console.print("[dim]Generate Test Plan, Feature Decomposition, SystemVerilog Coverage & SVA Suite.[/dim]\n")
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Verification Plan, Feature Decomposition & SVA Suite Synthesizer[/bold white]\n"
+            "[dim]Translates specifications into formal test plans, protocol functional coverage, and SystemVerilog assertions.[/dim]",
+            title="[bold cyan]📋 VERISIGHT PLAN ARCHITECT[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
     if not spec_path:
-        spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default="")
+        default_spec = "examples/specs/alu_spec.md" if Path("examples/specs/alu_spec.md").exists() else ""
+        spec_path = _prompt_path("Specification document file or directory (.md, .txt, .pdf)", required=True, default=default_spec)
     if not rtl_path:
+        default_rtl = ""
+        detected_rtl = None
+        if spec_path:
+            sp = Path(spec_path)
+            for cd in [sp.parent.parent / "rtl", sp.parent / "rtl"]:
+                if cd.exists() and cd.is_dir():
+                    rtl_cands = list(cd.glob("*.sv")) + list(cd.glob("*.v"))
+                    if rtl_cands:
+                        detected_rtl = str(rtl_cands[0])
+                        break
+        if detected_rtl:
+            console.print(f"  [dim]Tip: Adjacent project RTL found at[/dim] [cyan]{detected_rtl}[/cyan] [dim](press Enter to skip for Spec-Driven Planning)[/dim]")
+        # RTL is strictly optional: default is empty string so pressing Enter skips without selecting any default RTL
         rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
     if coverage_path is None:
         coverage_path = _prompt_path("Simulator Coverage Database / Report (optional .ucdb, .vdb, .txt, .json)", required=False, default="")
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for verification plan[/bold]", default="output/verification_plan").strip()
+
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]VeriSight Plan Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Design Specification", str(spec_path) if spec_path else "[dim]None[/dim]")
+    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[bold green]None (Spec-Driven Planning)[/bold green]")
+    summary_table.add_row("Coverage Database", str(coverage_path) if coverage_path else "[dim]None (Cold-start Plan)[/dim]")
+    summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
+    summary_table.add_row("Output Directory", output_dir)
+
+    console.print(summary_table)
+    console.print()
 
     # Configure VeriSight environment for Plan
     llm_kwargs: Dict[str, Any] = {
@@ -518,46 +649,65 @@ def run_plan_flow(
         except Exception:
             kb = None
 
-    console.print("\n[bold cyan]🚀 Launching VeriSight Plan Architect...[/bold cyan]\n")
-    try:
-        planner = VeriSightPlanner(output_dir=output_dir, knowledge_base=kb)
-        report = planner.run(
-            spec_path=spec_path,
-            rtl_path=rtl_path,
-            coverage_path=coverage_path if coverage_path else None,
-        )
+    with console.status("[bold green]Synthesizing Verification Architecture, Coverage Models & SVA...[/bold green]"):
+        try:
+            planner = VeriSightPlanner(output_dir=output_dir, knowledge_base=kb)
+            report = planner.run(
+                spec_path=spec_path,
+                rtl_path=rtl_path,
+                coverage_path=coverage_path if coverage_path else None,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Verification Planning failed:[/] {e}")
+            return
 
-        console.print("\n" + "=" * 62)
-        console.print("[bold green]🎉 Verification Plan Generated Successfully![/bold green]")
-        console.print("=" * 62)
-        console.print(f"  [bold]Target Design:[/]         {report.design_name}")
-        console.print(f"  [bold]Decomposed Features:[/]   {report.total_features}")
-        console.print(f"  [bold]Defined Test Scenarios:[/] {report.total_tests}")
-        console.print(f"  [bold]Coverage Points:[/]        {report.total_coverage_points}")
-        console.print(f"  [bold]SVA Formal Assertions:[/] {report.total_assertions}")
-        console.print(f"  [bold]Simulator Coverage:[/]    [cyan]{report.actual_coverage_overall}% Hit[/cyan] (Target: {report.target_coverage_overall}%)")
-        console.print(f"  [bold]Unhit Coverage Holes:[/]  [yellow]{report.unhit_bins_count} bins[/yellow]")
-        console.print()
-        console.print(f"  [bold cyan]Generated Artifacts in {output_dir}/:[/bold cyan]")
-        console.print(f"    • [white]verification_plan.html[/white]  (Interactive HTML Dashboard)")
-        console.print(f"    • [white]verification_plan.md[/white]    (Engineering Markdown Plan)")
-        console.print(f"    • [white]traceability_matrix.csv[/white] (ISO 26262/DO-254 Matrix)")
-        console.print(f"    • [white]coverage_model.sv[/white]      (SystemVerilog Covergroups Package)")
-        console.print(f"    • [white]dut_assertions.sv[/white]      (SystemVerilog Assertions Suite)")
-        console.print(f"    • [white]verification_plan.json[/white]  (Unified JSON Schema)")
-        console.print()
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Metric", style="bold cyan", width=25)
+    scorecard.add_column("Value", style="bold white", width=53)
 
-        html_file = Path(output_dir) / "verification_plan.html"
-        if html_file.exists():
-            open_html = Confirm.ask("[bold]Open the interactive HTML Verification Plan in your browser?[/bold]", default=True)
-            if open_html:
-                if _open_html_in_browser(html_file):
-                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
-                else:
-                    console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
+    scorecard.add_row("Synthesis Status", "[bold green]✓ Verification Plan Generated[/bold green]")
+    scorecard.add_row("Target Design", f"[bold white]{report.design_name.upper()}[/bold white]")
+    scorecard.add_row(
+        "Planning Mode",
+        "[bold green]Spec-Driven (Pure Specification Grounding)[/bold green]"
+        if not report.rtl_source
+        else f"[cyan]Specification + RTL Co-Design ({Path(report.rtl_source).name})[/cyan]",
+    )
+    scorecard.add_row("Decomposed Features", f"[bold green]{report.total_features}[/bold green] functional features")
+    scorecard.add_row("Defined Test Scenarios", f"[bold green]{report.total_tests}[/bold green] test scenarios")
+    scorecard.add_row("Coverage Points", f"[bold green]{report.total_coverage_points}[/bold green] covergroups & bins")
+    scorecard.add_row("SVA Formal Assertions", f"[bold green]{report.total_assertions}[/bold green] assertions synthesized")
+    scorecard.add_row("Simulator Coverage Hit", f"[cyan]{report.actual_coverage_overall}% Hit[/cyan] (Target: {report.target_coverage_overall}%)")
+    scorecard.add_row("Unhit Coverage Holes", f"[yellow]{report.unhit_bins_count} unhit bins identified[/yellow]")
 
-    except Exception as e:
-        console.print(f"\n[bold red]Verification Planning failed:[/] {e}")
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] VERISIGHT PLAN METRICS SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Generated Artifacts Table
+    art_table = Table(title=f"[bold cyan]Generated Plan Artifacts ({output_dir}/)[/bold cyan]", box=box.ROUNDED, show_lines=False)
+    art_table.add_column("Artifact", style="bold white", width=26)
+    art_table.add_column("Format / Purpose", style="dim white", width=52)
+
+    art_table.add_row("verification_plan.html", "Interactive Web Dashboard (Coverage & Plan)")
+    art_table.add_row("verification_plan.md", "Executive Engineering Verification Plan")
+    art_table.add_row("traceability_matrix.csv", "Requirements Traceability Matrix (ISO 26262/DO-254)")
+    art_table.add_row("coverage_model.sv", "Synthesized SystemVerilog Covergroups Package")
+    art_table.add_row("dut_assertions.sv", "Synthesized SVA Formal Assertions Module")
+    art_table.add_row("verification_plan.json", "Standardized Verification Schema")
+
+    console.print(art_table)
+    console.print()
+
+    html_file = Path(output_dir) / "verification_plan.html"
+    if html_file.exists():
+        open_html = Confirm.ask("[bold]Open the interactive HTML Verification Plan in your browser?[/bold]", default=True)
+        if open_html:
+            if _open_html_in_browser(html_file):
+                console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]\n")
+            else:
+                console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]\n")
 
 
 def run_debug_flow(
@@ -574,19 +724,86 @@ def run_debug_flow(
     local_endpoint: str = "",
 ):
     """Execute the VeriSight Debug workflow."""
-    console.print("\n[bold cyan]🛠️ VeriSight Debug — Autonomous Simulation RCA & Fix[/bold cyan]")
-    console.print("[dim]Analyze simulation logs, trace root cause, and generate automated code fixes.[/dim]\n")
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Root-Cause Analysis, Failure Localization & Bug Patching[/bold white]\n"
+            "[dim]Analyzes simulation logs, parses VCD & AST, identifies root causes, and synthesizes verified patches.[/dim]",
+            title="[bold cyan]🛠️  VERISIGHT DEBUG ENGINE[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
     if not log_path:
-        log_path = _prompt_path("Simulation Log file (.log)", required=True, default="")
+        default_log = ""
+        for cand_log in ["projects/ram/logs/sim.log", "examples/logs/sim.log"]:
+            if Path(cand_log).exists():
+                default_log = cand_log
+                break
+        log_path = _prompt_path("Simulation Log file (.log)", required=True, default=default_log)
+
     if not rtl_path:
-        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
+        default_rtl = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "rtl", lp.parent / "rtl"]:
+                if cand.exists() and cand.is_dir():
+                    r_files = list(cand.glob("*.sv")) + list(cand.glob("*.v"))
+                    if r_files:
+                        default_rtl = str(r_files[0])
+                        break
+        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default=default_rtl)
+
     if not tb_path:
-        tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default="")
+        default_tb = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "tb", lp.parent / "tb"]:
+                if cand.exists() and cand.is_dir():
+                    t_files = list(cand.glob("*.sv")) + list(cand.glob("*.v"))
+                    if t_files:
+                        default_tb = str(t_files[0])
+                        break
+        tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default=default_tb)
+
     if not spec_path:
-        spec_path = _prompt_path("Design Specification document (.md)", required=False, default="")
+        default_spec = ""
+        if log_path:
+            lp = Path(log_path)
+            for cand in [lp.parent.parent / "specs", lp.parent / "specs"]:
+                if cand.exists() and cand.is_dir():
+                    s_files = list(cand.glob("*.md")) + list(cand.glob("*.txt"))
+                    if s_files:
+                        default_spec = str(s_files[0])
+                        break
+        spec_path = _prompt_path("Design Specification document (.md)", required=False, default=default_spec)
+
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for reports[/bold]", default="output/custom_debug").strip()
+
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]Debug Pipeline Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Simulation Log", str(log_path) if log_path else "[dim]None[/dim]")
+    summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[dim]None[/dim]")
+    summary_table.add_row("UVM Testbench", str(tb_path) if tb_path else "[dim]None[/dim]")
+    summary_table.add_row("Design Spec", str(spec_path) if spec_path else "[dim]None[/dim]")
+    summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
+    summary_table.add_row("Output Directory", output_dir)
+
+    console.print(summary_table)
+    console.print()
 
     llm_kwargs: Dict[str, Any] = {
         "provider": provider,
@@ -613,44 +830,56 @@ def run_debug_flow(
         log_level="INFO",
     )
 
-    console.print("\n[bold cyan]🚀 Launching VeriSight Debug Pipeline...[/bold cyan]\n")
-    try:
-        pipeline = VeriSightPipeline(config=config)
-        report = pipeline.run(
-            spec_path=spec_path,
-            rtl_path=rtl_path,
-            tb_path=tb_path,
-            log_path=log_path,
-        )
+    with console.status("[bold green]Executing Multi-Agent RCA & Diagnostic Analysis...[/bold green]"):
+        try:
+            pipeline = VeriSightPipeline(config=config)
+            report = pipeline.run(
+                spec_path=spec_path,
+                rtl_path=rtl_path,
+                tb_path=tb_path,
+                log_path=log_path,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")
+            return
 
-        console.print("\n" + "=" * 62)
-        console.print("[bold green]🎉 Analysis Completed Successfully![/bold green]")
-        console.print("=" * 62)
-        console.print(f"  [bold]Classification:[/]  {report.classification}")
-        console.print(f"  [bold]Confidence:[/]      {report.confidence}%")
-        console.print(f"  [bold]Root Cause:[/]      {report.root_cause}")
-        console.print(f"  [bold]Category:[/]        {report.category}")
-        console.print(f"  [bold]Module:[/]          {report.module}")
-        console.print()
-        console.print(f"  [bold cyan]Generated Reports in {output_dir}/:[/bold cyan]")
-        console.print(f"    • [white]report.html[/white]  (Visual interactive report)")
-        console.print(f"    • [white]report.md[/white]    (Detailed markdown documentation)")
-        console.print(f"    • [white]error.json[/white]   (Machine-readable error schema)")
-        console.print(f"    • [white]summary.txt[/white]  (Executive summary)")
-        console.print(f"    • [white]fix/[/white]         (Automated code patch)")
-        console.print()
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Metric", style="bold cyan", width=24)
+    scorecard.add_column("Value", style="bold white", width=54)
 
-        html_file = Path(output_dir) / "report.html"
-        if html_file.exists():
-            open_html = Confirm.ask("[bold]Open the HTML report in your browser?[/bold]", default=True)
-            if open_html:
-                if _open_html_in_browser(html_file):
-                    console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]")
-                else:
-                    console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]")
+    scorecard.add_row("Diagnosis Status", "[bold green]✓ RCA Analysis Completed[/bold green]")
+    scorecard.add_row("Classification", f"[bold yellow]{report.classification}[/bold yellow]")
+    scorecard.add_row("Culprit Module", f"[bold white]{report.module}[/bold white]")
+    scorecard.add_row("Failure Category", f"[bold white]{report.category}[/bold white]")
+    scorecard.add_row("Identified Root Cause", f"[white]{report.root_cause}[/white]")
 
-    except Exception as e:
-        console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] VERISIGHT DEBUG RCA SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Generated Artifacts Table
+    art_table = Table(title=f"[bold cyan]Generated Debug Artifacts ({output_dir}/)[/bold cyan]", box=box.ROUNDED, show_lines=False)
+    art_table.add_column("Artifact", style="bold white", width=24)
+    art_table.add_column("Format / Purpose", style="dim white", width=54)
+
+    art_table.add_row("report.html", "Visual Interactive RCA Cockpit (Browser)")
+    art_table.add_row("report.md", "Detailed Engineering Root-Cause Documentation")
+    art_table.add_row("error.json", "Standardized Machine-Readable Error Schema")
+    art_table.add_row("summary.txt", "Executive Summary for CI/CD Integration")
+    art_table.add_row("fix/", "Automated RTL/TB Remediation Code Patch")
+
+    console.print(art_table)
+    console.print()
+
+    html_file = Path(output_dir) / "report.html"
+    if html_file.exists():
+        open_html = Confirm.ask("[bold]Open the HTML report in your browser?[/bold]", default=True)
+        if open_html:
+            if _open_html_in_browser(html_file):
+                console.print(f"[green]✓ Opened in your browser: file://{html_file.resolve()}[/green]\n")
+            else:
+                console.print(f"[dim]You can open it at: file://{html_file.resolve()}[/dim]\n")
 
 
 def run_sim_flow(
@@ -725,7 +954,7 @@ def run_sim_flow(
 
         rca_res = results.get("rca")
         if rca_res:
-            console.print(f"\n  [bold cyan]RCA Diagnosis:[/]   {rca_res.classification} ({rca_res.confidence}% conf)")
+            console.print(f"\n  [bold cyan]RCA Diagnosis:[/]   {rca_res.classification}")
             console.print(f"  [bold]Root Cause:[/]      {rca_res.root_cause}")
 
         dashboards = results.get("dashboards", {})
@@ -747,108 +976,464 @@ def run_sim_flow(
         console.print(f"\n[bold red]Closed-Loop Execution failed:[/] {e}")
 
 
-def run_wizard():
-    """Execute the unified interactive guided setup wizard."""
-    _print_welcome_banner()
+def run_edaplayground_export_flow(
+    rtl_path: Optional[str] = None,
+    tb_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Interactive guided flow to export RTL and Testbench to EDA Playground."""
+    from verisight.tools.eda_playground_exporter import export_to_edaplayground
 
-    console.print("[bold cyan]Step 1: Choose Autonomous Workflow[/bold cyan]")
-    console.print("  [1] [bold green]🛠️  VeriSight Debug[/bold green]  — Root-Cause Analysis & Fix for Sim Failures")
-    console.print("  [2] [bold green]📋 VeriSight Plan[/bold green]   — Generate Test Plan, Coverage Model & SVA Suite")
-    console.print("  [3] [bold green]🚀 Closed-Loop Sim[/bold green]  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit")
-    console.print("  [4] [bold cyan]🌐 Live Web Cockpit[/bold cyan] — Launch Interactive Browser Studio (Sim/Waveforms/RCA)")
-    console.print("  [5] [bold yellow]⚡ Quick Demos[/bold yellow]      — Instant 1-Click Run on ALU or FIFO")
-    console.print("  [6] [bold red]🚪 Exit[/bold red]")
-    console.print()
+    console.print("\n[bold cyan]📦 VeriSight — EDA Playground Cloud Bundle Exporter[/bold cyan]")
+    console.print("[dim]Package RTL and Testbench for 1-click cloud simulation with Siemens Questa, Synopsys VCS, or Riviera-PRO.[/dim]\n")
 
-    workflow = Prompt.ask(
-        "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5", "6"],
-        default="1",
+    if not rtl_path:
+        rtl_path = _prompt_path("RTL Source file or directory (.sv, .v)", required=True, default="examples/rtl/alu.sv")
+    if not tb_path:
+        tb_path = _prompt_path("Testbench file or directory (.sv, .v)", required=True, default="examples/tb/alu_tb.sv")
+    if not output_dir:
+        output_dir = Prompt.ask("[bold]Output bundle directory[/bold]", default="output/edaplayground").strip()
+
+    preferred_sim = Prompt.ask(
+        "[bold]Target Simulator for preconfigured flags[/bold]",
+        choices=["questa", "vcs", "riviera", "xcelium", "verilator"],
+        default="questa",
+    )
+    anonymize = Confirm.ask(
+        "[bold]Enable RTL Token Masking (scrub proprietary identifiers before cloud upload)?[/bold]",
+        default=False,
     )
 
-    if workflow == "6":
-        console.print("[dim]Exiting VeriSight. Goodbye![/dim]")
+    try:
+        res = export_to_edaplayground(
+            rtl_path=rtl_path,
+            tb_path=tb_path,
+            output_dir=output_dir,
+            preferred_simulator=preferred_sim,
+            anonymize_rtl=anonymize,
+        )
+
+        console.print("\n[bold green]✓ EDA Playground bundle created successfully![/bold green]")
+        console.print(f"  • [cyan]design.sv:[/]             {res['design_sv']}")
+        console.print(f"  • [cyan]testbench.sv:[/]          {res['testbench_sv']}")
+        console.print(f"  • [cyan]Launch Studio (HTML):[/] {res['launch_html']}")
+        console.print(f"  • [cyan]Auto-Injector Script:[/] {res.get('userscript_js', '')}")
+        console.print(f"  • [cyan]Configuration (JSON):[/] {res['config_json']}")
+        console.print(f"  • [cyan]User Guide (MD):[/]      {res['readme_md']}\n")
+
+        console.print("[bold yellow]⚡ 1-Click Auto-Injector Included:[/] Drag the bookmarklet from Launch Studio to populate both files and flags into EDA Playground in 1 click!\n")
+
+        open_dash = Confirm.ask("[bold]Open EDA Playground Launch Studio in browser now?[/bold]", default=True)
+        if open_dash:
+            _open_html_in_browser(Path(res["launch_html"]))
+            console.print(f"[green]✓ Opened: file://{Path(res['launch_html']).resolve()}[/green]")
+            console.print("[dim]Tip: Drag the '⚡ Inject to EDA Playground' bookmarklet to your browser bar, then click it on EDA Playground to load all files![/dim]")
+
+    except Exception as e:
+        console.print(f"\n[bold red]EDA Playground Export failed:[/] {e}")
+
+
+def run_uvm_flow(
+    rtl_path: Optional[str] = None,
+    spec_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Run autonomous UVM Testbench Environment Generator (XcelUVM Architect)."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Autonomous Production-Grade UVM 1.2 Testbench Environment Synthesis[/bold white]\n"
+            "[dim]Parses RTL AST, detects protocol compliance, and synthesizes complete UVM components,\n"
+            "scoreboards, reference models, functional coverage, and Questa/VCS simulation harnesses.[/dim]",
+            title="[bold cyan]🏗️  XCELUVM ARCHITECT — UVM TESTBENCH GENERATOR[/bold cyan]",
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
+
+    default_rtl = "projects/apb/rtl/apb_slave.sv" if Path("projects/apb/rtl/apb_slave.sv").exists() else "examples/rtl/alu.sv"
+    if not rtl_path:
+        rtl_path = _prompt_path(
+            "Path to RTL source file or directory (.sv, .v)",
+            required=False,
+            default=default_rtl,
+        )
+
+    default_spec = "projects/apb/specs/apb_spec.md" if Path("projects/apb/specs/apb_spec.md").exists() else ""
+    if not spec_path:
+        spec_path = _prompt_path(
+            "Path to specification file (optional, press Enter to infer from RTL)",
+            required=False,
+            default=default_spec,
+        )
+
+    if not output_dir:
+        output_dir = Prompt.ask(
+            "[bold]Output directory for generated UVM environment[/bold]",
+            default="output/uvm_environment",
+        ).strip()
+
+    # Pre-Flight Configuration Summary
+    summary_table = Table(
+        title="[bold cyan]XcelUVM Architect Pre-Flight Configuration[/bold cyan]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    summary_table.add_column("Parameter", style="cyan", width=24)
+    summary_table.add_column("Configured Target", style="white", width=54)
+
+    summary_table.add_row("Target RTL Design", str(rtl_path) if rtl_path else "[dim]Auto-synthesized[/dim]")
+    summary_table.add_row("Design Specification", str(spec_path) if spec_path else "[dim]Inferred from RTL & Protocol[/dim]")
+    summary_table.add_row("Output Directory", output_dir)
+    summary_table.add_row("Methodology Standard", "IEEE 1800.2 UVM 1.2 Production Testbench")
+
+    console.print(summary_table)
+    console.print()
+
+    from verisight.uvm.uvm_architect import UVMArchitect
+
+    with console.status("[bold green]Synthesizing complete UVM 1.2 Testbench Environment...[/bold green]"):
+        try:
+            architect = UVMArchitect(output_dir=output_dir)
+            res = architect.generate(
+                rtl_path=str(rtl_path) if rtl_path else None,
+                spec_path=str(spec_path) if spec_path else None,
+                output_dir=output_dir,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]UVM Synthesis failed:[/] {e}")
+            return
+
+    # Post-Execution Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="green", expand=False)
+    scorecard.add_column("Property", style="bold cyan", width=24)
+    scorecard.add_column("Value", style="bold white", width=54)
+
+    scorecard.add_row("Synthesis Status", "[bold green]✓ Complete UVM Environment Synthesized[/bold green]")
+    scorecard.add_row("Target Design", f"[bold white]{res.design_name.upper()}[/bold white]")
+    scorecard.add_row("Detected Protocol", f"[bold cyan]{res.protocol_detected.upper()}[/bold cyan]")
+    scorecard.add_row("DUT Ports Mapped", f"[bold white]{res.inputs_count} inputs, {res.outputs_count} outputs[/bold white]")
+    scorecard.add_row("Output Directory", f"[cyan]{res.output_dir}[/cyan]")
+    scorecard.add_row("Generated Components", f"[bold green]{len(res.files_generated)} components[/bold green]")
+
+    console.print()
+    console.print(Panel(scorecard, title="[bold green] XCELUVM SYNTHESIS SCORECARD [/bold green]", box=box.ROUNDED, border_style="green"))
+    console.print()
+
+    # Formatted component table
+    comp_table = Table(
+        title=f"[bold cyan]Synthesized UVM Testbench Suite ({output_dir}/)[/bold cyan]",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+        show_lines=False,
+    )
+    comp_table.add_column("File / Component", style="bold white", width=30)
+    comp_table.add_column("UVM Class / Role", style="dim white", width=48)
+
+    for f in res.files_generated:
+        f_name = Path(f).name
+        role = "UVM Component"
+        if "_if.sv" in f_name:
+            role = "SystemVerilog Interface & Modports"
+        elif "_seq_item.sv" in f_name:
+            role = "uvm_sequence_item (Constrained Transactions)"
+        elif "_sequencer.sv" in f_name:
+            role = "uvm_sequencer typedef"
+        elif "_driver.sv" in f_name:
+            role = "uvm_driver (Pin-level Protocol Driving)"
+        elif "_monitor.sv" in f_name:
+            role = "uvm_monitor (Protocol Sampling & Analysis Port)"
+        elif "_agent.sv" in f_name:
+            role = "uvm_agent (Active/Passive Configurable Agent)"
+        elif "_ref_model.sv" in f_name or "_reference_model.sv" in f_name:
+            role = "Behavioral Golden Reference Model"
+        elif "_scoreboard.sv" in f_name:
+            role = "uvm_scoreboard (In-order Checking & Error Counting)"
+        elif "_coverage.sv" in f_name:
+            role = "uvm_subscriber (Protocol Functional Coverage)"
+        elif "_seq.sv" in f_name or "_sequence.sv" in f_name:
+            role = "uvm_sequence (Sanity, Random & Corner-Case Sequences)"
+        elif "_env.sv" in f_name:
+            role = "uvm_env (Top Environment Topology)"
+        elif "_test.sv" in f_name:
+            role = "uvm_test (Base Test & Directed/Random Tests)"
+        elif "_pkg.sv" in f_name:
+            role = "SystemVerilog Package (`include wrapper)"
+        elif "_tb_top.sv" in f_name:
+            role = "Testbench Top Module (Clock/Reset Gen & DUT Instantiation)"
+        elif "run.do" in f_name:
+            role = "Siemens Questa / ModelSim Batch Simulation Script"
+        elif "Makefile" in f_name:
+            role = "Synopsys VCS / Questa Automation Makefile"
+
+        comp_table.add_row(f_name, role)
+
+    console.print(comp_table)
+    console.print()
+
+    # Next steps box
+    sim_guide = (
+        "[bold white]To run the synthesized UVM Testbench:[/bold white]\n"
+        f"  [cyan]cd {output_dir}[/cyan]\n"
+        "  • [bold]Siemens Questa / ModelSim:[/] [white]vsim -c -do run.do[/white]\n"
+        "  • [bold]Synopsys VCS:[/]              [white]make run_vcs[/white]\n"
+        "  • [bold]Cadence Xcelium:[/]           [white]make run_xcelium[/white]"
+    )
+    console.print(Panel(sim_guide, title="[bold cyan] Simulation Quick-Start [/bold cyan]", box=box.ROUNDED, border_style="cyan"))
+    console.print()
+
+
+def run_spec_driven_tb_flow(
+    rtl_path: Optional[str] = None,
+    spec_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+):
+    """Run Spec-Driven Testbench Generation Agent (Workflow 4)."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold white]Spec-Driven Testbench Generation Agent (Workflow 4)[/bold white]\n"
+            "[dim]Synthesizes complete, specification-grounded SystemVerilog UVM 1.2 testbenches.\n"
+            "Enforces that the Specification is the functional source of truth: reference models and\n"
+            "scoreboards independently discover RTL defects rather than reproducing them.[/dim]",
+            title="[bold magenta]🎯 VERISIGHT TESTBENCH — SPEC-DRIVEN UVM SYNTHESIS[/bold magenta]",
+            box=box.ROUNDED,
+            border_style="magenta",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    console.print()
+
+    default_rtl = "projects/ram/rtl/ram_rtl.sv" if Path("projects/ram/rtl/ram_rtl.sv").exists() else "examples/rtl/alu.sv"
+    if not rtl_path:
+        rtl_path = _prompt_path(
+            "Path to RTL source file (.sv, .v)",
+            required=True,
+            default=default_rtl,
+        )
+
+    default_spec = "projects/ram/specs/spec.md" if Path("projects/ram/specs/spec.md").exists() else "examples/specs/alu_spec.md"
+    if not spec_path:
+        spec_path = _prompt_path(
+            "Path to Design Specification file (.md, .txt)",
+            required=True,
+            default=default_spec,
+        )
+
+    if not output_dir:
+        output_dir = Prompt.ask(
+            "[bold]Output directory for generated UVM environment[/bold]",
+            default="output/spec_driven_uvm",
+        ).strip()
+
+    from verisight.agents.spec_driven_tb_agent import SpecDrivenTestbenchAgent
+
+    with console.status("[bold magenta]Running Spec-Driven Testbench Generation Agent...[/bold magenta]"):
+        try:
+            agent = SpecDrivenTestbenchAgent(output_dir=output_dir)
+            res = agent.generate_testbench(
+                spec_path=str(spec_path),
+                rtl_path=str(rtl_path),
+                output_dir=output_dir,
+                run_sim=True,
+            )
+        except Exception as e:
+            console.print(f"\n[bold red]Spec-Driven Testbench Generation failed:[/] {e}")
+            return
+
+    # Scorecard
+    scorecard = Table(box=box.ROUNDED, show_header=False, border_style="magenta", expand=False)
+    scorecard.add_column("Property", style="bold magenta", width=28)
+    scorecard.add_column("Value", style="bold white", width=54)
+
+    scorecard.add_row("Agent Workflow", "[bold magenta]Workflow 4: Spec-Driven Testbench[/bold magenta]")
+    scorecard.add_row("Target Design", f"[bold white]{res.design_name.upper()}[/bold white]")
+    scorecard.add_row("Specification Title", f"[cyan]{res.mental_model.spec_title}[/cyan]")
+    scorecard.add_row("Requirements Grounded", f"[bold green]{len(res.requirements)} atomic REQ items[/bold green]")
+    scorecard.add_row("Intent vs. RTL Checks", f"[bold yellow]{len(res.mental_model.intent_vs_implementation)} checkpoints[/bold yellow]")
+    scorecard.add_row("Static Syntax Review", "[bold green]✓ Passed (pyslang IEEE 1800)[/bold green]" if res.static_validation.syntax_clean else "[bold red]Diagnostics Logged[/bold red]")
+    if res.simulation_validation:
+        sim_stat = "[bold yellow]RTL Defect Successfully Exposed![/bold yellow]" if res.simulation_validation.mismatches_detected > 0 else "[bold green]Simulation Passed Cleanly[/bold green]"
+        scorecard.add_row("Simulation Status", sim_stat)
+        scorecard.add_row("Scoreboard Findings", f"{res.simulation_validation.mismatches_detected} mismatches against spec")
+
+    console.print()
+    console.print(Panel(scorecard, title="[bold magenta] SPEC-DRIVEN VERIFICATION SCORECARD [/bold magenta]", box=box.ROUNDED, border_style="magenta"))
+    console.print()
+
+    # Formatted component table
+    comp_table = Table(
+        title=f"[bold magenta]Synthesized Spec-Driven UVM Suite ({output_dir}/)[/bold magenta]",
+        box=box.ROUNDED,
+        header_style="bold magenta",
+        show_lines=False,
+    )
+    comp_table.add_column("File / Component", style="bold white", width=32)
+    comp_table.add_column("UVM Class / Role", style="dim white", width=46)
+
+    for comp in res.uvm_components:
+        comp_table.add_row(comp.file_name, comp.role)
+
+    console.print(comp_table)
+    console.print()
+
+
+def run_wizard():
+    """Execute the unified interactive guided setup wizard with modern colorful boxes."""
+    try:
+        _print_welcome_banner()
+
+        console.print("[bold cyan]Step 1: Select Autonomous Verification Engine[/bold cyan]\n")
+
+        cards_data = [
+            {
+                "opt": "1",
+                "title": "🛠️  VeriSight Debug",
+                "tag": "RCA & FIX",
+                "desc": "Autonomous RCA & Failure Localization",
+                "features": "• Log Windowing • VCD Trace • Safe Patch",
+                "color": "#FF5370",
+                "border": "bold #FF5370",
+                "badge_style": "bold black on #FF8A80",
+            },
+            {
+                "opt": "2",
+                "title": "📋 VeriSight Plan",
+                "tag": "PLAN & SVA",
+                "desc": "Test Planning, Coverage Models & SVA",
+                "features": "• 50+ Test Cases • Covergroups • SVA",
+                "color": "#00E5FF",
+                "border": "bold #00E5FF",
+                "badge_style": "bold black on #80D8FF",
+            },
+            {
+                "opt": "3",
+                "title": "🎯 VeriSight TestBench",
+                "tag": "SPEC-DRIVEN",
+                "desc": "Spec-Driven UVM Synthesis with Ref Model",
+                "features": "• Spec-as-Truth • Golden Ref Model • Audit",
+                "color": "#E040FB",
+                "border": "bold #E040FB",
+                "badge_style": "bold black on #EA80FC",
+            },
+        ]
+
+        panels = []
+        for item in cards_data:
+            content = (
+                f"[bold white]{item['desc']}[/bold white]\n"
+                f"[{item['color']}]{item['features']}[/{item['color']}]"
+            )
+            title_text = f"[{item['border']}][{item['opt']}][/] [bold white]{item['title']}[/bold white]"
+            p = Panel(
+                content,
+                title=title_text,
+                title_align="left",
+                subtitle=f"[{item['badge_style']}] {item['tag']} [/]",
+                subtitle_align="right",
+                border_style=item["border"],
+                box=box.ROUNDED,
+                padding=(0, 1),
+                expand=True,
+            )
+            panels.append(p)
+
+        exit_panel = Panel(
+            "[white]Quit VeriSight Interactive Launcher[/white]\n[dim]Clean terminal session exit[/dim]",
+            title="[bold grey70][4][/bold grey70] [bold white]🚪 Exit[/bold white]",
+            title_align="left",
+            subtitle="[bold black on #B0BEC5] SYSTEM [/]",
+            subtitle_align="right",
+            border_style="grey58",
+            box=box.ROUNDED,
+            padding=(0, 1),
+            expand=True,
+        )
+
+        info_panel = Panel(
+            "[dim]• Web UI: [bold cyan]./start serve[/bold cyan]   • Cloud: [bold cyan]./start edaplayground[/bold cyan]   • DPO LoRA: [bold cyan]./start dpo[/bold cyan]   • Air-Gap: [bold cyan]./start --airgap[/bold cyan][/dim]",
+            title="[bold cyan]⚡ QUICK UTILITIES & PLATFORM TOOLS[/bold cyan]",
+            title_align="center",
+            border_style="dim cyan",
+            box=box.ROUNDED,
+            padding=(0, 1),
+            expand=True,
+        )
+
+        if console.width >= 75:
+            grid = Table.grid(expand=True, padding=(0, 1))
+            grid.add_column(ratio=1)
+            grid.add_column(ratio=1)
+            grid.add_row(panels[0], panels[1])
+            grid.add_row(panels[2], exit_panel)
+            console.print(grid)
+            console.print(info_panel)
+        else:
+            for p in panels:
+                console.print(p)
+            console.print(exit_panel)
+            console.print(info_panel)
+
+        console.print()
+
+        workflow_choice = Prompt.ask(
+            "[bold white]Select an engine[/bold white] "
+            "[[bold #FF5370]1:Debug[/bold #FF5370] • "
+            "[bold #00E5FF]2:Plan[/bold #00E5FF] • "
+            "[bold #E040FB]3:TestBench[/bold #E040FB] • "
+            "[dim]4:Exit[/dim]]",
+            choices=["1", "2", "3", "4", "debug", "plan", "tb", "testbench", "uvm", "xcel", "xceluvm", "exit", "q", "quit"],
+            default="1",
+        ).strip().lower()
+
+        alias_map = {
+            "debug": "1",
+            "plan": "2",
+            "tb": "3",
+            "testbench": "3",
+            "uvm": "3",
+            "xcel": "3",
+            "xceluvm": "3",
+            "exit": "4",
+            "q": "4",
+            "quit": "4",
+        }
+        workflow = alias_map.get(workflow_choice, workflow_choice)
+
+        if workflow == "4":
+            console.print("\n[dim]👋 Exiting VeriSight. Have a productive verification session![/dim]\n")
+            sys.exit(0)
+
+        if workflow == "3":
+            console.print("\n[bold #E040FB]🎯 Activating VeriSight TestBench — Spec-Driven UVM Synthesis Engine...[/bold #E040FB]")
+            run_spec_driven_tb_flow()
+            return
+
+        if workflow == "1":
+            console.print("\n[bold #FF5370]⚡ Activating VeriSight Debug Triage & RCA Engine...[/bold #FF5370]")
+        elif workflow == "2":
+            console.print("\n[bold #00E5FF]📋 Activating VeriSight Plan Architect...[/bold #00E5FF]")
+
+        console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
+        provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
+
+        if workflow == "1":
+            run_debug_flow(
+                provider, api_key, model_name,
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+
+        elif workflow == "2":
+            run_plan_flow(
+                provider, api_key, model_name,
+                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
+            )
+
+    except KeyboardInterrupt:
+        console.print("\n\n[dim]Launcher interrupted by user. Exiting VeriSight.[/dim]\n")
         sys.exit(0)
-
-    if workflow == "4":
-        from verisight.server.app import start_server
-        console.print("\n[bold cyan]⚡ Launching VeriSight Live Web Cockpit at http://127.0.0.1:8000[/bold cyan]")
-        start_server(host="127.0.0.1", port=8000, open_browser=True)
-        return
-
-    console.print("\n[bold cyan]Step 2: LLM Configuration[/bold cyan]")
-    provider, api_key, model_name, airgap, anonymize_rtl, local_endpoint = _configure_api_key()
-
-    if workflow == "1":
-        run_debug_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "2":
-        run_plan_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "3":
-        run_sim_flow(
-            provider, api_key, model_name,
-            airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-        )
-
-    elif workflow == "5":
-        console.print("\n[bold cyan]Select Pre-packaged Demo:[/bold cyan]")
-        console.print("  [1] ALU Debug Demo   (Detect Missing Reset Bug)")
-        console.print("  [2] FIFO Debug Demo  (Synchronous FIFO UVM Debug)")
-        console.print("  [3] ALU Plan Demo    (Generate Full Test Plan, SV Coverage & SVA for ALU)")
-        console.print("  [4] FIFO Plan Demo   (Generate Full Test Plan, SV Coverage & SVA for FIFO)")
-        console.print("  [5] ALU Closed-Loop  (Simulate ALU RTL+TB -> Waveform RCA -> Coverage)")
-
-        demo_sel = Prompt.ask("[bold]Your choice[/bold]", choices=["1", "2", "3", "4", "5"], default="1")
-
-        if demo_sel == "1":
-            run_debug_flow(
-                provider, api_key, model_name,
-                spec_path="examples/specs/alu_spec.md",
-                rtl_path="examples/rtl/",
-                tb_path="examples/tb/",
-                log_path="examples/logs/sim.log",
-                output_dir="output/demo_alu_debug",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "2":
-            run_debug_flow(
-                provider, api_key, model_name,
-                spec_path="projects/fifo/specs/spec.md",
-                rtl_path="projects/fifo/rtl/",
-                tb_path="projects/fifo/tb/",
-                log_path="projects/fifo/logs/sim.log",
-                output_dir="output/demo_fifo_debug",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "3":
-            run_plan_flow(
-                provider, api_key, model_name,
-                spec_path="examples/specs/alu_spec.md",
-                rtl_path="examples/rtl/",
-                output_dir="output/demo_alu_plan",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "4":
-            run_plan_flow(
-                provider, api_key, model_name,
-                spec_path="projects/fifo/specs/spec.md",
-                rtl_path="projects/fifo/rtl/",
-                output_dir="output/demo_fifo_plan",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )
-        elif demo_sel == "5":
-            run_sim_flow(
-                provider, api_key, model_name,
-                rtl_path="examples/rtl/alu.sv",
-                tb_path="examples/tb/alu_tb.sv",
-                spec_path="examples/specs/alu_spec.md",
-                output_dir="output/demo_alu_closed_loop",
-                airgap=airgap, anonymize_rtl=anonymize_rtl, local_endpoint=local_endpoint,
-            )

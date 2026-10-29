@@ -15,7 +15,7 @@
   <header class="app-header" id="appHeader">
     <div class="brand-group">
       <div class="brand-logo">
-        <span class="logo-icon">⚡</span>
+        <span class="logo-icon">[VS]</span>
         <div class="brand-text">
           <span class="brand-title">VERISIGHT</span>
           <span class="brand-subtitle">NEURAL SILICON COCKPIT</span>
@@ -27,7 +27,7 @@
           <span id="simPillText">Detecting Sim...</span>
         </span>
         <span class="status-pill security-pill" id="securityPill" title="Security & Air-Gap Mode">
-          <span class="pill-icon">🛡️</span>
+          <span class="pill-icon">[AIR-GAP]</span>
           <span>Sovereign Air-Gap</span>
         </span>
         <span class="status-pill live-pill" id="serverPill" title="Server Connection">
@@ -40,19 +40,19 @@
     <!-- Tab Navigation -->
     <nav class="nav-tabs" id="mainNav" aria-label="Main Navigation">
       <button class="nav-tab active" id="tabBtnSim" data-tab="tabSim">
-        <span class="tab-icon">🚀</span> Simulation Runner
+        SIMULATION RUNNER
       </button>
       <button class="nav-tab" id="tabBtnDebug" data-tab="tabDebug">
-        <span class="tab-icon">🔍</span> Root-Cause Debug
+        ROOT-CAUSE DEBUG
       </button>
       <button class="nav-tab" id="tabBtnWaveform" data-tab="tabWaveform">
-        <span class="tab-icon">📈</span> Waveform Studio
+        WAVEFORM STUDIO
       </button>
       <button class="nav-tab" id="tabBtnPlan" data-tab="tabPlan">
-        <span class="tab-icon">📋</span> Coverage Cockpit
+        PLAN & COVERAGE COCKPIT
       </button>
       <button class="nav-tab" id="tabBtnRuns" data-tab="tabRuns">
-        <span class="tab-icon">📜</span> Past Runs
+        PAST RUNS
       </button>
     </nav>
   </header>
@@ -74,9 +74,9 @@
         </div>
         <div class="preset-group">
           <span class="preset-label">Pre-packaged Demos:</span>
-          <button class="btn-preset active" id="btnPresetAlu">⚡ ALU (Missing Reset Bug)</button>
-          <button class="btn-preset" id="btnPresetFifo">📦 Synchronous FIFO</button>
-          <button class="btn-preset" id="btnPresetCustom">⚙️ Custom RTL</button>
+          <button class="btn-preset active" id="btnPresetAlu">ALU (Missing Reset Bug)</button>
+          <button class="btn-preset" id="btnPresetFifo">Synchronous FIFO</button>
+          <button class="btn-preset" id="btnPresetCustom">Custom RTL</button>
         </div>
       </div>
 
@@ -84,7 +84,7 @@
         <!-- Configuration Card -->
         <div class="card form-card" id="simConfigCard">
           <div class="card-header">
-            <h2 class="card-title"><span>🛠️</span> Simulation Parameters</h2>
+            <h2 class="card-title">Simulation Parameters</h2>
             <span class="card-badge">Ready to Launch</span>
           </div>
 
@@ -92,7 +92,7 @@
             <div class="form-group">
               <label for="rtlPathInput">RTL Source Path (.sv, .v)</label>
               <div class="input-with-icon">
-                <span class="input-icon">📄</span>
+                <span class="input-icon">SRC</span>
                 <input type="text" id="rtlPathInput" value="examples/rtl/alu.sv" required placeholder="Path to RTL design">
               </div>
             </div>
@@ -100,7 +100,7 @@
             <div class="form-group">
               <label for="tbPathInput">Testbench Source Path (.sv)</label>
               <div class="input-with-icon">
-                <span class="input-icon">🧪</span>
+                <span class="input-icon">TB</span>
                 <input type="text" id="tbPathInput" value="examples/tb/alu_tb.sv" required placeholder="Path to Testbench">
               </div>
             </div>
@@ -108,7 +108,7 @@
             <div class="form-group">
               <label for="specPathInput">Specification Document (.md) <span class="tag-optional">Optional</span></label>
               <div class="input-with-icon">
-                <span class="input-icon">📑</span>
+                <span class="input-icon">SPEC</span>
                 <input type="text" id="specPathInput" value="examples/specs/alu_spec.md" placeholder="Path to design specification">
               </div>
             </div>
@@ -128,7 +128,7 @@
               <div class="form-group half">
                 <label for="securityModeSelect">AI Security & Execution Mode</label>
                 <select id="securityModeSelect" class="custom-select">
-                  <option value="airgap" selected>🛡️ Sovereign Air-Gap (Local / No-Cloud)</option>
+                  <option value="airgap" selected>Sovereign Air-Gap (Local / No-Cloud)</option>
                   <option value="gemini">Google Gemini 2.0 Flash</option>
                   <option value="claude">Anthropic Claude Sonnet 3.5</option>
                 </select>
@@ -142,7 +142,7 @@
 
             <button type="button" class="btn btn-primary btn-glow" id="btnLaunchSim">
               <span class="btn-spinner" id="simSpinner" style="display:none;"></span>
-              <span class="btn-text" id="btnSimText">🚀 Launch Closed-Loop Simulation</span>
+              <span class="btn-text" id="btnSimText">Launch Closed-Loop Simulation</span>
             </button>
           </form>
         </div>
@@ -168,7 +168,7 @@
 
       <!-- Execution Results HUD (reveals upon completion) -->
       <div class="hud-results-container" id="hudResults" style="display:none;">
-        <h3 class="hud-title">⚡ Execution Metrics & Autonomous Synthesis</h3>
+        <h3 class="hud-title">Execution Metrics & Autonomous Synthesis</h3>
         <div class="hud-metrics-grid">
           <div class="metric-card" id="mCardStatus">
             <span class="m-label">Simulation Status</span>
@@ -191,9 +191,9 @@
           <div class="metric-card" id="mCardActions">
             <span class="m-label">Interactive Artifacts</span>
             <div class="hud-links">
-              <a href="#" id="linkReportHtml" target="_blank" class="hud-btn hud-btn-cyan">📄 Debug HTML</a>
-              <a href="#" id="linkPlanHtml" target="_blank" class="hud-btn hud-btn-emerald">📋 Plan Cockpit</a>
-              <button class="hud-btn hud-btn-purple" id="btnHudInspectWave">📈 Inspect VCD</button>
+              <a href="#" id="linkReportHtml" target="_blank" class="hud-btn hud-btn-cyan">DEBUG HTML</a>
+              <a href="#" id="linkPlanHtml" target="_blank" class="hud-btn hud-btn-emerald">PLAN COCKPIT</a>
+              <button class="hud-btn hud-btn-purple" id="btnHudInspectWave">INSPECT VCD</button>
             </div>
           </div>
         </div>
@@ -237,10 +237,10 @@
         <!-- Automated Patch Studio Card -->
         <div class="card patch-card" id="patchCard">
           <div class="card-header">
-            <h2 class="card-title"><span>🩹</span> Automated RTL Healing Patch</h2>
+            <h2 class="card-title">Automated RTL Healing Patch</h2>
             <div class="patch-header-actions">
-              <button class="btn btn-emerald btn-sm" id="btnApplyFix">⚡ Apply Fix to RTL</button>
-              <button class="btn btn-secondary btn-sm" id="btnRevertFix" style="display:none;">↩️ Revert</button>
+              <button class="btn btn-emerald btn-sm" id="btnApplyFix">Apply Fix to RTL</button>
+              <button class="btn btn-secondary btn-sm" id="btnRevertFix" style="display:none;">Revert</button>
             </div>
           </div>
           <div class="patch-viewer" id="patchViewer">
@@ -255,7 +255,7 @@
       <!-- Anomaly Trace Table Card -->
       <div class="card trace-card">
         <div class="card-header">
-          <h2 class="card-title"><span>🔬</span> Anomaly Evidence & Propagation Trace</h2>
+          <h2 class="card-title">Anomaly Evidence & Propagation Trace</h2>
           <span class="card-badge" id="traceCountBadge">5 Anomalies Logged</span>
         </div>
         <div class="table-container">
@@ -305,10 +305,10 @@
           </p>
         </div>
         <div class="waveform-controls">
-          <button class="btn btn-secondary btn-sm" id="btnWaveZoomIn">🔍+ Zoom In</button>
-          <button class="btn btn-secondary btn-sm" id="btnWaveZoomOut">🔍- Zoom Out</button>
+          <button class="btn btn-secondary btn-sm" id="btnWaveZoomIn">Zoom In (+)</button>
+          <button class="btn btn-secondary btn-sm" id="btnWaveZoomOut">Zoom Out (-)</button>
           <button class="btn btn-secondary btn-sm" id="btnWaveReset">Reset View</button>
-          <button class="btn btn-primary btn-sm btn-glow" id="btnWaveJumpFail">⚡ Jump to Failure (Cycle 1)</button>
+          <button class="btn btn-primary btn-sm btn-glow" id="btnWaveJumpFail">Jump to Failure (Cycle 1)</button>
         </div>
       </div>
 
@@ -329,8 +329,8 @@
             <div class="wave-signal-item"><code>op[2:0]</code></div>
             <div class="wave-signal-item"><code>a[7:0]</code></div>
             <div class="wave-signal-item"><code>b[7:0]</code></div>
-            <div class="wave-signal-item wave-signal-error"><code>result[7:0] ⚠</code></div>
-            <div class="wave-signal-item wave-signal-error"><code>zero ⚠</code></div>
+            <div class="wave-signal-item wave-signal-error"><code>result[7:0] [ERR]</code></div>
+            <div class="wave-signal-item wave-signal-error"><code>zero [ERR]</code></div>
             <div class="wave-signal-item"><code>overflow</code></div>
             <div class="wave-signal-item"><code>carry</code></div>
           </div>
@@ -399,7 +399,7 @@
       <!-- Unhit Holes & AI Directed Test Generator -->
       <div class="card unhit-card">
         <div class="card-header">
-          <h2 class="card-title"><span>🎯</span> Coverage Holes & AI Directed Test Generator</h2>
+          <h2 class="card-title">Coverage Holes & AI Directed Test Generator</h2>
           <span class="card-badge badge-warning">9 Unhit Bins Remaining</span>
         </div>
         <div class="table-container">
@@ -421,7 +421,7 @@
                 <td><span class="text-red">0 hits</span></td>
                 <td>10 hits</td>
                 <td><span class="badge-tag red">UNHIT HOLE</span></td>
-                <td><button class="btn btn-emerald btn-xs" onclick="window.VeriSightApp.generateDirectedTest('REQ-ALU-007')">⚡ Generate SV Directed Seq</button></td>
+                <td><button class="btn btn-emerald btn-xs" onclick="window.VeriSightApp.generateDirectedTest('REQ-ALU-007')">Generate SV Directed Seq</button></td>
               </tr>
               <tr>
                 <td><code>REQ-ALU-012</code></td>
@@ -429,7 +429,7 @@
                 <td><span class="text-red">0 hits</span></td>
                 <td>5 hits</td>
                 <td><span class="badge-tag red">UNHIT HOLE</span></td>
-                <td><button class="btn btn-emerald btn-xs" onclick="window.VeriSightApp.generateDirectedTest('REQ-ALU-012')">⚡ Generate SV Directed Seq</button></td>
+                <td><button class="btn btn-emerald btn-xs" onclick="window.VeriSightApp.generateDirectedTest('REQ-ALU-012')">Generate SV Directed Seq</button></td>
               </tr>
             </tbody>
           </table>
