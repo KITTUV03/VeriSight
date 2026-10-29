@@ -1356,7 +1356,7 @@ def run_wizard():
         )
 
         info_panel = Panel(
-            "[dim]• Web UI: [bold cyan]./start serve[/bold cyan]   • Cloud: [bold cyan]./start edaplayground[/bold cyan]   • Air-Gap: [bold cyan]./start --airgap[/bold cyan][/dim]",
+            "[dim]• Web UI: [bold cyan]./start serve[/bold cyan]   • Cloud: [bold cyan]./start edaplayground[/bold cyan]   • DPO LoRA: [bold cyan]./start dpo[/bold cyan]   • Air-Gap: [bold cyan]./start --airgap[/bold cyan][/dim]",
             title="[bold cyan]⚡ QUICK UTILITIES & PLATFORM TOOLS[/bold cyan]",
             title_align="center",
             border_style="dim cyan",

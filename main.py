@@ -59,7 +59,7 @@ Examples:
             "start", "wizard", "train", "train-kb", "learn", "plan",
             "sim", "simulate", "serve", "server", "web", "cockpit", "ui",
             "export-edaplayground", "edaplayground", "edaplay",
-            "tb", "testbench", "gentb", "uvm",
+            "tb", "testbench", "gentb", "uvm", "dpo", "train-dpo",
         ],
         help="Optional command: 'start' (guided wizard), 'tb' (spec-driven testbench generation agent), 'plan' (verification plan architect), 'sim' (closed-loop simulation runner), 'serve' (live interactive web cockpit), or 'export-edaplayground' (bundle for EDA Playground cloud simulation)",
     )
@@ -279,6 +279,17 @@ Examples:
         action="store_true",
         help="Sanitize and mask proprietary module and signal identifiers before model ingestion for confidential IP protection.",
     )
+    parser.add_argument(
+        "--dpo",
+        action="store_true",
+        help="Enable Direct Preference Optimization (DPO) LoRA adapter for Workflow 2 verification planning",
+    )
+    parser.add_argument(
+        "--dpo-adapter",
+        type=str,
+        default="models/verisight_plan_dpo_adapter",
+        help="Path to trained DPO LoRA adapter directory (default: models/verisight_plan_dpo_adapter)",
+    )
 
     return parser.parse_args(args)
 
@@ -327,7 +338,7 @@ def validate_inputs(args) -> bool:
                 "the freshly generated simulation log will be used instead"
             )
     elif not any([args.spec, args.rtl, args.tb, args.log]):
-        if getattr(args, "command", None) in ("start", "wizard") or getattr(args, "interactive", False):
+        if getattr(args, "command", None) in ("start", "wizard", "train", "train-kb", "learn", "dpo", "train-dpo") or getattr(args, "interactive", False):
             return True
         console.print("[red]Error:[/red] At least one input must be provided (or run 'python main.py start' for interactive mode)")
         console.print("  Use --spec, --rtl, --tb, or --log")
@@ -467,6 +478,28 @@ def main():
     if args.command in ("train", "train-kb", "learn"):
         from verisight.rag.train_knowledge_base import train_knowledge_base
         train_knowledge_base()
+        return
+
+    # Handle 'dpo' command: Direct Preference Optimization Trainer
+    if args.command in ("dpo", "train-dpo"):
+        from verisight.dpo.dpo_trainer import train_dpo_lora, DEFAULT_MODEL, DEFAULT_DATASET, DEFAULT_OUTPUT_DIR
+        from verisight.dpo.preference_miner import VerificationPreferenceMiner
+
+        miner = VerificationPreferenceMiner()
+        stats = miner.get_statistics()
+        console.print(f"[bold cyan]🎯 VeriSight Workflow 2: DPO with LoRA Engine[/bold cyan]")
+        console.print(f"  • Preference Dataset: [yellow]{stats['dataset_path']}[/yellow] ({stats['total_pairs']} pairs)")
+        for cat, count in stats["categories"].items():
+            console.print(f"      - {cat}: {count} pairs")
+
+        adapter_path = Path(args.dpo_adapter) if hasattr(args, "dpo_adapter") and args.dpo_adapter else DEFAULT_OUTPUT_DIR
+        res = train_dpo_lora(
+            base_model_name=args.model or DEFAULT_MODEL,
+            dataset_path=DEFAULT_DATASET,
+            output_dir=adapter_path,
+            dry_run=True,
+        )
+        console.print(f"\n[bold green]✓ DPO Verification Adapter Ready at:[/] {adapter_path}")
         return
 
     # Handle 'sim' / 'simulate' command: One-Click Closed-Loop Runner

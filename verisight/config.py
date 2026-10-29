@@ -202,6 +202,34 @@ class FixConfig:
 
 
 @dataclass
+class DPOConfig:
+    """
+    Configuration for Direct Preference Optimization (DPO) with LoRA.
+    Allows Workflow 2 (Planning Engine) to utilize preference-aligned adapters.
+    """
+    enabled: bool = False
+    adapter_path: str = "models/verisight_plan_dpo_adapter"
+    beta: float = 0.1
+    dataset_path: str = "data/preferences/workflow2_dpo.jsonl"
+    lora_r: int = 16
+    lora_alpha: int = 32
+
+    def __post_init__(self):
+        env_enabled = os.getenv("VERISIGHT_DPO_ENABLED")
+        if env_enabled is not None:
+            self.enabled = env_enabled.lower() in ("1", "true", "yes")
+        env_adapter = os.getenv("VERISIGHT_DPO_ADAPTER_PATH")
+        if env_adapter:
+            self.adapter_path = env_adapter
+        env_beta = os.getenv("VERISIGHT_DPO_BETA")
+        if env_beta:
+            try:
+                self.beta = float(env_beta)
+            except ValueError:
+                pass
+
+
+@dataclass
 class VeriSightConfig:
     """Top-level configuration for the VeriSight framework."""
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -209,6 +237,7 @@ class VeriSightConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     xtracer: XTracerConfig = field(default_factory=XTracerConfig)
     fix: FixConfig = field(default_factory=FixConfig)
+    dpo: DPOConfig = field(default_factory=DPOConfig)
     log_level: str = ""
 
     def __post_init__(self):
