@@ -129,3 +129,4 @@ def test_config_dpo_integration():
     assert isinstance(cfg.dpo, DPOConfig)
     assert cfg.dpo.beta == 0.1
     assert cfg.dpo.lora_r == 16
+
