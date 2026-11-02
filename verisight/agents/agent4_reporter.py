@@ -290,6 +290,7 @@ class ReportGeneratorAgent(BaseAgent):
             "errors": knowledge.logs.errors[:10],
             "mismatches": knowledge.logs.scoreboard_mismatches[:10],
             "fix": fix_result,
+            "upf": knowledge.upf,
         }
 
     def _generate_markdown_report(self, context: dict) -> str:
@@ -428,6 +429,49 @@ class ReportGeneratorAgent(BaseAgent):
                 ])
                 for issue in rtl_analysis.lint.issues:
                     lines.append(f"- [{issue.issue_type}] {issue.description}")
+                lines.append("")
+
+        # Power-Aware Intent (UPF Analysis)
+        upf = context.get("upf")
+        if upf:
+            lines.extend([
+                "## Power-Aware Intent (UPF Analysis)",
+                "",
+                f"**Power Domains:** {len(upf.power_domains)} | **Power Switches:** {len(upf.power_switches)} | **Isolation Strategies:** {len(upf.isolation_strategies)} | **Retention Strategies:** {len(upf.retention_strategies)}",
+                "",
+            ])
+            if upf.power_domains:
+                lines.extend([
+                    "### Power Domains",
+                    "",
+                    "| Domain Name | Scope | Elements | Primary Power | Primary Ground |",
+                    "|-------------|-------|----------|---------------|----------------|",
+                ])
+                for pd in upf.power_domains:
+                    elems = ", ".join(pd.elements) if pd.elements else "(top/all)"
+                    lines.append(f"| `{pd.name}` | `{pd.scope or '.'}` | `{elems}` | `{pd.primary_power_net or 'VDD'}` | `{pd.primary_ground_net or 'VSS'}` |")
+                lines.append("")
+
+            if upf.domain_crossings:
+                lines.extend([
+                    "### Cross-Domain Boundary Signals",
+                    "",
+                    "| Signal | Source Domain | Destination Domain | Isolation Strategy | Status |",
+                    "|--------|---------------|--------------------|--------------------|--------|",
+                ])
+                for dc in upf.domain_crossings:
+                    iso_tag = f"`{dc.isolation_strategy}`" if dc.has_isolation else "**NONE (HAZARD)**"
+                    status_str = "PASS" if not dc.issues else "WARNING: Missing Isolation"
+                    lines.append(f"| `{dc.signal}` | `{dc.source_domain}` | `{dc.dest_domain}` | {iso_tag} | {status_str} |")
+                lines.append("")
+
+            if upf.validation_issues:
+                lines.extend([
+                    "### UPF Diagnostics & Verification Findings",
+                    "",
+                ])
+                for vi in upf.validation_issues:
+                    lines.append(f"- **[{vi.severity.upper()}]** ({vi.issue_type}): {vi.description}")
                 lines.append("")
 
         # Recommended Fixes
@@ -760,7 +804,8 @@ class ReportGeneratorAgent(BaseAgent):
                     """
 
                 fix_section_html = f"""
-                    <div class="fix-hero-card">
+                    <div class="fix-hero-card fix-recommendation">
+                        <h3 class="fix-title" style="margin: 0 0 12px; font-size:16px; color:var(--cyan); font-weight:700;">Fix Recommendation (Agent 5)</h3>
                         <div class="fix-status-banner status-pass">
                             <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct}
                         </div>
@@ -812,6 +857,53 @@ class ReportGeneratorAgent(BaseAgent):
                         </div>
                     </div>
                 """
+
+        # UPF Power Intent HTML Section
+        upf_obj = context.get("upf")
+        upf_tab_btn = ""
+        upf_section_html = ""
+        if upf_obj:
+            upf_tab_btn = '<button class="nav-tab-btn" onclick="switchTab(\'tab-upf\')">⚡ Power Intent (UPF)</button>'
+            dom_rows = ""
+            for pd in upf_obj.power_domains:
+                elems = ", ".join(pd.elements) if pd.elements else "(top/all)"
+                dom_rows += f"<tr><td><code>{pd.name}</code></td><td><code>{pd.scope or '.'}</code></td><td>{elems}</td><td><code>{pd.primary_power_net or 'VDD'}</code></td><td><code>{pd.primary_ground_net or 'VSS'}</code></td></tr>"
+
+            crossing_rows = ""
+            for dc in upf_obj.domain_crossings:
+                iso_badge = f'<span class="badge badge-success">{dc.isolation_strategy}</span>' if dc.has_isolation else '<span class="badge badge-error">UNISOLATED</span>'
+                crossing_rows += f"<tr><td><code>{dc.signal}</code></td><td>{dc.source_domain}</td><td>{dc.dest_domain}</td><td>{iso_badge}</td><td>{'<span class=\"badge badge-warn\">HAZARD</span>' if dc.issues else '<span class=\"badge badge-success\">PASS</span>'}</td></tr>"
+
+            diag_items = ""
+            for vi in upf_obj.validation_issues:
+                badge_cls = "badge-error" if vi.severity == "error" else "badge-warn"
+                diag_items += f'<div class="evidence-card" style="margin-bottom:8px;"><span class="badge {badge_cls}">[{vi.severity.upper()}] {vi.issue_type}</span> <span style="margin-left:8px;">{vi.description}</span></div>'
+
+            upf_section_html = f"""
+                <div class="rca-hero-card">
+                    <div class="card-title-row">
+                        <div class="card-title"><span>⚡</span> UPF Power Intent Architecture</div>
+                        <span class="badge badge-info">{len(upf_obj.power_domains)} Power Domains</span>
+                    </div>
+                    <div class="grid-2col" style="margin-top:16px;">
+                        <div>
+                            <h4>Power Domains & Hierarchy Mapping</h4>
+                            <table class="table-styled">
+                                <thead><tr><th>Domain</th><th>Scope</th><th>RTL Elements</th><th>Power</th><th>Ground</th></tr></thead>
+                                <tbody>{dom_rows if dom_rows else '<tr><td colspan="5">No domains</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h4>Boundary Signals & Isolation Checks ({len(upf_obj.domain_crossings)})</h4>
+                            <table class="table-styled">
+                                <thead><tr><th>Signal</th><th>Source</th><th>Dest</th><th>Isolation</th><th>Status</th></tr></thead>
+                                <tbody>{crossing_rows if crossing_rows else '<tr><td colspan="5">No cross-domain boundary signals</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {f'<h4 style="margin-top:20px;">UPF Power Diagnostics & Rule Checks</h4><div style="margin-top:10px;">{diag_items}</div>' if diag_items else ''}
+                </div>
+            """
 
         # Signals Badges
         signals_html = ""
@@ -1635,6 +1727,7 @@ class ReportGeneratorAgent(BaseAgent):
             <button class="nav-tab-btn" onclick="switchTab('tab-evidence')">⛓️ Evidence Chain ({len(report.evidence)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-reasoning')">🧠 Diagnostic Reasoning ({len(report.reasoning)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-fix')">🛠️ Automated Fix & Patch</button>
+            {upf_tab_btn}
             {f'<button class="nav-tab-btn" onclick="switchTab(\'tab-xtracer\')">🔬 Gate X-Tracer</button>' if xtracer_items else ''}
         </nav>
 
@@ -1703,6 +1796,8 @@ class ReportGeneratorAgent(BaseAgent):
         <div id="tab-fix" class="tab-pane">
             {fix_section_html}
         </div>
+
+        {f'<div id="tab-upf" class="tab-pane">{upf_section_html}</div>' if upf_obj else ''}
 
         {f'<div id="tab-xtracer" class="tab-pane">{xtracer_items}</div>' if xtracer_items else ''}
 
@@ -1929,6 +2024,10 @@ class ReportGeneratorAgent(BaseAgent):
                 },
                 verified=False,
             )
+            if hasattr(self.kb, "store_rtl_files") and knowledge.rtl:
+                self.kb.store_rtl_files(session_id, knowledge.rtl)
+            if hasattr(self.kb, "store_power_intent") and knowledge.upf:
+                self.kb.store_power_intent(session_id, knowledge.upf)
             self.logger.info(f"Session stored in RAG knowledge base (verified=False): {session_id}")
 
         except Exception as e:

@@ -633,6 +633,7 @@ def run_debug_flow(
     rtl_path: Optional[str] = None,
     tb_path: Optional[str] = None,
     log_path: Optional[str] = None,
+    upf_path: Optional[str] = None,
     output_dir: Optional[str] = None,
     airgap: bool = False,
     anonymize_rtl: bool = False,
@@ -645,7 +646,9 @@ def run_debug_flow(
     if not log_path:
         log_path = _prompt_path("Simulation Log file (.log)", required=True, default="")
     if not rtl_path:
-        rtl_path = _prompt_path("RTL Source directory or file (.sv, .v)", required=False, default="")
+        rtl_path = _prompt_path("RTL Source directory, file, or comma-separated list (.sv, .v, .vhd)", required=False, default="")
+    if upf_path is None:
+        upf_path = _prompt_path("UPF Power Intent file (.upf) [optional]", required=False, default="")
     if not tb_path:
         tb_path = _prompt_path("UVM Testbench directory or file (.sv)", required=False, default="")
     if not spec_path:
@@ -681,9 +684,18 @@ def run_debug_flow(
     console.print("\n[bold cyan]🚀 Launching VeriSight Debug Pipeline...[/bold cyan]\n")
     try:
         pipeline = VeriSightPipeline(config=config)
+        rtl_files = None
+        if rtl_path and "," in rtl_path:
+            rtl_files = [f.strip() for f in rtl_path.split(",") if f.strip()]
+            rtl_p = None
+        else:
+            rtl_p = rtl_path
+
         report = pipeline.run(
             spec_path=spec_path,
-            rtl_path=rtl_path,
+            rtl_path=rtl_p,
+            rtl_files=rtl_files,
+            upf_path=upf_path or None,
             tb_path=tb_path,
             log_path=log_path,
         )
@@ -724,6 +736,7 @@ def run_sim_flow(
     rtl_path: Optional[str] = None,
     tb_path: Optional[str] = None,
     spec_path: Optional[str] = None,
+    upf_path: Optional[str] = None,
     simulator: Optional[str] = None,
     output_dir: Optional[str] = None,
     airgap: bool = False,
@@ -740,9 +753,11 @@ def run_sim_flow(
     console.print(f"  [dim]Auto-detected system simulator:[/] [bold green]{detected_sim or 'None (fallback hints available)'}[/bold green]\n")
 
     if not rtl_path:
-        rtl_path = _prompt_path("RTL Source file or directory (.sv, .v)", required=True, default="examples/rtl/alu.sv")
+        rtl_path = _prompt_path("RTL Source file, directory, or comma-separated list (.sv, .v, .vhd)", required=True, default="examples/rtl/alu.sv")
     if not tb_path:
         tb_path = _prompt_path("Testbench file or directory (.sv, .v)", required=True, default="examples/tb/alu_tb.sv")
+    if upf_path is None:
+        upf_path = _prompt_path("UPF Power Intent file (.upf) [optional]", required=False, default="")
     if not spec_path:
         spec_path = _prompt_path("Design Specification document (.md) [optional]", required=False, default="examples/specs/alu_spec.md")
 
@@ -759,10 +774,12 @@ def run_sim_flow(
 
     console.print("\n[bold cyan]⚡ Launching Closed-Loop Flow...[/bold cyan]\n")
     try:
+        rtl_arg = [f.strip() for f in rtl_path.split(",") if f.strip()] if (rtl_path and "," in rtl_path) else rtl_path
         results = execute_closed_loop_flow(
-            rtl_path=rtl_path,
+            rtl_path=rtl_arg,
             tb_path=tb_path,
             spec_path=spec_path if spec_path else None,
+            upf_path=upf_path or None,
             output_dir=output_dir,
             simulator=simulator,
             airgap=airgap,

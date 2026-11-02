@@ -1079,3 +1079,318 @@ input[type="text"]:focus, select:focus {
 .text-red { color: var(--red-bright) !important; }
 .text-cyan { color: var(--cyan-bright) !important; }
 .text-emerald { color: var(--emerald-bright) !important; }
+
+/* ==========================================================================
+   Multi-File RTL & Optional UPF Upload & Mode Banner Styles
+   ========================================================================== */
+
+.analysis-mode-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  transition: var(--transition);
+}
+
+.analysis-mode-banner.mode-rtl {
+  background: rgba(0, 245, 155, 0.08);
+  border: 1px solid rgba(0, 245, 155, 0.25);
+}
+
+.analysis-mode-banner.mode-upf {
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.15);
+}
+
+.mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mode-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.mode-rtl .mode-title {
+  color: var(--emerald-bright);
+}
+
+.mode-upf .mode-title {
+  color: #c084fc;
+}
+
+.mode-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  padding: 0.85rem;
+  background: rgba(10, 14, 22, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-label {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tag-required {
+  font-size: 0.68rem;
+  background: rgba(255, 51, 102, 0.15);
+  color: var(--red-bright);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+.badge-count {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--cyan-bright);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+
+.badge-status {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border-radius: var(--radius-full);
+}
+
+.badge-status.active {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.file-dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  padding: 1.1rem;
+  text-align: center;
+  background: rgba(5, 7, 10, 0.4);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.file-dropzone:hover, .file-dropzone.drag-over {
+  border-color: var(--cyan-bright);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.upf-dropzone:hover, .upf-dropzone.drag-over {
+  border-color: var(--purple-bright);
+  background: rgba(168, 85, 247, 0.05);
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  pointer-events: none;
+}
+
+.dropzone-content button {
+  pointer-events: auto;
+}
+
+.dropzone-icon {
+  font-size: 1.5rem;
+}
+
+.dropzone-text {
+  font-size: 0.82rem;
+  color: var(--text-main);
+}
+
+.dropzone-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--cyan-bright);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.uploaded-files-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(20, 28, 45, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+.chip-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: var(--transition);
+}
+
+.btn-chip-remove:hover {
+  color: var(--red-bright);
+}
+
+.upf-file-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #fff;
+  margin-top: 0.3rem;
+}
+
+.path-fallback-row {
+  margin-top: 0.3rem;
+}
+
+.project-validation-card {
+  background: rgba(14, 18, 27, 0.95);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.val-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.val-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--cyan-bright);
+}
+
+.btn-val-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.val-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.val-stat {
+  background: rgba(7, 9, 14, 0.6);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.val-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  display: block;
+}
+
+.val-stat-val {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.val-issues-box {
+  margin-top: 0.5rem;
+}
+
+.val-issue-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.76rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.3rem;
+}
+
+.val-issue-row.warning {
+  background: rgba(255, 183, 3, 0.1);
+  color: #ffb703;
+  border-left: 3px solid #ffb703;
+}
+
+.val-issue-row.error {
+  background: rgba(255, 51, 102, 0.1);
+  color: #ff3366;
+  border-left: 3px solid #ff3366;
+}
+
+.val-issue-row.info {
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--cyan-bright);
+  border-left: 3px solid var(--cyan-bright);
+}

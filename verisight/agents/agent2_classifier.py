@@ -305,8 +305,27 @@ class RootCauseClassifierAgent(BaseAgent):
             tool_files += _re2.findall(r"([\w./\\-]+\.(?:sv|svh|v|vh))", te.text)
         analysis["tool_error_files"] = tool_files
 
+        # Check for UPF power-intent issues if UPF is present
+        analysis["power_issues"] = []
+        if knowledge.upf:
+            for issue in knowledge.upf.validation_issues:
+                if issue.severity == "error":
+                    analysis["power_issues"].append(f"[{issue.issue_type}] {issue.description}")
+            for cross in knowledge.upf.domain_crossings:
+                for c_issue in cross.issues:
+                    analysis["power_issues"].append(f"[boundary] {c_issue}")
+
+            log_text = " ".join(e.message for e in knowledge.logs.errors).lower()
+            power_keywords = ("isolation", "retention", "clamp", "power domain", "upf", "level shifter", "pst", "power_state")
+            if any(kw in log_text for kw in power_keywords):
+                analysis["power_log_hit"] = True
+                analysis["evidence"].append("Simulation log indicates power-aware/UPF defect")
+
         # Determine likely classification
-        if analysis["x_detected"] and analysis["reset_issues"]:
+        if analysis.get("power_log_hit") or (analysis.get("power_issues") and analysis["x_detected"]):
+            analysis["likely_classification"] = "RTL Bug"
+            analysis["likely_category"] = "Power Intent / UPF Violation"
+        elif analysis["x_detected"] and analysis["reset_issues"]:
             analysis["likely_classification"] = "RTL Bug"
             analysis["likely_category"] = "X Propagation"
         elif analysis["x_detected"]:
@@ -441,6 +460,25 @@ class RootCauseClassifierAgent(BaseAgent):
         elif knowledge.vcd:
             vcd_summary = f"VCD waveform unavailable: {knowledge.vcd.tool_message}"
 
+        # ── Power Intent (UPF) Summary (when UPF is provided) ─────────────
+        upf_summary = ""
+        if knowledge.upf:
+            upf_lines = [
+                f"Power Domains ({len(knowledge.upf.power_domains)}): {', '.join(d.name for d in knowledge.upf.power_domains)}",
+                f"Power Switches ({len(knowledge.upf.power_switches)}): {', '.join(s.name for s in knowledge.upf.power_switches)}",
+                f"Isolation Strategies ({len(knowledge.upf.isolation_strategies)}): {', '.join(i.name for i in knowledge.upf.isolation_strategies)}",
+                f"Retention Strategies ({len(knowledge.upf.retention_strategies)}): {', '.join(r.name for r in knowledge.upf.retention_strategies)}",
+                f"Cross-Domain Signals ({len(knowledge.upf.domain_crossings)}):",
+            ]
+            for c in knowledge.upf.domain_crossings[:8]:
+                iso_tag = f"iso={c.isolation_strategy}" if c.has_isolation else "NO_ISOLATION"
+                upf_lines.append(f"  - Signal '{c.signal}': {c.source_domain} -> {c.dest_domain} ({iso_tag})")
+            if knowledge.upf.validation_issues:
+                upf_lines.append(f"UPF Validation Diagnostics ({len(knowledge.upf.validation_issues)}):")
+                for vi in knowledge.upf.validation_issues[:5]:
+                    upf_lines.append(f"  - [{vi.severity.upper()}] {vi.description}")
+            upf_summary = "\n".join(upf_lines)
+
         # Pre-analysis findings
         pre_findings = "\n".join(pre_analysis.get("evidence", [])) or "No deterministic findings"
 
@@ -495,6 +533,9 @@ FAILURE STAGE: {stage}  (compile/elaboration → build failed before runtime)
 
 ═══ VCD WAVEFORM EVIDENCE ═══
 {vcd_summary or "No VCD waveform provided"}
+
+═══ UPF POWER INTENT (OPTIONAL) ═══
+{upf_summary or "No UPF power intent provided (RTL-only analysis)"}
 
 ═══ DETERMINISTIC PRE-ANALYSIS ═══
 {pre_findings}
@@ -628,6 +669,47 @@ Apply the 9 decision rules systematically. Include evidence chain and confidence
                 "Compilation Error" if stage == "compile" else "Elaboration Error",
                 conf, rtl_ref=rtl_ref, tb_ref=tb_ref,
                 fix=f"Resolve the {stage} error in {comp or 'the cited source file'} and re-run.",
+            )
+
+        # ── 1b) Power Intent / UPF Defect ──────────────────────────────────
+        if pre_analysis.get("likely_category") == "Power Intent / UPF Violation":
+            p_issues = pre_analysis.get("power_issues", [])
+            issue_desc = p_issues[0] if p_issues else "Signals crossing power domain boundary without isolation"
+            comp = knowledge.rtl.top_module or (knowledge.rtl.modules[0].name if knowledge.rtl.modules else "dut")
+            target_sig = ""
+            if knowledge.upf and knowledge.upf.domain_crossings:
+                for cr in knowledge.upf.domain_crossings:
+                    if cr.issues:
+                        target_sig = cr.signal
+                        comp = cr.source_module or comp
+                        break
+            extra_ev = [
+                EvidenceItem(
+                    source="upf",
+                    reference="UPF Domain Boundary Analysis",
+                    description=issue_desc,
+                )
+            ]
+            chain += [
+                ClassificationReasoning(
+                    step=1,
+                    observation="Power domain boundary crossing lacks required UPF isolation or level shifter strategy",
+                    inference=f"When power domain powers off, signal '{target_sig or 'cross_domain'}' floats/propagates X to destination domain",
+                    source="UPF/RTL cross-check"
+                )
+            ]
+            reason = (
+                f"Power-aware verification defect detected in UPF power intent: {issue_desc}. "
+                f"Floating signals crossing un-isolated power domain boundaries corrupt downstream logic."
+            )
+            fix_action = (
+                f"Add 'set_isolation' strategy in UPF with clamp_value for signal '{target_sig}' in domain '{comp}'."
+                if target_sig else "Add UPF isolation or level shifter strategy across domain boundary."
+            )
+            return finalize(
+                "RTL Bug", comp, reason, "Power Intent / UPF Violation",
+                85, rtl_ref=knowledge.rtl.modules[0].file if knowledge.rtl.modules else "",
+                fix=fix_action, extra_ev=extra_ev,
             )
 
         # ── 2) X propagation with an identified reset cause ─────────────────

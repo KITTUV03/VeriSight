@@ -182,16 +182,37 @@ def _filter_top_level_sources(sources: List[Path]) -> List[Path]:
     return top_level or sources  # never return an empty list
 
 
-def _collect_sources(rtl_path: str, tb_path: str) -> "tuple[List[Path], List[Path]]":
+def _collect_sources(rtl_path: Any, tb_path: Any) -> "tuple[List[Path], List[Path]]":
     """Returns (top_level_sources_to_compile, all_discovered_files_for_include_dirs)."""
-    rtl_files = discover_files(Path(rtl_path), RTL_EXTENSIONS) if rtl_path else []
-    tb_files = discover_files(Path(tb_path), TB_EXTENSIONS) if tb_path else []
+    rtl_items = rtl_path if isinstance(rtl_path, (list, tuple, set)) else ([rtl_path] if rtl_path else [])
+    rtl_files = []
+    for item in rtl_items:
+        p = Path(item)
+        if p.is_dir():
+            rtl_files.extend(discover_files(p, RTL_EXTENSIONS))
+        elif p.is_file() or p.suffix.lower() in RTL_EXTENSIONS:
+            rtl_files.append(p)
+        elif str(item):
+            rtl_files.extend(discover_files(p, RTL_EXTENSIONS))
+
+    tb_items = tb_path if isinstance(tb_path, (list, tuple, set)) else ([tb_path] if tb_path else [])
+    tb_files = []
+    for item in tb_items:
+        p = Path(item)
+        if p.is_dir():
+            tb_files.extend(discover_files(p, TB_EXTENSIONS))
+        elif p.is_file() or p.suffix.lower() in TB_EXTENSIONS:
+            tb_files.append(p)
+        elif str(item):
+            tb_files.extend(discover_files(p, TB_EXTENSIONS))
+
     # Preserve order, drop duplicates (rtl/tb paths could overlap).
     seen = set()
     ordered = []
     for f in [*rtl_files, *tb_files]:
-        if f not in seen:
-            seen.add(f)
+        rf = f.resolve() if f.exists() else f
+        if rf not in seen:
+            seen.add(rf)
             ordered.append(f)
     return _filter_top_level_sources(ordered), ordered
 
@@ -507,9 +528,10 @@ def run_simulation(
 
 
 def execute_closed_loop_flow(
-    rtl_path: str,
-    tb_path: str,
+    rtl_path: Any,
+    tb_path: Any,
     spec_path: Optional[str] = None,
+    upf_path: Optional[Any] = None,
     simulator: str = "auto",
     top_module: str = "",
     uvm_home: str = "",
@@ -522,6 +544,7 @@ def execute_closed_loop_flow(
     anonymize_rtl: bool = False,
     local_endpoint: str = "",
     launch_browser: bool = False,
+    **kwargs,
 ) -> Dict[str, Any]:
     """
     Unified One-Click Closed-Loop Simulation Runner:
@@ -590,11 +613,21 @@ def execute_closed_loop_flow(
     # Step 2: Root-Cause Analysis Pipeline
     logger.info("Step 2: Launching Autonomous Debug Analysis Engine...")
     pipeline = VeriSightPipeline(config=cfg)
+    
+    rtl_p = rtl_path if isinstance(rtl_path, str) else None
+    rtl_files_list = rtl_path if isinstance(rtl_path, list) else None
+    upf_p = upf_path if isinstance(upf_path, str) else None
+    upf_files_list = upf_path if isinstance(upf_path, list) else None
+
     debug_report = pipeline.run(
         log_path=str(sim_res.log_path),
-        rtl_path=rtl_path,
+        rtl_path=rtl_p,
+        rtl_files=rtl_files_list,
+        upf_path=upf_p,
+        upf_files=upf_files_list,
+        top_module=top_module or sim_res.top_module,
         spec_path=spec_path,
-        tb_path=tb_path,
+        tb_path=tb_path if isinstance(tb_path, str) else None,
         vcd_path=str(sim_res.vcd_path) if sim_res.vcd_path.exists() else None,
         coverage_path=str(sim_res.coverage_path) if sim_res.coverage_path and sim_res.coverage_path.exists() else None,
     )

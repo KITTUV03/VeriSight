@@ -13,6 +13,7 @@ from verisight.schemas.rtl_schema import RTLKnowledge
 from verisight.schemas.tb_schema import TBKnowledge
 from verisight.schemas.log_schema import LogKnowledge
 from verisight.schemas.vcd_schema import VCDData
+from verisight.schemas.upf_schema import UPFKnowledge
 
 
 class CoverageData(BaseModel):
@@ -87,6 +88,10 @@ class UnifiedKnowledge(BaseModel):
     rag_context: Optional[RAGContext] = Field(
         default=None,
         description="Context from RAG knowledge base"
+    )
+    upf: Optional[UPFKnowledge] = Field(
+        default=None,
+        description="Optional UPF power-intent knowledge"
     )
     input_files: Dict[str, List[str]] = Field(
         default_factory=dict,

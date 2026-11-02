@@ -286,6 +286,46 @@ class MiscResult(BaseModel):
     summary: str = Field(default="", description="Human-readable summary")
 
 
+# ─── Module 8: Power-Aware Intent Analysis ─────────────────────────
+
+class PowerIntentIssue(BaseModel):
+    """An issue identified during power-aware intent analysis."""
+    issue_type: str = Field(
+        description="Type: unisolated_crossing/missing_level_shifter/retention_hazard/power_state_violation/domain_mismatch"
+    )
+    severity: str = Field(description="Severity: critical/high/medium/low")
+    description: str = Field(description="Description of the power-aware defect")
+    source_domain: str = Field(default="", description="Source power domain")
+    dest_domain: str = Field(default="", description="Destination power domain")
+    signal: str = Field(default="", description="Associated signal or register")
+    module: str = Field(default="", description="Associated module")
+    file: str = Field(default="", description="Source file")
+    line_number: int = Field(default=0, description="Source line number")
+    recommendation: str = Field(default="", description="Recommended mitigation")
+
+
+class PowerIntentResult(BaseModel):
+    """Power-Aware Intent analysis results (power_intent.json)."""
+    power_domains: List[str] = Field(
+        default_factory=list,
+        description="Active power domains"
+    )
+    domain_crossings_count: int = Field(
+        default=0,
+        description="Total cross-domain signals analyzed"
+    )
+    issues: List[PowerIntentIssue] = Field(
+        default_factory=list,
+        description="All power-aware issues identified"
+    )
+    unisolated_crossings_count: int = Field(default=0)
+    missing_level_shifters_count: int = Field(default=0)
+    retention_hazards_count: int = Field(default=0)
+    invalid_power_states_count: int = Field(default=0)
+    severity: str = Field(default="none", description="Overall power severity: none/low/medium/high/critical")
+    summary: str = Field(default="", description="Executive summary of power-aware analysis")
+
+
 # ─── Aggregated RTL Analysis ───────────────────────────────────────
 
 class RTLAnalysis(BaseModel):
@@ -320,6 +360,10 @@ class RTLAnalysis(BaseModel):
     misc: MiscResult = Field(
         default_factory=MiscResult,
         description="Miscellaneous analysis"
+    )
+    power_intent: Optional[PowerIntentResult] = Field(
+        default=None,
+        description="Power-aware intent analysis (when UPF provided)"
     )
     primary_root_cause: str = Field(
         default="",

@@ -142,6 +142,10 @@ class RTLModule(BaseModel):
     )
     raw_source: str = Field(default="", description="Complete module source code")
     line_count: int = Field(default=0, description="Total lines in source file")
+    is_interface: bool = Field(default=False, description="Whether this is a SystemVerilog interface")
+    is_package: bool = Field(default=False, description="Whether this is a SystemVerilog package")
+    package_imports: List[str] = Field(default_factory=list, description="Imported package names")
+    includes: List[str] = Field(default_factory=list, description="Included header files")
 
 
 class RTLKnowledge(BaseModel):
@@ -159,4 +163,24 @@ class RTLKnowledge(BaseModel):
     global_issues: List[str] = Field(
         default_factory=list,
         description="Issues detected across the entire RTL codebase"
+    )
+    packages: List[str] = Field(
+        default_factory=list,
+        description="List of declared SystemVerilog packages"
+    )
+    interfaces: List[str] = Field(
+        default_factory=list,
+        description="List of declared SystemVerilog interfaces"
+    )
+    compilation_order: List[str] = Field(
+        default_factory=list,
+        description="Resolved compilation order of source files"
+    )
+    missing_dependencies: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Missing cross-file dependencies (modules, packages, headers)"
+    )
+    top_candidates: List[str] = Field(
+        default_factory=list,
+        description="All detected top-level module candidates"
     )

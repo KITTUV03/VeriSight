@@ -27,6 +27,7 @@ from verisight.schemas.rtl_analysis import (
     StructuralResult, StructuralIssue,
     ProtocolResult, ProtocolIssue,
     MiscResult, MiscIssue,
+    PowerIntentResult, PowerIntentIssue,
 )
 from verisight.tools import yosys_runner, xtracer_runner
 from verisight.tools.xtracer_runner import XTracerNotFoundError
@@ -116,6 +117,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
         # Module 7: Misc Analyzer
         self.logger.info("Module 7: Miscellaneous Analysis")
         analysis.misc = self._analyze_misc(knowledge)
+
+        # Module 8: Power-Aware Intent Analysis (UPF - Optional)
+        if knowledge.upf:
+            self.logger.info("Module 8: Power-Aware Intent Analysis (UPF)")
+            analysis.power_intent = self._analyze_power_intent(knowledge)
+        else:
+            self.logger.info("Module 8: Skipped Power-Aware Analysis (RTL-only run)")
 
         # Determine primary root cause
         analysis = self._determine_primary_root_cause(analysis, classification)
@@ -624,6 +632,100 @@ class RTLRootCauseAnalyzer(BaseAgent):
         self.logger.info(f"  → Misc: {len(result.issues)} issues")
         return result
 
+    # ─── Module 8: Power-Aware Intent Analyzer ─────────────────────
+
+    def _analyze_power_intent(self, knowledge: UnifiedKnowledge) -> PowerIntentResult:
+        """Analyze UPF power-intent, power domain boundary crossings, isolation, and retention."""
+        result = PowerIntentResult()
+        upf = knowledge.upf
+        if not upf:
+            return result
+
+        result.power_domains = [d.name for d in upf.power_domains]
+        result.domain_crossings_count = len(upf.domain_crossings)
+
+        # 1. Check un-isolated crossings from switchable domains
+        for cross in upf.domain_crossings:
+            if not cross.has_isolation and any(sw.domain == cross.source_domain for sw in upf.power_switches):
+                result.unisolated_crossings_count += 1
+                result.issues.append(PowerIntentIssue(
+                    issue_type="unisolated_crossing",
+                    severity="critical",
+                    description=(
+                        f"Signal '{cross.signal}' crosses from switchable domain '{cross.source_domain}' "
+                        f"to '{cross.dest_domain}' without an isolation strategy clamp."
+                    ),
+                    source_domain=cross.source_domain,
+                    dest_domain=cross.dest_domain,
+                    signal=cross.signal,
+                    module=cross.source_module,
+                    recommendation=f"Define 'set_isolation' on domain '{cross.source_domain}' targeting signal '{cross.signal}'.",
+                ))
+
+            # 2. Check missing level shifters
+            if not cross.has_level_shifter and cross.issues:
+                for iss in cross.issues:
+                    if "level" in iss.lower():
+                        result.missing_level_shifters_count += 1
+                        result.issues.append(PowerIntentIssue(
+                            issue_type="missing_level_shifter",
+                            severity="high",
+                            description=iss,
+                            source_domain=cross.source_domain,
+                            dest_domain=cross.dest_domain,
+                            signal=cross.signal,
+                            module=cross.source_module,
+                            recommendation="Add 'set_level_shifter' strategy between domains.",
+                        ))
+
+        # 3. Retention hazards and validation issues
+        for vi in upf.validation_issues:
+            if vi.issue_type == "retention_hazard":
+                result.retention_hazards_count += 1
+                result.issues.append(PowerIntentIssue(
+                    issue_type="retention_hazard",
+                    severity="high" if vi.severity == "error" else "medium",
+                    description=vi.description,
+                    recommendation="Specify retention strategy with save_signal and restore_signal.",
+                ))
+            elif vi.issue_type == "pst_violation":
+                result.invalid_power_states_count += 1
+                result.issues.append(PowerIntentIssue(
+                    issue_type="power_state_violation",
+                    severity="high",
+                    description=vi.description,
+                    recommendation="Update Power State Table to include valid state combinations.",
+                ))
+            elif vi.issue_type == "missing_element":
+                result.issues.append(PowerIntentIssue(
+                    issue_type="domain_mismatch",
+                    severity="critical" if vi.severity == "error" else "medium",
+                    description=vi.description,
+                    recommendation="Align UPF domain -elements with actual RTL module hierarchy.",
+                ))
+
+        # Determine severity and summary
+        if any(i.severity == "critical" for i in result.issues):
+            result.severity = "critical"
+        elif any(i.severity == "high" for i in result.issues):
+            result.severity = "high"
+        elif result.issues:
+            result.severity = "medium"
+        else:
+            result.severity = "none"
+
+        summary_parts = [
+            f"Power intent: {len(result.power_domains)} domains",
+            f"{result.domain_crossings_count} cross-domain signal(s)",
+            f"{len(result.issues)} power-aware defect(s)",
+        ]
+        if result.unisolated_crossings_count:
+            summary_parts.append(f"{result.unisolated_crossings_count} un-isolated crossing(s)")
+        result.summary = ", ".join(summary_parts)
+
+        self.logger.info(f"  → Power-Aware: {len(result.issues)} issues, severity={result.severity}")
+        return result
+
     # ─── Primary Root Cause Determination ──────────────────────────
 
     def _determine_primary_root_cause(
@@ -631,8 +733,12 @@ class RTLRootCauseAnalyzer(BaseAgent):
     ) -> RTLAnalysis:
         """Determine the primary root cause across all sub-modules."""
 
-        # Priority order: X-Trace > Functional > CDC > Lint > Structural > Protocol > Misc
-        if analysis.xtrace.severity in ("critical", "high"):
+        # Priority order: Power-Intent (if critical/high) > X-Trace > Functional > CDC > Lint > Structural > Protocol > Misc
+        if analysis.power_intent and analysis.power_intent.severity in ("critical", "high"):
+            analysis.primary_root_cause = analysis.power_intent.summary
+            analysis.primary_category = "Power Intent / UPF Violation"
+            analysis.confidence = 90
+        elif analysis.xtrace.severity in ("critical", "high"):
             analysis.primary_root_cause = analysis.xtrace.summary
             analysis.primary_category = "X Propagation"
             analysis.confidence = 95 if analysis.xtrace.severity == "critical" else 85

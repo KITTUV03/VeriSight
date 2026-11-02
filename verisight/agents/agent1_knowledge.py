@@ -8,7 +8,7 @@ Builds the UnifiedKnowledge (knowledge.json) passed to Agent 2.
 """
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union, Dict, Any
 from datetime import datetime
 
 from verisight.agents.base_agent import BaseAgent
@@ -18,6 +18,7 @@ from verisight.parsers.uvm_parser import parse_uvm
 from verisight.parsers.log_parser import parse_log
 from verisight.parsers.coverage_parser import parse_coverage
 from verisight.parsers.vcd_parser import parse_vcd
+from verisight.parsers.upf_parser import parse_upf
 from verisight.schemas.knowledge_schema import UnifiedKnowledge, RAGContext
 from verisight.rag.knowledge_base import KnowledgeBase
 from verisight.rag.retriever import Retriever
@@ -59,23 +60,31 @@ class KnowledgeExtractionAgent(BaseAgent):
     def execute(
         self,
         spec_path: Optional[str] = None,
-        rtl_path: Optional[str] = None,
+        rtl_path: Optional[Union[str, List[str]]] = None,
         tb_path: Optional[str] = None,
         log_path: Optional[str] = None,
         coverage_path: Optional[str] = None,
         vcd_path: Optional[str] = None,
+        upf_path: Optional[Union[str, List[str]]] = None,
+        rtl_files: Optional[List[str]] = None,
+        upf_files: Optional[List[str]] = None,
+        top_module: Optional[str] = None,
     ) -> UnifiedKnowledge:
         """
         Execute knowledge extraction from all available inputs.
 
         Args:
             spec_path: Path to design specification (.md).
-            rtl_path: Path to RTL source file(s) or directory.
+            rtl_path: Path to RTL source file(s), directory, or list of files.
             tb_path: Path to UVM testbench file(s) or directory.
             log_path: Path to simulation log file.
             coverage_path: Optional path to coverage report.
             vcd_path: Optional path to a simulation waveform (VCD), either
                 user-supplied or produced internally by --simulate.
+            upf_path: Optional path to UPF power-intent file(s) or directory.
+            rtl_files: Optional explicit list of RTL file paths.
+            upf_files: Optional explicit list of UPF file paths.
+            top_module: Optional top-level module name override.
 
         Returns:
             UnifiedKnowledge containing all parsed and enriched knowledge.
@@ -105,18 +114,42 @@ class KnowledgeExtractionAgent(BaseAgent):
         else:
             self.logger.warning("No specification provided")
 
-        # ─── Step 2: Parse RTL ────────────────────────────────────
-        if rtl_path:
-            self.logger.info(f"Step 2: Parsing RTL: {rtl_path}")
-            knowledge.rtl = parse_rtl(rtl_path)
+        # ─── Step 2: Parse RTL Project ────────────────────────────
+        if rtl_path or rtl_files:
+            target_desc = str(rtl_path) if rtl_path else f"{len(rtl_files)} files"
+            self.logger.info(f"Step 2: Parsing RTL: {target_desc}")
+            knowledge.rtl = parse_rtl(path=rtl_path, files=rtl_files, top_module=top_module)
             knowledge.input_files["rtl"] = knowledge.rtl.file_list
             self.logger.info(
-                f"  → {len(knowledge.rtl.modules)} modules, "
-                f"{knowledge.rtl.total_lines} lines, "
+                f"  → {len(knowledge.rtl.modules)} modules ({len(knowledge.rtl.packages)} pkgs), "
+                f"{knowledge.rtl.total_lines} lines across {len(knowledge.rtl.file_list)} files, "
                 f"top={knowledge.rtl.top_module}"
             )
         else:
             self.logger.warning("No RTL provided")
+
+        # ─── Step 2b: Parse UPF Power Intent (Optional) ───────────
+        if upf_path or upf_files:
+            target_upf = str(upf_path) if upf_path else f"{len(upf_files)} files"
+            self.logger.info(f"Step 2b: Parsing UPF Power Intent: {target_upf}")
+            knowledge.upf = parse_upf(
+                path=upf_path,
+                files=upf_files,
+                rtl_knowledge=knowledge.rtl,
+            )
+            knowledge.input_files["upf"] = knowledge.upf.file_list
+            self.logger.info(
+                f"  → {len(knowledge.upf.power_domains)} domains, "
+                f"{len(knowledge.upf.power_switches)} switches, "
+                f"{len(knowledge.upf.isolation_strategies)} isolation strats, "
+                f"{len(knowledge.upf.domain_crossings)} crossings"
+            )
+            if knowledge.upf.validation_issues:
+                self.logger.warning(
+                    f"  → UPF Diagnostics: {len(knowledge.upf.validation_issues)} validation issues detected"
+                )
+        else:
+            self.logger.info("Step 2b: No UPF power intent provided (RTL-only mode)")
 
         # ─── Step 3: Parse UVM Testbench ──────────────────────────
         if tb_path:
@@ -180,6 +213,8 @@ class KnowledgeExtractionAgent(BaseAgent):
         self.logger.info("Agent 1: Knowledge Extraction Complete")
         self.logger.info(f"  Spec requirements: {len(knowledge.spec.functional_requirements)}")
         self.logger.info(f"  RTL modules: {len(knowledge.rtl.modules)}")
+        if knowledge.upf:
+            self.logger.info(f"  UPF power domains: {len(knowledge.upf.power_domains)} ({len(knowledge.upf.domain_crossings)} crossings)")
         self.logger.info(f"  TB drivers: {len(knowledge.tb.drivers)}")
         self.logger.info(f"  Log errors: {knowledge.logs.summary.total_errors}")
         self.logger.info(f"  Simulation: {knowledge.logs.summary.pass_fail}")

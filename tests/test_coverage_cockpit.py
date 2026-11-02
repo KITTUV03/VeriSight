@@ -188,7 +188,7 @@ class TestCoverageCockpit(unittest.TestCase):
             html_out = tmp_path / "verification_plan.html"
             export_html(updated_report, html_out)
 
-            html_text = html_out.read_text()
+            html_text = html_out.read_text(encoding="utf-8")
             self.assertIn("Live Coverage Cockpit", html_text)
             self.assertIn("50.0% Hit", html_text)
             self.assertIn("bin_add_overflow", html_text)

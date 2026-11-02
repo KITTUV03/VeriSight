@@ -18,8 +18,9 @@ logger = get_logger("file_utils")
 T = TypeVar("T", bound=BaseModel)
 
 # File extensions for each input category
-RTL_EXTENSIONS = {".sv", ".v", ".svh", ".vh"}
+RTL_EXTENSIONS = {".sv", ".v", ".svh", ".vh", ".vhd", ".vhdl"}
 TB_EXTENSIONS = {".sv", ".svh", ".v", ".vh"}
+UPF_EXTENSIONS = {".upf"}
 LOG_EXTENSIONS = {".log", ".txt", ".rpt"}
 SPEC_EXTENSIONS = {".md", ".txt", ".rst", ".pdf"}
 COVERAGE_EXTENSIONS = {".rpt", ".txt", ".ucdb", ".xml"}

@@ -30,6 +30,7 @@ COLLECTIONS = [
     "assertions",
     "coverage",
     "lessons_learned",
+    "power_intent",
 ]
 
 
@@ -224,6 +225,90 @@ class KnowledgeBase:
             return True
         except Exception as e:
             logger.error(f"Failed to store pattern: {e}")
+            return False
+
+    def store_rtl_files(
+        self,
+        session_id: str,
+        rtl_knowledge: Any,
+    ) -> bool:
+        """
+        Index individual RTL files from a project into the knowledge base,
+        retaining file-level metadata and module boundaries.
+        """
+        rtl_col = self.get_collection("rtl")
+        if not rtl_col:
+            return False
+
+        try:
+            docs = []
+            ids = []
+            metas = []
+            for m in getattr(rtl_knowledge, "modules", []):
+                doc_text = (
+                    f"Module: {m.name}\n"
+                    f"File: {Path(m.file).name}\n"
+                    f"Ports: {', '.join(p.name for p in m.ports)}\n"
+                    f"Parameters: {', '.join(p.name for p in m.parameters)}\n"
+                    f"Imports: {', '.join(m.package_imports)}\n"
+                    f"Code Snippet:\n{m.raw_source[:1500]}"
+                )
+                doc_id = f"{session_id}_rtl_{Path(m.file).stem}_{m.name}"
+                docs.append(doc_text)
+                ids.append(doc_id)
+                metas.append({
+                    "session_id": session_id,
+                    "module": m.name,
+                    "filename": Path(m.file).name,
+                    "filepath": str(m.file),
+                    "is_package": str(getattr(m, "is_package", False)),
+                    "is_interface": str(getattr(m, "is_interface", False)),
+                    "top_module": getattr(rtl_knowledge, "top_module", ""),
+                    "line_count": str(m.line_count),
+                })
+
+            if docs:
+                rtl_col.upsert(documents=docs, ids=ids, metadatas=metas)
+                logger.info(f"Indexed {len(docs)} RTL module document(s) for session {session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store RTL files in knowledge base: {e}")
+            return False
+
+    def store_power_intent(
+        self,
+        session_id: str,
+        upf_knowledge: Any,
+    ) -> bool:
+        """
+        Index UPF power-intent information into the knowledge base.
+        """
+        upf_col = self.get_collection("power_intent")
+        if not upf_col:
+            return False
+
+        try:
+            doc_text = (
+                f"UPF Power Intent Summary:\n{getattr(upf_knowledge, 'summary', '')}\n"
+                f"Domains: {', '.join(d.name for d in getattr(upf_knowledge, 'power_domains', []))}\n"
+                f"Switches: {', '.join(s.name for s in getattr(upf_knowledge, 'power_switches', []))}\n"
+                f"Isolation: {', '.join(i.name for i in getattr(upf_knowledge, 'isolation_strategies', []))}\n"
+                f"Retention: {', '.join(r.name for r in getattr(upf_knowledge, 'retention_strategies', []))}"
+            )
+            upf_col.upsert(
+                documents=[doc_text],
+                ids=[f"{session_id}_upf"],
+                metadatas=[{
+                    "session_id": session_id,
+                    "domain_count": str(len(getattr(upf_knowledge, 'power_domains', []))),
+                    "crossing_count": str(len(getattr(upf_knowledge, 'domain_crossings', []))),
+                    "is_valid": str(getattr(upf_knowledge, 'is_valid', True)),
+                }]
+            )
+            logger.info(f"Indexed UPF power intent for session {session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store UPF power intent: {e}")
             return False
 
     def store_document(
