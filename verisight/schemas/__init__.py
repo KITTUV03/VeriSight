@@ -10,3 +10,4 @@ from verisight.schemas.rtl_analysis import *
 from verisight.schemas.fix_schema import *
 from verisight.schemas.upf_schema import *
 from verisight.schemas.report_schema import *
+from verisight.schemas.spec_driven_tb_schema import *

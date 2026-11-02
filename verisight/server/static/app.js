@@ -107,8 +107,8 @@
   function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚡';
-    toast.innerHTML = `<span style="color:var(--cyan-bright);">${icon}</span> <span>${message}</span>`;
+    const icon = type === 'success' ? '[OK]' : type === 'error' ? '[ERR]' : '[INFO]';
+    toast.innerHTML = `<span style="color:var(--cyan-bright);font-weight:700;margin-right:6px;">${icon}</span> <span>${message}</span>`;
     els.toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -423,6 +423,7 @@
     logTerminal(`[INFO] Simulator:   ${simulator.toUpperCase()}`);
     logTerminal(`[INFO] Security:    ${sec === 'airgap' ? '🛡️ Sovereign Air-Gap (Local)' : 'Cloud API'}`);
 
+
     try {
       const res = await fetch('/api/sim', {
         method: 'POST',
@@ -510,7 +511,7 @@
     } finally {
       els.btnLaunchSim.disabled = false;
       els.simSpinner.style.display = 'none';
-      els.btnSimText.textContent = '🚀 Launch Closed-Loop Simulation';
+      els.btnSimText.textContent = 'Launch Closed-Loop Simulation';
     }
   }
 
@@ -594,7 +595,7 @@
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', x + 4);
       text.setAttribute('y', 24);
-      text.setAttribute('fill', '#8b9bb4');
+      text.setAttribute('fill', '#93a395');
       text.setAttribute('font-size', '10');
       text.setAttribute('font-family', 'var(--font-mono)');
       text.textContent = `${Math.round(tPs / 1000)}ns`;
@@ -614,7 +615,7 @@
       rowLine.setAttribute('y1', yBase + rowHeight);
       rowLine.setAttribute('x2', width);
       rowLine.setAttribute('y2', yBase + rowHeight);
-      rowLine.setAttribute('stroke', 'rgba(255, 255, 255, 0.03)');
+      rowLine.setAttribute('stroke', 'rgba(244, 239, 230, 0.04)');
       svg.appendChild(rowLine);
 
       if (sig.is_bus) {
@@ -630,7 +631,7 @@
           const valText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           valText.setAttribute('x', x + 12);
           valText.setAttribute('y', midY + 4);
-          valText.setAttribute('fill', tr.v.includes('x') ? '#ff3366' : '#00e5ff');
+          valText.setAttribute('fill', tr.v.includes('x') ? '#bf2b4c' : '#f4efe6');
           valText.setAttribute('font-size', '10');
           valText.setAttribute('font-family', 'var(--font-mono)');
           valText.textContent = tr.v;
@@ -640,7 +641,7 @@
         pathD += `L ${width} ${midY}`;
         const busPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         busPath.setAttribute('d', pathD);
-        busPath.setAttribute('stroke', sig.name.includes('result') ? '#ff3366' : '#00e5ff');
+        busPath.setAttribute('stroke', sig.name.includes('result') ? '#bf2b4c' : '#c2cfc3');
         busPath.setAttribute('stroke-width', '1.5');
         busPath.setAttribute('fill', 'none');
         svg.appendChild(busPath);
@@ -664,7 +665,7 @@
 
         const wavePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wavePath.setAttribute('d', pathD);
-        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#ff3366' : '#00f59b');
+        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#bf2b4c' : '#93a395');
         wavePath.setAttribute('stroke-width', '1.75');
         wavePath.setAttribute('fill', 'none');
         svg.appendChild(wavePath);
@@ -678,7 +679,7 @@
     failLine.setAttribute('y1', 0);
     failLine.setAttribute('x2', failX);
     failLine.setAttribute('y2', totalHeight);
-    failLine.setAttribute('stroke', '#ff3366');
+    failLine.setAttribute('stroke', '#bf2b4c');
     failLine.setAttribute('stroke-width', '2');
     failLine.setAttribute('stroke-dasharray', '4,2');
     svg.appendChild(failLine);
@@ -686,11 +687,11 @@
     const failTag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     failTag.setAttribute('x', failX + 6);
     failTag.setAttribute('y', 36);
-    failTag.setAttribute('fill', '#ff3366');
+    failTag.setAttribute('fill', '#bf2b4c');
     failTag.setAttribute('font-size', '10');
     failTag.setAttribute('font-weight', 'bold');
     failTag.setAttribute('font-family', 'var(--font-mono)');
-    failTag.textContent = '⚡ FAILURE POINT (Cycle 1 / 15ns)';
+    failTag.textContent = '[FAIL] FAILURE POINT (Cycle 1 / 15ns)';
     svg.appendChild(failTag);
   }
 
@@ -714,7 +715,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to apply patch');
 
-      els.patchStatusText.textContent = `✓ Patch applied to ${data.target}. Backup: ${data.backup}`;
+      els.patchStatusText.textContent = `[OK] Patch applied to ${data.target}. Backup: ${data.backup}`;
       els.patchStatusText.style.color = 'var(--emerald-bright)';
       els.btnRevertFix.style.display = 'inline-flex';
       showToast(data.message, 'success');
@@ -766,7 +767,7 @@
         card.style.marginBottom = '1rem';
         card.innerHTML = `
           <div class="card-header">
-            <h2 class="card-title"><span>📂</span> ${run.id}</h2>
+            <h2 class="card-title">[RUN] ${run.id}</h2>
             <span class="card-badge ${run.confidence > 0 ? '' : 'badge-tag green'}">${run.classification}</span>
           </div>
           <p class="diag-text" style="margin-bottom:0.75rem;">${run.root_cause || 'Simulation & analysis run'}</p>
@@ -775,7 +776,7 @@
             <div style="display:flex; gap:0.5rem;">
               ${run.report_url ? `<a href="${run.report_url}" target="_blank" class="btn btn-secondary btn-xs">Open Report HTML</a>` : ''}
               ${run.plan_url ? `<a href="${run.plan_url}" target="_blank" class="btn btn-secondary btn-xs">Open Plan HTML</a>` : ''}
-              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">⚡ Inspect in Cockpit</button>
+              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">Inspect in Cockpit</button>
             </div>
           </div>
         `;
@@ -826,7 +827,7 @@
     generateDirectedTest: function (reqId) {
       showToast(`Generating SystemVerilog directed sequence for ${reqId}...`, 'info');
       setTimeout(() => {
-        showToast(`✓ Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
+        showToast(`[OK] Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
       }, 1200);
     },
     loadRunIntoCockpit: loadRunIntoCockpit,

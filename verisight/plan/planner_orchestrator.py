@@ -11,6 +11,7 @@ Coordinates the end-to-end verification planning pipeline:
 """
 
 import os
+import re
 import json
 import uuid
 from datetime import datetime
@@ -36,6 +37,19 @@ from verisight.utils.logger import get_logger
 logger = get_logger("plan.orchestrator")
 
 
+def _parse_width(w: Any) -> int:
+    if isinstance(w, int):
+        return max(1, w)
+    if isinstance(w, str):
+        m = re.search(r"\[?(\d+)\s*:\s*(\d+)\]?", w)
+        if m:
+            return max(1, abs(int(m.group(1)) - int(m.group(2))) + 1)
+        m_num = re.search(r"\d+", w)
+        if m_num:
+            return max(1, int(m_num.group(0)))
+    return 1
+
+
 class VeriSightPlanner:
     """End-to-end autonomous Verification & Architecture Planner."""
 
@@ -56,6 +70,7 @@ class VeriSightPlanner:
         rtl_path: Optional[str] = None,
         design_name: Optional[str] = None,
         coverage_path: Optional[str] = None,
+        generate_uvm: bool = False,
     ) -> VerificationPlanReport:
         """
         Execute full autonomous verification planning pipeline.
@@ -64,6 +79,10 @@ class VeriSightPlanner:
             spec_path: Path to specification document (.md, .txt).
             rtl_path: Optional path to RTL file or directory (.sv, .v).
             design_name: Optional design name (inferred from path if omitted).
+            generate_uvm: If True, also generate a full UVM testbench environment
+                (verisight.uvm.UVMArchitect) whose coverage subscriber reuses this
+                plan's own covergroups instead of a second, independent model.
+                Off by default to preserve existing behavior/outputs.
 
         Returns:
             VerificationPlanReport object.
@@ -92,6 +111,43 @@ class VeriSightPlanner:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # Extract RTL ports and structures for grounding
+        rtl_info: Dict[str, Any] = {
+            "ports": [],
+            "clocks": [],
+            "resets": [],
+            "fsms": [],
+        }
+
+        # When RTL source is not provided, operate in pure Spec-Driven Planning mode
+        if not rtl_path:
+            logger.info(f"No RTL source file provided. Operating in pure Spec-Driven Planning mode for {design_name}.")
+
+        if rtl_path and Path(rtl_path).exists():
+            try:
+                from verisight.parsers.rtl_parser import parse_rtl
+                rtl_data = parse_rtl(rtl_path)
+                for mod in getattr(rtl_data, "modules", []):
+                    for p in getattr(mod, "ports", []):
+                        rtl_info["ports"].append({
+                            "name": p.name,
+                            "dir": getattr(p, "direction", "in"),
+                            "width": _parse_width(getattr(p, "width", 1) or 1),
+                        })
+                    for cd in getattr(mod, "clock_domains", []):
+                        if getattr(cd, "clock_signal", None):
+                            rtl_info["clocks"].append(cd.clock_signal)
+                        if getattr(cd, "reset_signal", None):
+                            rtl_info["resets"].append(cd.reset_signal)
+                    for fsm in getattr(mod, "fsms", []):
+                        rtl_info["fsms"].append({
+                            "name": fsm.name,
+                            "states": [s.name for s in getattr(fsm, "states", [])],
+                        })
+                logger.info(f"Extracted {len(rtl_info['ports'])} RTL ports for grounding coverage & assertions.")
+            except Exception as e:
+                logger.warning(f"Could not parse RTL for grounding: {e}")
+
         # 1. Feature Extraction & RTL Delta Check
         logger.info(f"Phase 1/4: Decomposing Specification into Features for {design_name}...")
         features = self.feature_extractor.extract_features(
@@ -105,6 +161,7 @@ class VeriSightPlanner:
         test_scenarios = self.test_planner.generate_test_plan(
             features=features,
             design_name=design_name,
+            rtl_info=rtl_info,
         )
 
         # 3. Functional Coverage Model & SystemVerilog Code Generation
@@ -112,10 +169,13 @@ class VeriSightPlanner:
         covergroups = self.coverage_architect.design_coverage_model(
             features=features,
             design_name=design_name,
+            rtl_info=rtl_info,
+            spec_text=spec_text,
         )
         sv_coverage_code = self.coverage_architect.generate_sv_code(
             covergroups=covergroups,
             design_name=design_name,
+            rtl_info=rtl_info,
         )
 
         # 4. SVA Assertion Suite & SystemVerilog Code Generation
@@ -123,13 +183,41 @@ class VeriSightPlanner:
         assertions = self.assertion_architect.design_assertions(
             features=features,
             design_name=design_name,
+            rtl_info=rtl_info,
+            spec_text=spec_text,
         )
         sv_assertion_code = self.assertion_architect.generate_sv_code(
             assertions=assertions,
             design_name=design_name,
+            rtl_info=rtl_info,
         )
 
-        # 5. Bi-directional Traceability Matrix
+        # 5. SystemVerilog Syntax Validation Gate (pyslang AST check)
+        from verisight.parsers.sv_frontend import compile_text, format_diagnostics
+
+        cov_compile = compile_text(sv_coverage_code, name="coverage_model.sv")
+        cov_syntax_ok = cov_compile.syntax_ok
+        val_notes: List[str] = []
+
+        if cov_syntax_ok:
+            logger.info("Coverage model SystemVerilog syntax verified clean (pyslang).")
+            val_notes.append("coverage_model.sv: Syntax clean (0 errors).")
+        else:
+            diag_str = format_diagnostics(cov_compile.diagnostics, limit=3)
+            logger.warning(f"Coverage model SV syntax diagnostics:\n{diag_str}")
+            val_notes.append(f"coverage_model.sv: {diag_str}")
+
+        sva_compile = compile_text(sv_assertion_code, name="dut_assertions.sv")
+        sva_syntax_ok = sva_compile.syntax_ok
+        if sva_syntax_ok:
+            logger.info("SVA assertions SystemVerilog syntax verified clean (pyslang).")
+            val_notes.append("dut_assertions.sv: Syntax clean (0 errors).")
+        else:
+            diag_str = format_diagnostics(sva_compile.diagnostics, limit=3)
+            logger.warning(f"SVA assertions SV syntax diagnostics:\n{diag_str}")
+            val_notes.append(f"dut_assertions.sv: {diag_str}")
+
+        # 6. Bi-directional Traceability Matrix
         logger.info("Building Bi-Directional Traceability Matrix...")
         traceability_matrix = build_traceability_matrix(
             features=features,
@@ -139,6 +227,25 @@ class VeriSightPlanner:
         )
 
         total_cov_points = sum(len(cg.coverpoints) for cg in covergroups)
+
+        # 6b. Optional UVM Testbench Environment Generation
+        # Reuses this plan's own covergroups (grounded in extracted features) for
+        # the UVM coverage subscriber instead of synthesizing a second, independent
+        # coverage model.
+        uvm_result = None
+        if generate_uvm:
+            logger.info("Generating UVM testbench environment (reusing this plan's coverage model)...")
+            try:
+                from verisight.uvm.uvm_architect import UVMArchitect
+                uvm_result = UVMArchitect(output_dir=str(self.output_dir / "uvm")).generate(
+                    rtl_path=rtl_path,
+                    spec_path=spec_path,
+                    design_name=design_name,
+                    covergroups=covergroups,
+                )
+                logger.info(f"UVM environment generated in {uvm_result.output_dir} ({len(uvm_result.files_generated)} files).")
+            except Exception as e:
+                logger.warning(f"UVM environment generation failed: {e}")
 
         report = VerificationPlanReport(
             plan_id=str(uuid.uuid4())[:8],
@@ -159,14 +266,23 @@ class VeriSightPlanner:
             rag_cached=True if self.kb else False,
             sv_coverage_code=sv_coverage_code,
             sv_assertion_code=sv_assertion_code,
+            sv_coverage_syntax_ok=cov_syntax_ok,
+            sv_assertions_syntax_ok=sva_syntax_ok,
+            sv_validation_notes=val_notes,
+            uvm_generated=uvm_result is not None,
+            uvm_output_dir=uvm_result.output_dir if uvm_result else None,
+            uvm_files_generated=uvm_result.files_generated if uvm_result else [],
+            uvm_syntax_ok=uvm_result.syntax_clean if uvm_result else None,
+            uvm_protocol_detected=uvm_result.protocol_detected if uvm_result else None,
         )
 
-        # 6. Dynamic Coverage Closure Ingestion (Planned vs. Actual UCDB/vDB)
+        # 7. Dynamic Coverage Closure Ingestion (Planned vs. Actual UCDB/vDB)
         logger.info("Correlating Planned Requirements with Simulator Coverage Database...")
         report = self.coverage_correlator.correlate(
             report=report,
             coverage_path=coverage_path,
         )
+
 
         # 6. Save Artifacts
         # JSON Schema

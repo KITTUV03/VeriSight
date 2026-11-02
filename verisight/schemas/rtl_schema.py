@@ -10,6 +10,8 @@ from typing import List, Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 
+from verisight.schemas.parser_schema import ParserStatus
+
 
 class PortDirection(str, Enum):
     INPUT = "input"
@@ -183,4 +185,8 @@ class RTLKnowledge(BaseModel):
     top_candidates: List[str] = Field(
         default_factory=list,
         description="All detected top-level module candidates"
+    )
+    parser_status: ParserStatus = Field(
+        default_factory=ParserStatus,
+        description="Parser backend, degraded/partial status, and structured diagnostics"
     )

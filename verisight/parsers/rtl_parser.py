@@ -8,20 +8,33 @@ definitions, package imports, include dependencies, and cross-file compilation o
 
 Treats multiple files as a single logical RTL project while maintaining individual
 file boundaries, original paths, and line-accurate references.
-Deterministic, regex+heuristic parser — no LLM calls.
+
+Primary backend: pyslang (the Slang SystemVerilog frontend) via
+``verisight.parsers.sv_frontend`` + ``pyslang_rtl``. This gives real
+IEEE-1800 parsing with accurate types, signal dependencies, and source
+locations.
+
+Fallback: a deterministic regex+heuristic parser (the original
+implementation, preserved below). It is only used when pyslang is
+unavailable or produced no usable modules, and when it runs the result is
+explicitly labelled ``degraded`` with the pyslang diagnostics preserved —
+never a silent switch.
 """
 
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union, Set, Any
+from typing import List, Dict, Optional, Sequence, Tuple, Union, Set, Any
 
 from verisight.schemas.rtl_schema import (
     RTLKnowledge, RTLModule, Port, Parameter, AlwaysBlock,
     FSM, FSMState, FSMTransition, ClockDomain, RTLAssertion,
 )
+from verisight.schemas.parser_schema import ParserStatus, ParserDiagnostic, CATEGORY_TOOL
 from verisight.utils.file_utils import read_file, discover_files, RTL_EXTENSIONS
 from verisight.utils.sv_lexer import strip_comments
 from verisight.utils.logger import get_logger
+from verisight.parsers import sv_frontend
+from verisight.parsers.pyslang_rtl import build_rtl_knowledge
 
 logger = get_logger("rtl_parser")
 
@@ -38,6 +51,9 @@ def parse_rtl(
     path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
     files: Optional[List[Union[str, Path]]] = None,
     top_module: Optional[str] = None,
+    include_dirs: Optional[Sequence[str]] = None,
+    defines: Optional[Sequence[str]] = None,
+    allow_fallback: bool = True,
     rtl_path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
     rtl_files: Optional[List[Union[str, Path]]] = None,
     **kwargs,
@@ -45,10 +61,19 @@ def parse_rtl(
     """
     Parse RTL source files from a single file, a directory, or a list of files.
 
+    Uses the pyslang frontend first; falls back to the legacy regex parser
+    only when pyslang is unavailable or yields no modules.
+
     Args:
         path: Path to a single file, a directory, or list of file paths.
         files: Optional explicit list of file paths (takes precedence or combines with path).
         top_module: Optional explicit top-level module name override.
+        include_dirs: Optional `include search directories.
+        defines: Optional macro defines ("NAME" or "NAME=value").
+        allow_fallback: If True, fall back to the regex parser when the
+            pyslang frontend is unavailable or finds no modules. The result
+            is then flagged degraded. If False, the (possibly empty) pyslang
+            result is returned as-is.
 
     Returns:
         RTLKnowledge Pydantic model with modules, packages, dependencies, and top module.
@@ -91,8 +116,92 @@ def parse_rtl(
             global_issues=["No RTL source files provided or found"],
         )
 
-    logger.info(f"Parsing RTL project ({len(resolved_paths)} files)")
+    file_strs = [str(f) for f in resolved_paths]
+    include_dirs = list(include_dirs or [])
+    defines = list(defines or [])
 
+    # ─── Primary path: pyslang frontend ───────────────────────────────
+    if sv_frontend.is_available() and file_strs:
+        try:
+            result = sv_frontend.compile_files(file_strs, include_dirs, defines)
+            if result.compilation is not None:
+                knowledge = build_rtl_knowledge(result, file_strs)
+                knowledge.parser_status = result.status
+                if knowledge.modules or not allow_fallback:
+                    if top_module:
+                        knowledge.top_module = top_module
+                    logger.info(
+                        f"RTL parsed (pyslang): {len(knowledge.modules)} modules, "
+                        f"top={knowledge.top_module}, "
+                        f"syntax_ok={result.status.syntax_ok}, "
+                        f"degraded={result.status.degraded}"
+                    )
+                    return knowledge
+                logger.warning(
+                    "pyslang parsed no modules — falling back to regex parser (degraded)."
+                )
+                fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+                _mark_degraded(fallback, result.status, reason="pyslang found no modules")
+                return fallback
+            elif not allow_fallback:
+                knowledge = RTLKnowledge(file_list=file_strs)
+                knowledge.parser_status = result.status
+                return knowledge
+            else:
+                logger.warning(
+                    "pyslang frontend failed to compile — falling back to regex parser (degraded)."
+                )
+                fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+                _mark_degraded(fallback, result.status, reason="pyslang compilation failed")
+                return fallback
+        except Exception as exc:  # defensive: never let the frontend crash parsing
+            logger.warning(f"pyslang RTL parse raised {exc!r} — regex fallback (degraded).")
+            if not allow_fallback:
+                raise
+            fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+            _mark_degraded(fallback, None, reason=f"pyslang exception: {exc!r}")
+            return fallback
+
+    # ─── pyslang unavailable ──────────────────────────────────────────
+    if not sv_frontend.is_available():
+        logger.warning(
+            f"pyslang unavailable ({sv_frontend.unavailable_reason()}) — "
+            "using regex fallback (degraded)."
+        )
+    knowledge = _parse_rtl_regex(resolved_paths, top_module=top_module)
+    _mark_degraded(
+        knowledge, None,
+        reason=f"pyslang unavailable: {sv_frontend.unavailable_reason()}",
+    )
+    return knowledge
+
+
+def _mark_degraded(
+    knowledge: RTLKnowledge,
+    pyslang_status: Optional[ParserStatus],
+    reason: str,
+) -> None:
+    """Label a regex-fallback result as degraded, preserving pyslang diagnostics."""
+    status = ParserStatus(
+        backend="regex-fallback",
+        degraded=True,
+        elaborated=False,
+        syntax_ok=True,
+        notes=[
+            f"Regex fallback used: {reason}.",
+            "Results are approximate: no type/scope resolution, SVA/UVM/"
+            "generate constructs may be mis-parsed. Do not treat as a full AST.",
+        ],
+    )
+    if pyslang_status is not None:
+        status.diagnostics = list(pyslang_status.diagnostics)
+        status.notes = pyslang_status.notes + status.notes
+    knowledge.parser_status = status
+
+
+def _parse_rtl_regex(resolved_paths: List[Path], top_module: Optional[str] = None) -> RTLKnowledge:
+    """Deterministic regex/heuristic RTL parser (fallback and multi-file project parser)."""
+    logger.info(f"Parsing RTL project ({len(resolved_paths)} files)")
     modules: List[RTLModule] = []
     file_list: List[str] = []
     total_lines = 0

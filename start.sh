@@ -10,4 +10,8 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
-python3 main.py start "$@"
+if [ $# -eq 0 ]; then
+    python3 main.py start
+else
+    python3 main.py "$@"
+fi

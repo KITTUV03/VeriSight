@@ -472,26 +472,32 @@ def render_browser_rca_report(output_filename: str):
 
 print("Generating updated screenshots and diagrams...")
 
-# 1. Screen 1: WITH ALL 6 OFFICIAL WORKFLOW OPTIONS
+# 1. Screen 1: WITH 3-ENGINE AUTONOMOUS SUITE
 render_terminal(
     "Terminal — VeriSight Guided Wizard",
     [
-        [("$ ./start.sh", COLOR_GREEN, True)],
-        [("╔══════════════════════════════════════════════════════════════════════════════════╗", COLOR_CYAN, True)],
-        [("║  🔍 VeriSight — Autonomous Verification & Debugging Platform                     ║", COLOR_CYAN, True)],
-        [("║  Multi-Engine Autonomous Suite: Debug, Plan, SimRunner, WebCockpit & Demos      ║", TEXT_WHITE, True)],
-        [("╚══════════════════════════════════════════════════════════════════════════════════╝", COLOR_CYAN, True)],
-        [("Welcome! Select an autonomous workflow below to get started.", TEXT_DIM, False)],
+        [("$ ./start", COLOR_GREEN, True)],
+        [("╭────── ⚡  V E R I S I G H T  •  INTELLIGENT VERIFICATION PLATFORM  ⚡ ───────╮", COLOR_CYAN, True)],
+        [("│    AUTONOMOUS ASIC/SOC   UVM 1.2 VIP   MULTI-AGENT RCA   IEEE 1800 PYSLANG   │", COLOR_YELLOW, True)],
+        [("│   Enterprise-Grade AI Architecture for ASIC / SoC Design Verification        │", TEXT_WHITE, False)],
+        [("│   Protocols: AMBA (AXI/AHB/APB) • PCIe • CHI • DDR • I2C • SPI               │", COLOR_CYAN, False)],
+        [("╰─────────────────── v1.3.0 Enterprise Architecture • Sovereign Air-Gap Ready ─╯", COLOR_CYAN, True)],
         [("", TEXT_WHITE, False)],
-        [("Step 1: Choose Autonomous Workflow", COLOR_CYAN, True)],
-        [("  [1] ", COLOR_YELLOW, True), ("🛠️  VeriSight Debug", COLOR_GREEN, True), ("  — Root-Cause Analysis & Fix for Sim Failures", TEXT_WHITE, False)],
-        [("  [2] ", COLOR_YELLOW, True), ("📋 VeriSight Plan", COLOR_GREEN, True), ("   — Generate Test Plan, Coverage Model & SVA Suite", TEXT_WHITE, False)],
-        [("  [3] ", COLOR_YELLOW, True), ("🚀 Closed-Loop Sim", COLOR_GREEN, True), ("  — Simulate RTL+TB -> Auto-RCA & Coverage Cockpit", TEXT_WHITE, False)],
-        [("  [4] ", COLOR_YELLOW, True), ("🌐 Live Web Cockpit", COLOR_CYAN, True), (" — Launch Interactive Browser Studio (Sim/Waveforms/RCA)", TEXT_WHITE, False)],
-        [("  [5] ", COLOR_YELLOW, True), ("⚡ Quick Demos", COLOR_YELLOW, True), ("      — Instant 1-Click Run on ALU or FIFO", TEXT_WHITE, False)],
-        [("  [6] ", COLOR_YELLOW, True), ("🚪 Exit", COLOR_RED, True), ("             — Terminate the VeriSight Session", TEXT_WHITE, False)],
+        [("Step 1: Select Autonomous Verification Engine", COLOR_CYAN, True)],
         [("", TEXT_WHITE, False)],
-        [("Select an option [1/2/3/4/5/6] (1): ", COLOR_YELLOW, True), ("1", COLOR_GREEN, True), (" █", TEXT_WHITE, True)]
+        [("╭─ [1] 🛠️  VeriSight Debug ───────────╮ ╭─ [2] 📋 VeriSight Plan ──────────────╮", BORDER_COLOR, False)],
+        [("│ Autonomous RCA & Failure            │ │ Test Planning, Coverage Models & SVA │", TEXT_WHITE, False)],
+        [("│ • Log Windowing • VCD Trace • Fix   │ │ • 50+ Test Cases • Covergroups • SVA │", COLOR_RED, False)],
+        [("╰───────────────────────  RCA & FIX  ─╯ ╰───────────────────────  PLAN & SVA  ─╯", BORDER_COLOR, False)],
+        [("╭─ [3] 🎯 VeriSight TestBench ────────╮ ╭─ [4] 🚪 Exit ────────────────────────╮", BORDER_COLOR, False)],
+        [("│ Spec-Driven UVM Synthesis with Ref  │ │ Quit VeriSight Interactive Launcher  │", TEXT_WHITE, False)],
+        [("│ • Spec-as-Truth • Golden Ref Model  │ │ Clean terminal session exit          │", COLOR_MAGENTA, False)],
+        [("╰─────────────────────  SPEC-DRIVEN  ─╯ ╰───────────────────────────  SYSTEM  ─╯", BORDER_COLOR, False)],
+        [("╭──────────────────── ⚡ QUICK UTILITIES & PLATFORM TOOLS ─────────────────────╮", COLOR_CYAN, False)],
+        [("│ • Web UI: ./start serve   • Cloud: ./start edaplayground   • Air-Gap Mode    │", TEXT_DIM, False)],
+        [("╰──────────────────────────────────────────────────────────────────────────────╯", COLOR_CYAN, False)],
+        [("", TEXT_WHITE, False)],
+        [("Select an engine [1:Debug • 2:Plan • 3:TestBench • 4:Exit] (1): ", COLOR_YELLOW, True), ("1", COLOR_GREEN, True), (" █", TEXT_WHITE, True)]
     ],
     "screenshot_01_welcome_menu.png"
 )
@@ -592,38 +598,81 @@ render_terminal(
     "screenshot_05_agent2_plan_inputs.png"
 )
 
-# 6. Screen 6: Plan Results
+# 6. Screen 6: Plan Results with 50+ Testcases & Multi-Covergroups
 render_terminal(
     "Terminal — VeriSight Plan: Generation Results",
     [
-        [("[1/6] Ingesting Spec Document (Markdown / Text / Multi-page PDF)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
-        [("[2/6] Parsing RTL Port Interface & FSM States (alu.sv)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
-        [("[3/6] Synthesizing Hierarchical Feature Tree & Test Matrix...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
-        [("[4/6] Generating SystemVerilog Functional Coverage Model (covergroup)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
-        [("[5/6] Formulating SystemVerilog Assertions Suite (SVA Properties)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
-        [("[6/6] Computing Bi-Directional Traceability Matrix & HTML Dashboard...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
+        [("[1/4] Ingesting & Decomposing Specification Document (PDF / Markdown)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
+        [("[2/4] Formulating 50+ Exhaustive Test Scenarios across 8 Categories...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
+        [("[3/4] Synthesizing Multi-Covergroup Models (90 CPs, 150+ Bins)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
+        [("[4/4] Formulating IEEE 1800 SystemVerilog Assertions Suite (34 SVA)...", COLOR_CYAN, False), (" [DONE]", COLOR_GREEN, True)],
+        [("⚙️ [Syntax Gate] Validating coverage_model.sv and dut_assertions.sv via pyslang...", COLOR_CYAN, False), (" [CLEAN 0 ERRORS]", COLOR_GREEN, True)],
         [("", TEXT_WHITE, False)],
         [("══════════════════════════════════════════════════════════════════════════════", COLOR_GREEN, True)],
-        [("🎉 Verification Plan Generated Successfully!", COLOR_GREEN, True)],
+        [("🎉 Verification Plan Generated Successfully (Pure Spec-Driven Mode)!", COLOR_GREEN, True)],
         [("══════════════════════════════════════════════════════════════════════════════", COLOR_GREEN, True)],
-        [("  Target Design:            ", TEXT_WHITE, True), ("ALU_Top (Arithmetic Logic Unit)", COLOR_CYAN, True)],
-        [("  Decomposed Features:      ", TEXT_WHITE, True), ("22 verification functional units", COLOR_YELLOW, False)],
-        [("  Defined Test Scenarios:   ", TEXT_WHITE, True), ("45 directed & constrained-random test cases", COLOR_GREEN, True)],
-        [("  Coverage Points:          ", TEXT_WHITE, True), ("12 covergroups & cross coverage bins", COLOR_GREEN, True)],
-        [("  SVA Formal Assertions:    ", TEXT_WHITE, True), ("23 temporal sequence & invariant properties", COLOR_GREEN, True)],
+        [("  Target Design:            ", TEXT_WHITE, True), ("I2C_DESIGN (AMBA APB to I2C Master/Slave)", COLOR_CYAN, True)],
+        [("  Planning Mode:            ", TEXT_WHITE, True), ("Spec-Driven (Pure Specification Grounding)", COLOR_GREEN, True)],
+        [("  Decomposed Features:      ", TEXT_WHITE, True), ("145 functional specification requirements", COLOR_YELLOW, False)],
+        [("  Defined Test Scenarios:   ", TEXT_WHITE, True), ("52 exhaustive test scenarios (8 categories)", COLOR_GREEN, True)],
+        [("  Coverage Points:          ", TEXT_WHITE, True), ("90 covergroups & 150+ protocol/data bins", COLOR_GREEN, True)],
+        [("  SVA Formal Assertions:    ", TEXT_WHITE, True), ("34 protocol invariants & timing assertions", COLOR_GREEN, True)],
+        [("  Static Syntax Review:     ", TEXT_WHITE, True), ("✓ Passed (pyslang IEEE 1800 compilation)", COLOR_GREEN, True)],
         [("", TEXT_WHITE, False)],
         [("  Generated Artifacts in output/verification_plan/:", COLOR_CYAN, True)],
         [("    • ", COLOR_YELLOW, False), ("verification_plan.html", TEXT_WHITE, True), ("  (Interactive HTML Dashboard with Live Filtering)", TEXT_DIM, False)],
-        [("    • ", COLOR_YELLOW, False), ("verification_plan.md", TEXT_WHITE, True), ("    (Engineering Markdown Plan for git repository)", TEXT_DIM, False)],
-        [("    • ", COLOR_YELLOW, False), ("traceability_matrix.csv", TEXT_WHITE, True), (" (ISO 26262/DO-254 Certified Bi-directional Matrix)", COLOR_YELLOW, False)],
-        [("    • ", COLOR_YELLOW, False), ("coverage_model.sv", TEXT_WHITE, True), ("      (Production-ready SystemVerilog Covergroups)", COLOR_GREEN, False)],
-        [("    • ", COLOR_YELLOW, False), ("dut_assertions.sv", TEXT_WHITE, True), ("      (SystemVerilog Assertions Suite ready for TB bind)", COLOR_GREEN, False)],
-        [("    • ", COLOR_YELLOW, False), ("verification_plan.json", TEXT_WHITE, True), ("  (Full Schema-Validated JSON Architecture)", TEXT_DIM, False)],
+        [("    • ", COLOR_YELLOW, False), ("verification_plan.md", TEXT_WHITE, True), ("    (Executive Engineering Plan for git repository)", TEXT_DIM, False)],
+        [("    • ", COLOR_YELLOW, False), ("traceability_matrix.csv", TEXT_WHITE, True), (" (ISO 26262/DO-254 Certified Traceability Matrix)", COLOR_YELLOW, False)],
+        [("    • ", COLOR_YELLOW, False), ("coverage_model.sv", TEXT_WHITE, True), ("      (Synthesized SystemVerilog Covergroups Package)", COLOR_GREEN, False)],
+        [("    • ", COLOR_YELLOW, False), ("dut_assertions.sv", TEXT_WHITE, True), ("      (Synthesized SVA Formal Assertions Module)", COLOR_GREEN, False)],
+        [("    • ", COLOR_YELLOW, False), ("verification_plan.json", TEXT_WHITE, True), ("  (Standardized Verification Schema)", TEXT_DIM, False)],
         [("", TEXT_WHITE, False)],
         [("Open the interactive HTML Verification Plan in your browser? [Y/n]: ", COLOR_YELLOW, True), ("Y", COLOR_GREEN, True)],
         [("✓ Opened: file:///home/mirafra_lp38/VeriSight/output/verification_plan/verification_plan.html", COLOR_GREEN, False)]
     ],
     "screenshot_06_agent2_plan_results.png"
+)
+
+# 16. Screen 16: Spec-Driven Testbench Scorecard & VIP Suite
+render_terminal(
+    "Terminal — VeriSight TestBench: Spec-Driven UVM Synthesis",
+    [
+        [("🎯 VERISIGHT TESTBENCH — SPEC-DRIVEN UVM SYNTHESIS", COLOR_MAGENTA, True)],
+        [("Synthesizes complete, specification-grounded SystemVerilog UVM 1.2 testbenches.", TEXT_DIM, False)],
+        [("Enforces that the Specification is the functional source of truth:", TEXT_DIM, False)],
+        [("reference models and scoreboards independently discover RTL defects rather than reproducing them.", TEXT_DIM, False)],
+        [("", TEXT_WHITE, False)],
+        [("╭─────────────────── SPEC-DRIVEN VERIFICATION SCORECARD ───────────────────╮", COLOR_MAGENTA, True)],
+        [("│ Agent Workflow      │ Workflow 3: Spec-Driven Testbench                  │", TEXT_WHITE, False)],
+        [("│ Target Design       │ APB_SLAVE (AMBA Advanced Peripheral Bus)           │", COLOR_CYAN, True)],
+        [("│ Specification Title │ AMBA APB Protocol v2.0 Specification               │", TEXT_WHITE, False)],
+        [("│ Requirements Bound  │ 5 atomic REQ items (Handshake, Wait-states, Error) │", COLOR_YELLOW, False)],
+        [("│ Intent vs RTL Check │ 2 checkpoints verified against behavioral model    │", COLOR_GREEN, False)],
+        [("│ Static Syntax Review│ ✓ Passed (pyslang IEEE 1800 AST verification)      │", COLOR_GREEN, True)],
+        [("│ Simulation Status   │ Simulation Passed Cleanly (12/12 Transactions OK)  │", COLOR_GREEN, True)],
+        [("│ Scoreboard Findings │ 0 mismatches against spec (Independent Reference)  │", COLOR_GREEN, True)],
+        [("╰──────────────────────────────────────────────────────────────────────────╯", COLOR_MAGENTA, True)],
+        [("", TEXT_WHITE, False)],
+        [("Synthesized Spec-Driven UVM Suite (output/spec_driven_uvm/):", COLOR_CYAN, True)],
+        [("  File / Component           │ UVM Class / Role", BORDER_COLOR, False)],
+        [("  ───────────────────────────┼─────────────────────────────────────────────", BORDER_COLOR, False)],
+        [("  apb_slave_if.sv            │ SystemVerilog Interface with Modports", TEXT_WHITE, False)],
+        [("  apb_slave_seq_item.sv      │ uvm_sequence_item (Constrained Transactions)", TEXT_WHITE, False)],
+        [("  apb_slave_sequencer.sv     │ uvm_sequencer typedef", TEXT_WHITE, False)],
+        [("  apb_slave_driver.sv        │ uvm_driver (Pin-level Protocol Driving)", TEXT_WHITE, False)],
+        [("  apb_slave_monitor.sv       │ uvm_monitor (Analysis Port Sampling)", TEXT_WHITE, False)],
+        [("  apb_slave_agent.sv         │ uvm_agent (Active/Passive Configurable)", TEXT_WHITE, False)],
+        [("  apb_slave_reference_model.sv│ Golden Reference Model (Spec-as-Truth)", COLOR_GREEN, True)],
+        [("  apb_slave_scoreboard.sv    │ uvm_scoreboard (Independent Defect Detection)", COLOR_GREEN, True)],
+        [("  apb_slave_coverage.sv      │ uvm_subscriber (Protocol Functional Coverage)", TEXT_WHITE, False)],
+        [("  apb_slave_sequence.sv      │ uvm_sequence (Sanity, Random & Corner Tests)", TEXT_WHITE, False)],
+        [("  apb_slave_env.sv           │ uvm_env (Top Environment Topology)", TEXT_WHITE, False)],
+        [("  apb_slave_test.sv          │ uvm_test (Base Test & Multi-Phase Regressions)", TEXT_WHITE, False)],
+        [("  apb_slave_pkg.sv           │ SystemVerilog Package (`include wrapper)", TEXT_WHITE, False)],
+        [("  apb_slave_tb_top.sv        │ Top-Level Testbench Module (Clock/Reset/DUT)", COLOR_CYAN, True)],
+        [("  run.do / Makefile          │ Siemens Questa / Synopsys VCS Launch Harness", COLOR_YELLOW, False)],
+    ],
+    "screenshot_16_spec_driven_tb.png"
 )
 
 # 7. Screen 7: Option 3 Closed-Loop Sim

@@ -148,11 +148,17 @@ class XTracerConfig:
     top_module: str = ""
     vcd_path: str = ""
     signal: str = ""
+    signals: List[str] = field(default_factory=list)
     time_ps: Optional[int] = None
     xtracer_path: str = ""
     max_depth: int = 100
 
     def __post_init__(self):
+        if not self.signals and self.signal:
+            self.signals = [s.strip() for s in self.signal.split(",") if s.strip()]
+        elif self.signals and not self.signal:
+            self.signal = self.signals[0]
+
         if not self.xtracer_path:
             env_path = os.getenv("VERISIGHT_XTRACER_PATH")
             if env_path:
@@ -171,9 +177,11 @@ class FixConfig:
     enabled=False makes Agent 5 a no-op, preserving the existing pipeline
     behaviour exactly. min_confidence is the evidence-weighted threshold
     below which the agent declines to emit a fix.
+    allow_tb_fix=False restricts fixes to RTL only by default.
     """
     enabled: bool = True
     min_confidence: float = 0.70
+    allow_tb_fix: bool = False
     fix_output_subdir: str = "fix"   # relative to pipeline output_dir
 
     def __post_init__(self):
@@ -188,6 +196,38 @@ class FixConfig:
             except ValueError:
                 pass
 
+        env_allow_tb = os.getenv("VERISIGHT_ALLOW_TB_FIX")
+        if env_allow_tb is not None:
+            self.allow_tb_fix = env_allow_tb.lower() in ("1", "true", "yes")
+
+
+@dataclass
+class DPOConfig:
+    """
+    Configuration for Direct Preference Optimization (DPO) with LoRA.
+    Allows Workflow 2 (Planning Engine) to utilize preference-aligned adapters.
+    """
+    enabled: bool = False
+    adapter_path: str = "models/verisight_plan_dpo_adapter"
+    beta: float = 0.1
+    dataset_path: str = "data/preferences/workflow2_dpo.jsonl"
+    lora_r: int = 16
+    lora_alpha: int = 32
+
+    def __post_init__(self):
+        env_enabled = os.getenv("VERISIGHT_DPO_ENABLED")
+        if env_enabled is not None:
+            self.enabled = env_enabled.lower() in ("1", "true", "yes")
+        env_adapter = os.getenv("VERISIGHT_DPO_ADAPTER_PATH")
+        if env_adapter:
+            self.adapter_path = env_adapter
+        env_beta = os.getenv("VERISIGHT_DPO_BETA")
+        if env_beta:
+            try:
+                self.beta = float(env_beta)
+            except ValueError:
+                pass
+
 
 @dataclass
 class VeriSightConfig:
@@ -197,6 +237,7 @@ class VeriSightConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     xtracer: XTracerConfig = field(default_factory=XTracerConfig)
     fix: FixConfig = field(default_factory=FixConfig)
+    dpo: DPOConfig = field(default_factory=DPOConfig)
     log_level: str = ""
 
     def __post_init__(self):

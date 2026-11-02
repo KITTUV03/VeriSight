@@ -86,6 +86,22 @@ class ValidationResult(BaseModel):
         default="",
         description="Details of specification check result"
     )
+    anti_tamper: str = Field(
+        default="NOT_RUN",
+        description="Inspection for prohibited check removal or weakening: PASS / FAIL / NOT_RUN"
+    )
+    anti_tamper_notes: str = Field(
+        default="",
+        description="Details of verification check anti-tampering inspection"
+    )
+    lint: str = Field(
+        default="NOT_RUN",
+        description="Fast lint check (verilator/iverilog): PASS / FAIL / NOT_RUN"
+    )
+    lint_notes: str = Field(
+        default="",
+        description="Details of fast lint check"
+    )
     simulation: str = Field(
         default="NOT_AVAILABLE",
         description="Level 4 simulation run: PASS / FAIL / NOT_AVAILABLE"
