@@ -473,26 +473,31 @@ class ReportGeneratorAgent(BaseAgent):
                     lines.append(f"| `{pd.name}` | `{pd.scope or '.'}` | `{elems}` | `{pd.primary_power_net or 'VDD'}` | `{pd.primary_ground_net or 'VSS'}` |")
                 lines.append("")
 
-            if upf.domain_crossings:
+            domain_crossings = getattr(upf, "domain_crossings", [])
+            if domain_crossings:
                 lines.extend([
                     "### Cross-Domain Boundary Signals",
                     "",
                     "| Signal | Source Domain | Destination Domain | Isolation Strategy | Status |",
                     "|--------|---------------|--------------------|--------------------|--------|",
                 ])
-                for dc in upf.domain_crossings:
-                    iso_tag = f"`{dc.isolation_strategy}`" if dc.has_isolation else "**NONE (HAZARD)**"
-                    status_str = "PASS" if not dc.issues else "WARNING: Missing Isolation"
-                    lines.append(f"| `{dc.signal}` | `{dc.source_domain}` | `{dc.dest_domain}` | {iso_tag} | {status_str} |")
+                for dc in domain_crossings:
+                    iso_tag = f"`{dc.isolation_strategy}`" if getattr(dc, 'has_isolation', False) else "**NONE (HAZARD)**"
+                    status_str = "PASS" if not getattr(dc, 'issues', []) else "WARNING: Missing Isolation"
+                    lines.append(f"| `{getattr(dc, 'signal', '')}` | `{getattr(dc, 'source_domain', '')}` | `{getattr(dc, 'dest_domain', '')}` | {iso_tag} | {status_str} |")
                 lines.append("")
 
-            if upf.validation_issues:
+            val_issues = getattr(upf, "validation_issues", []) or getattr(upf, "diagnostics", [])
+            if val_issues:
                 lines.extend([
                     "### UPF Diagnostics & Verification Findings",
                     "",
                 ])
-                for vi in upf.validation_issues:
-                    lines.append(f"- **[{vi.severity.upper()}]** ({vi.issue_type}): {vi.description}")
+                for vi in val_issues:
+                    sev = getattr(vi, 'severity', 'warning').upper()
+                    itype = getattr(vi, 'issue_type', getattr(vi, 'code', 'UPF'))
+                    desc = getattr(vi, 'description', getattr(vi, 'message', ''))
+                    lines.append(f"- **[{sev}]** ({itype}): {desc}")
                 lines.append("")
 
         # Recommended Fixes
@@ -891,14 +896,19 @@ class ReportGeneratorAgent(BaseAgent):
                 dom_rows += f"<tr><td><code>{pd.name}</code></td><td><code>{pd.scope or '.'}</code></td><td>{elems}</td><td><code>{pd.primary_power_net or 'VDD'}</code></td><td><code>{pd.primary_ground_net or 'VSS'}</code></td></tr>"
 
             crossing_rows = ""
-            for dc in upf_obj.domain_crossings:
-                iso_badge = f'<span class="badge badge-success">{dc.isolation_strategy}</span>' if dc.has_isolation else '<span class="badge badge-error">UNISOLATED</span>'
-                crossing_rows += f"<tr><td><code>{dc.signal}</code></td><td>{dc.source_domain}</td><td>{dc.dest_domain}</td><td>{iso_badge}</td><td>{'<span class=\"badge badge-warn\">HAZARD</span>' if dc.issues else '<span class=\"badge badge-success\">PASS</span>'}</td></tr>"
+            domain_crossings_list = getattr(upf_obj, "domain_crossings", [])
+            for dc in domain_crossings_list:
+                iso_badge = f'<span class="badge badge-success">{dc.isolation_strategy}</span>' if getattr(dc, 'has_isolation', False) else '<span class="badge badge-error">UNISOLATED</span>'
+                crossing_rows += f"<tr><td><code>{getattr(dc, 'signal', '')}</code></td><td>{getattr(dc, 'source_domain', '')}</td><td>{getattr(dc, 'dest_domain', '')}</td><td>{iso_badge}</td><td>{'<span class=\"badge badge-warn\">HAZARD</span>' if getattr(dc, 'issues', []) else '<span class=\"badge badge-success\">PASS</span>'}</td></tr>"
 
             diag_items = ""
-            for vi in upf_obj.validation_issues:
-                badge_cls = "badge-error" if vi.severity == "error" else "badge-warn"
-                diag_items += f'<div class="evidence-card" style="margin-bottom:8px;"><span class="badge {badge_cls}">[{vi.severity.upper()}] {vi.issue_type}</span> <span style="margin-left:8px;">{vi.description}</span></div>'
+            val_issues_list = getattr(upf_obj, "validation_issues", []) or getattr(upf_obj, "diagnostics", [])
+            for vi in val_issues_list:
+                sev = getattr(vi, 'severity', 'warning')
+                itype = getattr(vi, 'issue_type', getattr(vi, 'code', 'UPF'))
+                desc = getattr(vi, 'description', getattr(vi, 'message', ''))
+                badge_cls = "badge-error" if sev == "error" else "badge-warn"
+                diag_items += f'<div class="evidence-card" style="margin-bottom:8px;"><span class="badge {badge_cls}">[{sev.upper()}] {itype}</span> <span style="margin-left:8px;">{desc}</span></div>'
 
             upf_section_html = f"""
                 <div class="rca-hero-card">

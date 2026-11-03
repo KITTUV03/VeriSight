@@ -142,6 +142,25 @@ class UPFDiagnostic(BaseModel):
     code: str = Field(default="UPF", description="Diagnostic category code")
 
 
+class DomainCrossing(BaseModel):
+    """Signal crossing power domain boundaries."""
+    signal: str = Field(default="", description="Signal name")
+    source_domain: str = Field(default="", description="Source power domain")
+    dest_domain: str = Field(default="", description="Destination power domain")
+    has_isolation: bool = Field(default=False, description="Whether isolation is defined")
+    isolation_strategy: Optional[str] = Field(default=None, description="Name of isolation strategy")
+    issues: List[str] = Field(default_factory=list, description="Issues or hazards detected")
+
+
+class ValidationIssue(BaseModel):
+    """Power intent verification finding or diagnostic."""
+    severity: str = Field(default="warning", description="Severity: error, warning, note")
+    issue_type: str = Field(default="UPF", description="Issue type")
+    description: str = Field(default="", description="Issue description")
+    file: Optional[str] = None
+    line: Optional[int] = None
+
+
 class UPFKnowledge(BaseModel):
     """
     Complete power intent extracted from one or more UPF files and
@@ -158,6 +177,8 @@ class UPFKnowledge(BaseModel):
     retention_strategies: List[RetentionStrategy] = Field(default_factory=list, description="Retention strategies")
     power_state_tables: List[PowerStateTable] = Field(default_factory=list, description="Power state tables")
     power_states: List[PowerState] = Field(default_factory=list, description="Power states")
+    domain_crossings: List[DomainCrossing] = Field(default_factory=list, description="Cross-domain boundary signals")
+    validation_issues: List[ValidationIssue] = Field(default_factory=list, description="Validation issues and diagnostics")
     diagnostics: List[UPFDiagnostic] = Field(default_factory=list, description="UPF diagnostics & hierarchy warnings")
     is_valid: bool = Field(default=True, description="Whether UPF is syntactically and architecturally valid")
     resolved_hierarchy: Dict[str, str] = Field(
