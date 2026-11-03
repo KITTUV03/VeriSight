@@ -758,8 +758,7 @@ def run_debug_flow(
                         default_rtl = str(r_files[0])
                         break
         rtl_path = _prompt_path("RTL Source directory, file, or comma-separated list (.sv, .v, .vhd)", required=False, default=default_rtl)
-    if upf_path is None:
-        upf_path = _prompt_path("UPF Power Intent file (.upf) [optional]", required=False, default="")
+
     if not tb_path:
         default_tb = ""
         if log_path:
@@ -784,7 +783,8 @@ def run_debug_flow(
                         break
         spec_path = _prompt_path("Design Specification document (.md)", required=False, default=default_spec)
 
-    upf_path = _prompt_path("UPF Power Intent file (.upf) [Optional - Enter to skip]", required=False, default="")
+    if upf_path is None:
+        upf_path = _prompt_path("UPF Power Intent file (.upf) [Optional - Enter to skip]", required=False, default="")
 
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for reports[/bold]", default="output/custom_debug").strip()
@@ -838,18 +838,11 @@ def run_debug_flow(
     with console.status("[bold green]Executing Multi-Agent RCA & Diagnostic Analysis...[/bold green]"):
         try:
             pipeline = VeriSightPipeline(config=config)
-            rtl_files = None
-            if rtl_path and "," in rtl_path:
-                rtl_files = [f.strip() for f in rtl_path.split(",") if f.strip()]
-                rtl_p = None
-            else:
-                rtl_p = rtl_path
+            rtl_arg = [f.strip() for f in rtl_path.split(",") if f.strip()] if (rtl_path and "," in rtl_path) else rtl_path
 
             report = pipeline.run(
                 spec_path=spec_path,
-                rtl_path=rtl_p,
-                rtl_files=rtl_files,
-                upf_path=upf_path or None,
+                rtl_path=rtl_arg,
                 tb_path=tb_path,
                 log_path=log_path,
                 upf_path=upf_path or None,
