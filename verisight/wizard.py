@@ -784,6 +784,8 @@ def run_debug_flow(
                         break
         spec_path = _prompt_path("Design Specification document (.md)", required=False, default=default_spec)
 
+    upf_path = _prompt_path("UPF Power Intent file (.upf) [Optional - Enter to skip]", required=False, default="")
+
     if not output_dir:
         output_dir = Prompt.ask("[bold]Output directory for reports[/bold]", default="output/custom_debug").strip()
 
@@ -799,6 +801,7 @@ def run_debug_flow(
 
     summary_table.add_row("Simulation Log", str(log_path) if log_path else "[dim]None[/dim]")
     summary_table.add_row("RTL Source", str(rtl_path) if rtl_path else "[dim]None[/dim]")
+    summary_table.add_row("UPF Power Intent", str(upf_path) if upf_path else "[dim]None (RTL-only)[/dim]")
     summary_table.add_row("UVM Testbench", str(tb_path) if tb_path else "[dim]None[/dim]")
     summary_table.add_row("Design Spec", str(spec_path) if spec_path else "[dim]None[/dim]")
     summary_table.add_row("AI Provider / Model", f"{provider.capitalize()} ({model_name or 'default'})" if not airgap else "Sovereign Air-Gapped (Local)")
@@ -849,6 +852,7 @@ def run_debug_flow(
                 upf_path=upf_path or None,
                 tb_path=tb_path,
                 log_path=log_path,
+                upf_path=upf_path or None,
             )
         except Exception as e:
             console.print(f"\n[bold red]Pipeline encountered an error:[/] {e}")

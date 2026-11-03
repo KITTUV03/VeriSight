@@ -24,6 +24,7 @@ UPF_EXTENSIONS = {".upf"}
 LOG_EXTENSIONS = {".log", ".txt", ".rpt"}
 SPEC_EXTENSIONS = {".md", ".txt", ".rst", ".pdf"}
 COVERAGE_EXTENSIONS = {".rpt", ".txt", ".ucdb", ".xml"}
+UPF_EXTENSIONS = {".upf"}
 
 
 def extract_pdf_text(filepath: Union[str, Path]) -> str:

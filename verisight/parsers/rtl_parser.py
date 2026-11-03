@@ -1,13 +1,9 @@
 """
 RTL Parser for VeriSight.
 
-Parses SystemVerilog and Verilog (and VHDL entities) RTL source files and extracts
-structured knowledge including module declarations, ports, parameters, always blocks,
-FSMs, clock domains, reset logic, inline assertions, package definitions, interface
-definitions, package imports, include dependencies, and cross-file compilation order.
-
-Treats multiple files as a single logical RTL project while maintaining individual
-file boundaries, original paths, and line-accurate references.
+Parses SystemVerilog RTL source files and extracts structured knowledge
+including module declarations, ports, parameters, always blocks, FSMs,
+clock domains, reset logic, and inline assertions.
 
 Primary backend: pyslang (the Slang SystemVerilog frontend) via
 ``verisight.parsers.sv_frontend`` + ``pyslang_rtl``. This gives real
@@ -23,13 +19,16 @@ never a silent switch.
 
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Sequence, Tuple, Union, Set, Any
+from typing import List, Dict, Optional, Sequence, Tuple, Union, Set
 
 from verisight.schemas.rtl_schema import (
     RTLKnowledge, RTLModule, Port, Parameter, AlwaysBlock,
     FSM, FSMState, FSMTransition, ClockDomain, RTLAssertion,
 )
-from verisight.schemas.parser_schema import ParserStatus, ParserDiagnostic, CATEGORY_TOOL
+from verisight.schemas.parser_schema import (
+    ParserStatus, ParserDiagnostic, CATEGORY_TOOL,
+    CATEGORY_MISSING_DEPENDENCY, SEVERITY_ERROR, SEVERITY_WARNING,
+)
 from verisight.utils.file_utils import read_file, discover_files, RTL_EXTENSIONS
 from verisight.utils.sv_lexer import strip_comments
 from verisight.utils.logger import get_logger
@@ -38,98 +37,291 @@ from verisight.parsers.pyslang_rtl import build_rtl_knowledge
 
 logger = get_logger("rtl_parser")
 
-VERILOG_PRIMITIVES = {
-    "and", "nand", "or", "nor", "xor", "xnor", "buf", "not",
-    "bufif0", "bufif1", "notif0", "notif1", "pullup", "pulldown",
-    "cmos", "rcmos", "nmos", "pmos", "rnmos", "rpmos", "rtran", "rtranif0", "rtranif1", "tran", "tranif0", "tranif1",
-}
 
-STANDARD_PACKAGES = {"uvm_pkg"}
+def resolve_rtl_files(path: Union[str, Path, Sequence[Union[str, Path]]]) -> List[Path]:
+    """Resolve single path, directory, or sequence of paths into existing file paths."""
+    resolved_files: List[Path] = []
+    seen = set()
+
+    def _add_p(p_in: Path):
+        try:
+            r = p_in.resolve()
+            if r not in seen and p_in.is_file() and p_in.suffix.lower() in RTL_EXTENSIONS:
+                seen.add(r)
+                resolved_files.append(p_in)
+        except Exception:
+            pass
+
+    if isinstance(path, (str, Path)):
+        p = Path(path)
+        if p.is_file():
+            _add_p(p)
+        elif p.is_dir():
+            for f in discover_files(p, RTL_EXTENSIONS):
+                _add_p(f)
+        else:
+            # Check if multiple paths separated by commas or spaces
+            parts = str(path).replace(",", " ").split()
+            if len(parts) > 1:
+                for part in parts:
+                    sub_p = Path(part)
+                    if sub_p.is_file():
+                        _add_p(sub_p)
+                    elif sub_p.is_dir():
+                        for f in discover_files(sub_p, RTL_EXTENSIONS):
+                            _add_p(f)
+    elif isinstance(path, Sequence):
+        for item in path:
+            p = Path(item)
+            if p.is_file():
+                _add_p(p)
+            elif p.is_dir():
+                for f in discover_files(p, RTL_EXTENSIONS):
+                    _add_p(f)
+
+    return resolved_files
+
+
+def order_rtl_sources(files: Sequence[Path]) -> Tuple[List[Path], List[str], List[str], List[str]]:
+    """
+    Analyzes multiple RTL files and determines compilation order:
+    1. Header/include files (.svh, .vh)
+    2. Packages (package ...; endpackage)
+    3. Interfaces (interface ...; endinterface)
+    4. Leaf submodules (modules instantiated by others)
+    5. Top-level modules
+
+    Also extracts defined packages, interfaces, and auto-include directories.
+    """
+    headers: List[Path] = []
+    packages_files: List[Path] = []
+    interfaces_files: List[Path] = []
+    modules_files: List[Path] = []
+
+    defined_packages: List[str] = []
+    defined_interfaces: List[str] = []
+    auto_incdirs: Set[str] = set()
+
+    pkg_pattern = re.compile(r"\bpackage\s+(\w+)\s*;", re.MULTILINE)
+    iface_pattern = re.compile(r"\binterface\s+(\w+)\s*(?:#|\()?", re.MULTILINE)
+    mod_pattern = re.compile(r"\bmodule\s+(\w+)\s*(?:#|\()?", re.MULTILINE)
+    inst_pattern = re.compile(r"\b(\w+)\s+(?:#\s*\([^)]*\)\s+)?(\w+)\s*\(", re.MULTILINE)
+
+    file_meta: Dict[Path, Dict[str, Any]] = {}
+
+    for f in files:
+        auto_incdirs.add(str(f.parent.resolve()))
+        suffix = f.suffix.lower()
+        content = ""
+        try:
+            content = f.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+        clean = strip_comments(content) if content else ""
+        pkgs = pkg_pattern.findall(clean)
+        ifaces = iface_pattern.findall(clean)
+        mods = mod_pattern.findall(clean)
+
+        defined_packages.extend(pkgs)
+        defined_interfaces.extend(ifaces)
+
+        if suffix in (".svh", ".vh"):
+            headers.append(f)
+        elif pkgs:
+            packages_files.append(f)
+        elif ifaces and not mods:
+            interfaces_files.append(f)
+        else:
+            modules_files.append(f)
+
+        file_meta[f] = {
+            "pkgs": pkgs,
+            "ifaces": ifaces,
+            "mods": mods,
+            "insts": [inst.get("module") for inst in _extract_instantiations(clean, str(f))],
+        }
+
+    # Dependency sort modules: submodules before instantiators
+    ordered_mods: List[Path] = []
+    visited = set()
+
+    def _visit_mod(p: Path, stack: set):
+        if p in visited:
+            return
+        stack.add(p)
+        p_insts = set(file_meta.get(p, {}).get("insts", []))
+        for other_p in modules_files:
+            if other_p != p and other_p not in visited and other_p not in stack:
+                other_mods = set(file_meta.get(other_p, {}).get("mods", []))
+                if p_insts.intersection(other_mods):
+                    _visit_mod(other_p, stack)
+        stack.remove(p)
+        visited.add(p)
+        ordered_mods.append(p)
+
+    for mf in modules_files:
+        if mf not in visited:
+            _visit_mod(mf, set())
+
+    # Prioritize leaf modules (modules with 0 instantiations) before parent/top modules
+    leaf_mods = [f for f in ordered_mods if not file_meta.get(f, {}).get("insts")]
+    parent_mods = [f for f in ordered_mods if f not in leaf_mods]
+
+    ordered_files = headers + packages_files + interfaces_files + leaf_mods + parent_mods
+    return ordered_files, defined_packages, defined_interfaces, sorted(auto_incdirs)
+
+
+def check_missing_dependencies(
+    modules: List[RTLModule],
+    defined_packages: Sequence[str],
+    file_list: Optional[Sequence[Union[str, Path]]] = None,
+) -> Tuple[List[str], List[ParserDiagnostic]]:
+    """Detect instantiated modules that are missing from uploaded RTL."""
+    missing: List[str] = []
+    diags: List[ParserDiagnostic] = []
+    defined_mods = {m.name for m in modules}
+    verilog_primitives = {
+        "and", "nand", "or", "nor", "xor", "xnor", "buf", "not",
+        "bufif0", "bufif1", "notif0", "notif1", "pulldown", "pullup",
+        "nmos", "pmos", "cmos", "rnmos", "rpmos", "rcmos", "tran",
+        "rtran", "tranif0", "rtranif0", "tranif1", "rtranif1",
+        "interface", "modport", "package", "typedef", "struct", "enum",
+        "initial", "always", "assign", "begin", "end", "task", "function",
+    }
+    for m in modules:
+        for inst in m.instantiations:
+            inst_mod = inst.get("module", "")
+            if (
+                inst_mod
+                and inst_mod not in defined_mods
+                and inst_mod not in verilog_primitives
+                and not inst_mod.startswith("$")
+                and inst_mod not in missing
+            ):
+                missing.append(inst_mod)
+                diags.append(ParserDiagnostic(
+                    severity=SEVERITY_ERROR,
+                    category=CATEGORY_MISSING_DEPENDENCY,
+                    message=(
+                        f"Module '{inst_mod}' instantiated in module '{m.name}' "
+                        f"({m.file}) is not defined in any uploaded RTL source file."
+                    ),
+                    file=m.file,
+                    code="MissingModuleDependency",
+                ))
+
+    # Also inspect raw source files for instantiations that could not be elaborated by AST
+    if file_list:
+        for f in file_list:
+            content = read_file(f)
+            clean = strip_comments(content) if content else ""
+            file_insts = _extract_instantiations(clean, str(f))
+            for inst in file_insts:
+                inst_mod = inst.get("module", "")
+                if (
+                    inst_mod
+                    and inst_mod not in defined_mods
+                    and inst_mod not in verilog_primitives
+                    and not inst_mod.startswith("$")
+                    and inst_mod not in missing
+                ):
+                    missing.append(inst_mod)
+                    diags.append(ParserDiagnostic(
+                        severity=SEVERITY_ERROR,
+                        category=CATEGORY_MISSING_DEPENDENCY,
+                        message=(
+                            f"Module '{inst_mod}' instantiated in file '{Path(f).name}' "
+                            f"is not defined in any uploaded RTL source file."
+                        ),
+                        file=str(f),
+                        code="MissingModuleDependency",
+                    ))
+
+    return sorted(set(missing)), diags
 
 
 def parse_rtl(
-    path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
-    files: Optional[List[Union[str, Path]]] = None,
-    top_module: Optional[str] = None,
+    path: Union[str, Path, Sequence[Union[str, Path]]],
     include_dirs: Optional[Sequence[str]] = None,
     defines: Optional[Sequence[str]] = None,
     allow_fallback: bool = True,
-    rtl_path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
-    rtl_files: Optional[List[Union[str, Path]]] = None,
-    **kwargs,
+    top_module: Optional[str] = None,
 ) -> RTLKnowledge:
     """
-    Parse RTL source files from a single file, a directory, or a list of files.
+    Parse RTL source files from a file, directory, or sequence of files.
 
     Uses the pyslang frontend first; falls back to the legacy regex parser
     only when pyslang is unavailable or yields no modules.
 
     Args:
-        path: Path to a single file, a directory, or list of file paths.
-        files: Optional explicit list of file paths (takes precedence or combines with path).
-        top_module: Optional explicit top-level module name override.
+        path: Single file, directory, or sequence of .sv/.v/.vhd files.
         include_dirs: Optional `include search directories.
         defines: Optional macro defines ("NAME" or "NAME=value").
-        allow_fallback: If True, fall back to the regex parser when the
-            pyslang frontend is unavailable or finds no modules. The result
-            is then flagged degraded. If False, the (possibly empty) pyslang
-            result is returned as-is.
+        allow_fallback: If True, fall back to the regex parser when pyslang
+            is unavailable or finds no modules.
+        top_module: Optional explicit top-level module selection.
 
     Returns:
-        RTLKnowledge Pydantic model with modules, packages, dependencies, and top module.
+        RTLKnowledge Pydantic model with dependency ordering and diagnostics.
     """
-    path = path or rtl_path or kwargs.get("rtl")
-    files = files or rtl_files
-    # ── 1. Resolve and deduplicate file list ───────────────────────────
-    resolved_paths: List[Path] = []
+    logger.info(f"Parsing RTL: {path}")
+    files = resolve_rtl_files(path)
 
-    def _add_target(target: Union[str, Path]):
-        if isinstance(target, (list, tuple)):
-            for item in target:
-                _add_target(item)
-            return
-
-        p = Path(target)
-        if p.is_file():
-            if p not in resolved_paths:
-                resolved_paths.append(p)
-        elif p.is_dir():
-            found = discover_files(p, RTL_EXTENSIONS)
-            for f in found:
-                if f not in resolved_paths:
-                    resolved_paths.append(f)
-        else:
-            logger.warning(f"RTL target path does not exist on disk: {target}")
-
-    if files:
-        _add_target(files)
-    if path:
-        _add_target(path)
-
-    if not resolved_paths:
-        logger.warning("parse_rtl: No valid RTL source files found")
-        return RTLKnowledge(
-            modules=[],
-            top_module="",
-            file_list=[],
-            total_lines=0,
-            global_issues=["No RTL source files provided or found"],
+    if not files:
+        logger.warning(f"No RTL files resolved from path: {path}")
+        pstatus = ParserStatus(
+            backend="none",
+            syntax_ok=False,
+            degraded=True,
+            diagnostics=[
+                ParserDiagnostic(
+                    severity=SEVERITY_ERROR,
+                    category=CATEGORY_TOOL,
+                    message=f"No RTL source files found at: {path}",
+                    code="NoFilesFound",
+                )
+            ]
         )
+        return RTLKnowledge(parser_status=pstatus)
 
-    file_strs = [str(f) for f in resolved_paths]
-    include_dirs = list(include_dirs or [])
+    ordered_files, def_pkgs, def_ifaces, auto_incdirs = order_rtl_sources(files)
+    file_strs = [str(f) for f in ordered_files]
+
+    all_include_dirs = list(include_dirs or [])
+    for d in auto_incdirs:
+        if d not in all_include_dirs:
+            all_include_dirs.append(d)
+
     defines = list(defines or [])
 
     # ─── Primary path: pyslang frontend ───────────────────────────────
     if sv_frontend.is_available() and file_strs:
         try:
-            result = sv_frontend.compile_files(file_strs, include_dirs, defines)
+            result = sv_frontend.compile_files(file_strs, all_include_dirs, defines)
             if result.compilation is not None:
                 knowledge = build_rtl_knowledge(result, file_strs)
                 knowledge.parser_status = result.status
+                knowledge.packages = def_pkgs
+                knowledge.interfaces = def_ifaces
+
+                # Missing dependencies check
+                missing_deps, dep_diags = check_missing_dependencies(knowledge.modules, def_pkgs, file_list=ordered_files)
+                knowledge.missing_dependencies = missing_deps
+                knowledge.parser_status.diagnostics.extend(dep_diags)
+
+                # Top module resolution
+                if top_module:
+                    knowledge.top_module = top_module
+                elif knowledge.top_candidates:
+                    knowledge.top_module = knowledge.top_candidates[0]
+                    if len(knowledge.top_candidates) > 1:
+                        knowledge.parser_status.notes.append(
+                            f"Multiple candidate top modules: {', '.join(knowledge.top_candidates)}. "
+                            f"Selected '{knowledge.top_module}' as top."
+                        )
+
                 if knowledge.modules or not allow_fallback:
-                    if top_module:
-                        knowledge.top_module = top_module
                     logger.info(
                         f"RTL parsed (pyslang): {len(knowledge.modules)} modules, "
                         f"top={knowledge.top_module}, "
@@ -137,10 +329,11 @@ def parse_rtl(
                         f"degraded={result.status.degraded}"
                     )
                     return knowledge
+
                 logger.warning(
                     "pyslang parsed no modules — falling back to regex parser (degraded)."
                 )
-                fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+                fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
                 _mark_degraded(fallback, result.status, reason="pyslang found no modules")
                 return fallback
             elif not allow_fallback:
@@ -151,14 +344,14 @@ def parse_rtl(
                 logger.warning(
                     "pyslang frontend failed to compile — falling back to regex parser (degraded)."
                 )
-                fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+                fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
                 _mark_degraded(fallback, result.status, reason="pyslang compilation failed")
                 return fallback
         except Exception as exc:  # defensive: never let the frontend crash parsing
             logger.warning(f"pyslang RTL parse raised {exc!r} — regex fallback (degraded).")
             if not allow_fallback:
                 raise
-            fallback = _parse_rtl_regex(resolved_paths, top_module=top_module)
+            fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
             _mark_degraded(fallback, None, reason=f"pyslang exception: {exc!r}")
             return fallback
 
@@ -168,7 +361,7 @@ def parse_rtl(
             f"pyslang unavailable ({sv_frontend.unavailable_reason()}) — "
             "using regex fallback (degraded)."
         )
-    knowledge = _parse_rtl_regex(resolved_paths, top_module=top_module)
+    knowledge = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
     _mark_degraded(
         knowledge, None,
         reason=f"pyslang unavailable: {sv_frontend.unavailable_reason()}",
@@ -186,7 +379,7 @@ def _mark_degraded(
         backend="regex-fallback",
         degraded=True,
         elaborated=False,
-        syntax_ok=True,
+        syntax_ok=True,  # regex parser does not validate syntax
         notes=[
             f"Regex fallback used: {reason}.",
             "Results are approximate: no type/scope resolution, SVA/UVM/"
@@ -199,266 +392,71 @@ def _mark_degraded(
     knowledge.parser_status = status
 
 
-def _parse_rtl_regex(resolved_paths: List[Path], top_module: Optional[str] = None) -> RTLKnowledge:
-    """Deterministic regex/heuristic RTL parser (fallback and multi-file project parser)."""
-    logger.info(f"Parsing RTL project ({len(resolved_paths)} files)")
-    modules: List[RTLModule] = []
-    file_list: List[str] = []
+def _parse_rtl_regex(
+    files: Sequence[Path],
+    top_module: Optional[str] = None,
+    def_pkgs: Optional[Sequence[str]] = None,
+    def_ifaces: Optional[Sequence[str]] = None,
+) -> RTLKnowledge:
+    """Legacy regex/heuristic RTL parser (fallback only)."""
+    modules = []
+    file_list = []
     total_lines = 0
-    packages_declared: List[str] = []
-    interfaces_declared: List[str] = []
-    file_basenames: Set[str] = set()
-    global_issues: List[str] = []
 
-    for f in resolved_paths:
-        f_str = str(f)
-        file_list.append(f_str)
-        file_basenames.add(f.name)
-
-        # Check for empty file
-        try:
-            size = f.stat().st_size
-            if size == 0:
-                global_issues.append(f"Empty source file: {f.name}")
-                continue
-        except Exception:
-            pass
-
+    for f in files:
+        file_list.append(str(f))
         content = read_file(f)
         if not content:
             continue
-
-        file_lines = content.count("\n") + 1
-        total_lines += file_lines
-
-        # Parse packages, interfaces, modules, or VHDL entities
-        file_modules = _parse_file(f_str, content)
-        for m in file_modules:
-            if m.is_package and m.name not in packages_declared:
-                packages_declared.append(m.name)
-            elif m.is_interface and m.name not in interfaces_declared:
-                interfaces_declared.append(m.name)
+        total_lines += content.count("\n") + 1
+        file_modules = _parse_file(str(f), content)
         modules.extend(file_modules)
 
-    # ── 2. Collect declared entities and track cross-file dependencies ─
-    declared_module_names = {m.name for m in modules}
-    all_known_entities = declared_module_names | set(packages_declared) | set(interfaces_declared) | VERILOG_PRIMITIVES
-
-    missing_dependencies: List[Dict[str, Any]] = []
-
-    for m in modules:
-        # Check module instantiations
-        for inst in m.instantiations:
-            inst_mod = inst.get("module", "")
-            if inst_mod and inst_mod not in all_known_entities and not inst_mod.startswith("$"):
-                issue_dict = {
-                    "type": "missing_module",
-                    "required": inst_mod,
-                    "used_by": m.name,
-                    "file": inst.get("file", m.file),
-                    "description": f"Module '{m.name}' in {Path(m.file).name} instantiates undefined module '{inst_mod}'",
-                }
-                missing_dependencies.append(issue_dict)
-                global_issues.append(issue_dict["description"])
-
-        # Check package imports
-        for pkg in m.package_imports:
-            clean_pkg = pkg.split("::")[0]
-            if clean_pkg not in packages_declared and clean_pkg not in STANDARD_PACKAGES:
-                issue_dict = {
-                    "type": "missing_package",
-                    "required": clean_pkg,
-                    "used_by": m.name,
-                    "file": m.file,
-                    "description": f"Module '{m.name}' imports undeclared package '{clean_pkg}'",
-                }
-                missing_dependencies.append(issue_dict)
-                global_issues.append(issue_dict["description"])
-
-        # Check include files
-        for inc in m.includes:
-            inc_name = Path(inc).name
-            if inc_name not in file_basenames and not Path(inc).exists():
-                issue_dict = {
-                    "type": "missing_include",
-                    "required": inc,
-                    "used_by": m.name,
-                    "file": m.file,
-                    "description": f"File {Path(m.file).name} includes missing header '{inc}'",
-                }
-                missing_dependencies.append(issue_dict)
-                global_issues.append(issue_dict["description"])
-
-    # ── 3. Top-Level Module Detection & Resolution ─────────────────────
-    instantiated_modules = set()
+    # Detect top module (module that isn't instantiated by others)
+    instantiated = set()
     for m in modules:
         for inst in m.instantiations:
-            instantiated_modules.add(inst.get("module", ""))
+            instantiated.add(inst.get("module", ""))
+    top_candidates = [m.name for m in modules if m.name not in instantiated]
 
-    # Top candidates are real modules (not packages, not interfaces) never instantiated
-    top_candidates = [
-        m.name for m in modules
-        if not m.is_package and not m.is_interface and m.name not in instantiated_modules
-    ]
+    resolved_top = top_module if top_module else (top_candidates[0] if top_candidates else "")
 
-    detected_top = ""
-    if top_module:
-        # User specified top module
-        if top_module in declared_module_names:
-            detected_top = top_module
-        else:
-            global_issues.append(
-                f"Specified top module '{top_module}' not found in parsed modules: {sorted(list(declared_module_names))}"
-            )
-            detected_top = top_candidates[0] if top_candidates else (modules[0].name if modules else "")
-    else:
-        if len(top_candidates) == 1:
-            detected_top = top_candidates[0]
-        elif len(top_candidates) > 1:
-            # Ranking heuristics:
-            # 1. Contains 'top' in name (case-insensitive)
-            # 2. Instantiates the most submodules
-            # 3. First candidate in file list
-            ranked = sorted(
-                top_candidates,
-                key=lambda name: (
-                    1 if "top" in name.lower() or "dut" in name.lower() else 0,
-                    len([inst for m in modules if m.name == name for inst in m.instantiations]),
-                ),
-                reverse=True,
-            )
-            detected_top = ranked[0]
-            global_issues.append(
-                f"Multiple top-level candidates detected ({', '.join(top_candidates)}). "
-                f"Auto-selected '{detected_top}' based on hierarchy heuristics."
-            )
-        elif modules:
-            # If all are instantiated (cycle) or only 1 module exists
-            detected_top = modules[0].name
-
-    # ── 4. Resolve Compilation Order (Topological) ─────────────────────
-    compilation_order = _compute_compilation_order(modules, file_list)
-
-    # ── 5. Collect always block issues ─────────────────────────────────
+    # Collect global issues
+    global_issues = []
     for m in modules:
         for ab in m.always_blocks:
             global_issues.extend(ab.issues)
 
+    missing_deps, dep_diags = check_missing_dependencies(modules, def_pkgs or [], file_list=files)
+
     knowledge = RTLKnowledge(
         modules=modules,
-        top_module=detected_top,
+        top_module=resolved_top,
         file_list=file_list,
         total_lines=total_lines,
         global_issues=global_issues,
-        packages=packages_declared,
-        interfaces=interfaces_declared,
-        compilation_order=compilation_order,
-        missing_dependencies=missing_dependencies,
+        packages=list(def_pkgs or []),
+        interfaces=list(def_ifaces or []),
+        missing_dependencies=missing_deps,
         top_candidates=top_candidates,
     )
 
     logger.info(
-        f"RTL project parsed: {len(modules)} modules ({len(packages_declared)} pkgs, "
-        f"{len(interfaces_declared)} ifaces), {total_lines} lines across {len(file_list)} files, "
-        f"top={detected_top}, {len(global_issues)} diagnostics"
+        f"RTL parsed: {len(modules)} modules, {total_lines} lines, "
+        f"top={top_module}, {len(global_issues)} issues"
     )
     return knowledge
 
 
-def _compute_compilation_order(modules: List[RTLModule], file_list: List[str]) -> List[str]:
-    """
-    Compute optimal compilation order for RTL source files.
-    Packages first, interfaces next, leaf submodules before parents.
-    """
-    file_ranks: Dict[str, int] = {f: 100 for f in file_list}
-
-    # 1. Packages get lowest rank (compile earliest)
-    for m in modules:
-        if m.is_package:
-            file_ranks[m.file] = min(file_ranks.get(m.file, 100), 10)
-        elif m.is_interface:
-            file_ranks[m.file] = min(file_ranks.get(m.file, 100), 20)
-
-    # 2. Dependency ordering: if module A instantiates module B, file of B should compile before file of A
-    module_to_file = {m.name: m.file for m in modules}
-    for m in modules:
-        for inst in m.instantiations:
-            child_mod = inst.get("module")
-            if child_mod in module_to_file:
-                child_file = module_to_file[child_mod]
-                if child_file != m.file:
-                    file_ranks[child_file] = min(file_ranks[child_file], file_ranks[m.file] - 1)
-
-    # Sort files by calculated rank, preserving original relative order for ties
-    ordered = sorted(file_list, key=lambda f: (file_ranks.get(f, 100), file_list.index(f)))
-    return ordered
-
-
 def _parse_file(filepath: str, content: str) -> List[RTLModule]:
-    """Parse all modules, packages, interfaces, and VHDL entities from a single file."""
-    modules: List[RTLModule] = []
+    """Parse all modules from a single file."""
+    modules = []
     clean = strip_comments(content)
     lines = content.splitlines()
-    is_vhdl = filepath.lower().endswith((".vhd", ".vhdl"))
 
-    # Extract file-level package imports and `include directives
-    file_imports = re.findall(r"import\s+([\w:*]+)\s*;", clean)
-    file_includes = re.findall(r"`include\s+[\"<]([^\"<>]+)[\">]", clean)
-
-    if is_vhdl:
-        return _parse_vhdl_file(filepath, content, clean, lines)
-
-    # ── A. Find SystemVerilog Packages ────────────────────────────────
-    pkg_pattern = re.compile(
-        r"\bpackage\s+(\w+)\s*;([\s\S]*?)\bendpackage\b",
-        re.MULTILINE
-    )
-    for match in pkg_pattern.finditer(clean):
-        pkg_name = match.group(1)
-        pkg_body = match.group(2)
-        pkg_start = content[:match.start()].count("\n") + 1
-        pkg_end = content[:match.end()].count("\n") + 1
-
-        pkg_module = RTLModule(
-            name=pkg_name,
-            file=filepath,
-            parameters=_extract_parameters(pkg_body),
-            raw_source=content[match.start():match.end()],
-            line_count=pkg_end - pkg_start + 1,
-            is_package=True,
-            package_imports=file_imports,
-            includes=file_includes,
-        )
-        modules.append(pkg_module)
-
-    # ── B. Find SystemVerilog Interfaces ──────────────────────────────
-    iface_pattern = re.compile(
-        r"\binterface\s+(\w+)\s*(?:#\s*\([\s\S]*?\))?\s*(?:\([\s\S]*?\))?\s*;([\s\S]*?)\bendinterface\b",
-        re.MULTILINE
-    )
-    for match in iface_pattern.finditer(clean):
-        iface_name = match.group(1)
-        iface_body = match.group(2)
-        iface_start = content[:match.start()].count("\n") + 1
-        iface_end = content[:match.end()].count("\n") + 1
-
-        iface_module = RTLModule(
-            name=iface_name,
-            file=filepath,
-            ports=_extract_ports(clean[match.start():match.end()]),
-            parameters=_extract_parameters(iface_body),
-            raw_source=content[match.start():match.end()],
-            line_count=iface_end - iface_start + 1,
-            is_interface=True,
-            package_imports=file_imports,
-            includes=file_includes,
-        )
-        modules.append(iface_module)
-
-    # ── C. Find SystemVerilog / Verilog Modules ────────────────────────
-    # Matches module declarations: module name #(...) (...); or module name (...); or module name;
+    # Find all module declarations
     module_pattern = re.compile(
-        r"\bmodule\s+(\w+)\s*(?:#\s*\([\s\S]*?\))?\s*(?:\([\s\S]*?\))?\s*;",
+        r"module\s+(\w+)\s*(?:#\s*\([\s\S]*?\))?\s*\([\s\S]*?\)\s*;",
         re.MULTILINE
     )
 
@@ -467,7 +465,10 @@ def _parse_file(filepath: str, content: str) -> List[RTLModule]:
         mod_start = content[:match.start()].count("\n") + 1
 
         # Find matching endmodule
-        endmod = re.search(r"\bendmodule\b", clean[match.start():])
+        endmod = re.search(
+            r"\bendmodule\b",
+            clean[match.start():]
+        )
         if endmod:
             mod_end_offset = match.start() + endmod.end()
             mod_content = clean[match.start():mod_end_offset]
@@ -477,9 +478,6 @@ def _parse_file(filepath: str, content: str) -> List[RTLModule]:
             mod_content = clean[match.start():]
             mod_raw = content[match.start():]
             mod_end = len(lines)
-
-        module_imports = re.findall(r"import\s+([\w:*]+)\s*;", mod_content)
-        all_imports = sorted(set(file_imports + module_imports))
 
         module = RTLModule(
             name=mod_name,
@@ -494,47 +492,8 @@ def _parse_file(filepath: str, content: str) -> List[RTLModule]:
             assertions=_extract_assertions(mod_content, filepath, mod_start),
             raw_source=mod_raw,
             line_count=mod_end - mod_start + 1,
-            package_imports=all_imports,
-            includes=file_includes,
         )
         modules.append(module)
-
-    return modules
-
-
-def _parse_vhdl_file(filepath: str, content: str, clean: str, lines: List[str]) -> List[RTLModule]:
-    """Parse basic VHDL entity declarations into RTLModule objects."""
-    modules: List[RTLModule] = []
-    entity_pattern = re.compile(
-        r"\bentity\s+(\w+)\s+is\s+port\s*\(([\s\S]*?)\)\s*;\s*end(?:\s+(?:entity\s+)?\1)?\s*;",
-        re.IGNORECASE | re.MULTILINE
-    )
-
-    for match in entity_pattern.finditer(clean):
-        ent_name = match.group(1)
-        port_clause = match.group(2)
-        start_line = content[:match.start()].count("\n") + 1
-        end_line = content[:match.end()].count("\n") + 1
-
-        ports: List[Port] = []
-        for port_line in port_clause.split(";"):
-            p_match = re.search(r"(\w+)\s*:\s*(in|out|inout)\s+([\w_]+(?:\s*\([^)]+\))?)", port_line, re.IGNORECASE)
-            if p_match:
-                p_name, p_dir, p_type = p_match.group(1), p_match.group(2).lower(), p_match.group(3)
-                ports.append(Port(
-                    name=p_name,
-                    direction=p_dir,
-                    signal_type=p_type,
-                    width="1" if "vector" not in p_type.lower() else p_type,
-                ))
-
-        modules.append(RTLModule(
-            name=ent_name,
-            file=filepath,
-            ports=ports,
-            raw_source=content[match.start():match.end()],
-            line_count=end_line - start_line + 1,
-        ))
 
     return modules
 
@@ -594,6 +553,7 @@ def _extract_always_blocks(
     """Extract and classify always blocks."""
     blocks = []
 
+    # Pattern for always blocks with different sensitivities
     always_pattern = re.compile(
         r"(always_ff|always_comb|always_latch|always)\s*"
         r"(?:@\s*\(([^)]*)\))?\s*"
@@ -606,17 +566,21 @@ def _extract_always_blocks(
         sensitivity = match.group(2) or ""
         begin_pos = match.start(3)
 
+        # Find matching 'end'
         block_content = _find_matching_block(content, begin_pos)
         block_start_line = module_start_line + content[:match.start()].count("\n")
         block_end_line = module_start_line + content[:begin_pos + len(block_content)].count("\n")
 
+        # Classify block type
         block_type, clock, reset, reset_active = _classify_always(
             keyword, sensitivity, block_content
         )
 
+        # Extract signals written and read
         signals_written = _extract_lhs_signals(block_content)
         signals_read = _extract_rhs_signals(block_content, signals_written)
 
+        # Check for common issues
         issues = _check_always_issues(
             block_type, sensitivity, block_content, signals_written
         )
@@ -636,7 +600,7 @@ def _extract_always_blocks(
             has_reset=has_reset,
             line_start=block_start_line,
             line_end=block_end_line,
-            raw_code=block_content[:1000],
+            raw_code=block_content[:1000],  # cap to avoid huge strings
             issues=issues,
         ))
 
@@ -646,7 +610,11 @@ def _extract_always_blocks(
 def _classify_always(
     keyword: str, sensitivity: str, body: str
 ) -> Tuple[str, str, str, str]:
-    """Classify an always block as sequential, combinational, or latch."""
+    """
+    Classify an always block as sequential, combinational, or latch.
+
+    Returns (block_type, clock_signal, reset_signal, reset_active_level).
+    """
     clock = ""
     reset = ""
     reset_active = ""
@@ -669,6 +637,7 @@ def _classify_always(
     elif keyword == "always_latch":
         block_type = "latch"
     else:
+        # Plain 'always' — classify by sensitivity list
         if re.search(r"posedge|negedge", sensitivity):
             block_type = "sequential"
             clk_match = re.search(r"posedge\s+(\w+)", sensitivity)
@@ -716,21 +685,27 @@ def _check_always_issues(
     issues = []
 
     if block_type == "sequential":
+        # Check for blocking assignments in sequential block
         if re.search(r"\w+\s*=[^=]", body) and not re.search(r"<=", body):
             issues.append("blocking_assignment_in_sequential: Uses = instead of <= in sequential block")
 
     if block_type == "combinational":
+        # Check for non-blocking assignments in combinational block
         if re.search(r"<=", body):
             issues.append("nonblocking_in_combinational: Uses <= in combinational block")
 
+        # Check for incomplete sensitivity list (only for plain 'always')
         if sensitivity and sensitivity != "*" and "posedge" not in sensitivity:
             issues.append("incomplete_sensitivity: Sensitivity list may be incomplete, use always @(*) or always_comb")
 
+    # Check for inferred latch (if without else in combinational)
+    if block_type == "combinational":
         if_count = len(re.findall(r"\bif\b", body))
         else_count = len(re.findall(r"\belse\b", body))
         if if_count > else_count:
             issues.append("potential_latch: if without else may infer latch")
 
+    # Check for missing default in case
     if re.search(r"\bcase\b", body) and not re.search(r"\bdefault\b", body):
         issues.append("missing_case_default: case statement without default")
 
@@ -759,6 +734,16 @@ def _extract_fsms(content: str, module_name: str) -> List[FSM]:
     """Extract finite state machines from case statements on enum/parameter states."""
     fsms = []
 
+    # Find parameter/localparam state definitions
+    state_defs: Dict[str, List[FSMState]] = {}
+    # Pattern: parameter IDLE = 2'b00, RUN = 2'b01, ...
+    enum_pattern = re.compile(
+        r"(?:typedef\s+enum\s+(?:logic\s*\[[\d:]+\]\s*)?\{([^}]+)\}\s*(\w+))|"
+        r"(?:(?:parameter|localparam)\s+(\w+)\s*=\s*\d+'[bhd]?\d+)",
+        re.MULTILINE
+    )
+
+    # Find case statements that look like FSMs
     case_pattern = re.compile(
         r"case\s*\(\s*(\w+)\s*\)([\s\S]*?)endcase",
         re.MULTILINE
@@ -768,13 +753,14 @@ def _extract_fsms(content: str, module_name: str) -> List[FSM]:
         state_var = case_match.group(1)
         case_body = case_match.group(2)
 
+        # Extract state labels from case items
         case_items = re.findall(
             r"(\w+)\s*:\s*([\s\S]*?)(?=\w+\s*:|default\s*:|$)",
             case_body
         )
 
         if len(case_items) < 2:
-            continue
+            continue  # Not enough states for an FSM
 
         states = []
         transitions = []
@@ -784,6 +770,7 @@ def _extract_fsms(content: str, module_name: str) -> List[FSM]:
                 continue
             states.append(FSMState(name=state_name))
 
+            # Find next-state assignments
             next_state_matches = re.findall(
                 r"(\w+)\s*<=?\s*(\w+)\s*;",
                 state_body
@@ -814,6 +801,7 @@ def _extract_clock_domains(content: str) -> List[ClockDomain]:
     domains: Dict[str, List[str]] = {}
     domain_resets: Dict[str, str] = {}
 
+    # Find all posedge clock references
     always_pattern = re.compile(
         r"always(?:_ff)?\s*@\s*\(([^)]+)\)\s*begin([\s\S]*?)end",
         re.MULTILINE
@@ -829,9 +817,11 @@ def _extract_clock_domains(content: str) -> List[ClockDomain]:
             if clk not in domains:
                 domains[clk] = []
 
+            # Add signals assigned in this block
             written = _extract_lhs_signals(body)
             domains[clk].extend(written)
 
+            # Check for reset
             rst_match = re.search(r"(?:posedge|negedge)\s+(\w*(?:rst|reset)\w*)", sensitivity, re.IGNORECASE)
             if rst_match:
                 domain_resets[clk] = rst_match.group(1)
@@ -855,17 +845,22 @@ def _extract_assignments(content: str) -> List[str]:
 def _extract_instantiations(content: str, filepath: str) -> List[Dict[str, str]]:
     """Extract module instantiations."""
     instances = []
+    # Pattern: module_name [#(params)] instance_name (ports);
     inst_pattern = re.compile(
         r"(\w+)\s+(?:#\s*\([^)]*\)\s+)?(\w+)\s*\(",
         re.MULTILINE
     )
 
+    # Keywords that aren't module instantiations
     not_modules = {
         "module", "function", "task", "if", "else", "case", "for",
         "while", "assign", "always", "initial", "begin", "end",
         "input", "output", "inout", "wire", "reg", "logic",
         "parameter", "localparam", "generate", "integer",
-        "always_ff", "always_comb", "always_latch", "package", "interface",
+        "always_ff", "always_comb", "always_latch",
+        "interface", "modport", "package", "endmodule", "endinterface",
+        "endpackage", "import", "export", "typedef", "struct", "enum",
+        "assert", "assume", "cover", "property", "sequence", "return",
     }
 
     for match in inst_pattern.finditer(content):

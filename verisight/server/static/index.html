@@ -84,101 +84,67 @@
         <!-- Configuration Card -->
         <div class="card form-card" id="simConfigCard">
           <div class="card-header">
-            <h2 class="card-title">Simulation Parameters</h2>
-            <span class="card-badge">Ready to Launch</span>
+            <h2 class="card-title">Simulation & Verification Parameters</h2>
+            <div class="mode-badge-wrap">
+              <span class="card-badge mode-badge-rtl" id="analysisModeBadge">RTL-Only Analysis</span>
+              <span class="card-badge file-count-badge" id="fileCountBadge">1 File</span>
+            </div>
           </div>
 
           <form id="simForm" class="sim-form" onsubmit="return false;">
-            <!-- Analysis Mode Indicator Banner -->
-            <div class="analysis-mode-banner mode-rtl" id="analysisModeBanner">
-              <div class="mode-badge" id="modeBadge">
-                <span class="mode-pulse"></span>
-                <span class="mode-title" id="modeTitle">🟢 RTL-Only Analysis Mode</span>
-
-              </div>
-              <span class="mode-desc" id="modeDesc">Standard functional verification and root-cause debugging without power intent.</span>
+            <!-- Section 1: Multi-File RTL Upload -->
+            <div class="form-section-header">
+              <span class="section-title">RTL Source Files (Multi-File Ingestion)</span>
             </div>
 
-            <!-- RTL Source Files Section -->
-            <div class="form-section rtl-upload-section">
-              <div class="section-title-row">
-                <label class="section-label"><span>📁</span> RTL Source Files <span class="tag-required">Required</span></label>
-                <span class="badge-count" id="rtlFileCount">1 file</span>
-              </div>
-
-              <!-- Multi-file Dropzone -->
-              <div class="file-dropzone" id="rtlDropzone">
+            <div class="form-group">
+              <div class="upload-dropzone" id="rtlDropzone">
                 <input type="file" id="rtlFileInput" multiple accept=".v,.sv,.vh,.svh,.vhd,.vhdl" style="display:none;">
                 <div class="dropzone-content">
-                  <span class="dropzone-icon">📥</span>
-                  <span class="dropzone-text">Drag & drop multiple RTL files here, or <button type="button" class="btn-link" id="btnBrowseRtl">browse files</button></span>
-                  <span class="dropzone-hint">Supports .v, .sv, .vh, .svh, .vhd, .vhdl (Preserves separate units)</span>
+                  <span class="dropzone-icon">📁</span>
+                  <span class="dropzone-text"><strong>Choose RTL files</strong> or drag & drop</span>
+                  <span class="dropzone-hint">Multi-file support: .sv, .v, .svh, .vh, .vhd</span>
                 </div>
               </div>
+              <div class="file-chips-container" id="rtlChipsContainer"></div>
+            </div>
 
-              <!-- Uploaded Files Chip List -->
-              <div class="uploaded-files-list" id="rtlFilesList"></div>
-
-              <!-- Direct Path Input (for CLI / script paths & presets) -->
-              <div class="input-with-icon path-fallback-row">
-                <span class="input-icon">📄</span>
-                <input type="text" id="rtlPathInput" value="examples/rtl/alu.sv" placeholder="Or enter file path or comma-separated list">
+            <div class="form-row">
+              <div class="form-group half">
+                <label for="rtlPathInput">Or RTL File / Directory Path</label>
+                <div class="input-with-icon">
+                  <span class="input-icon">SRC</span>
+                  <input type="text" id="rtlPathInput" value="examples/rtl/alu.sv" placeholder="Path to RTL file or directory">
+                </div>
+              </div>
+              <div class="form-group half">
+                <label for="topModuleInput">Top Module Name <span class="tag-optional">Auto-Detected</span></label>
+                <div class="input-with-icon">
+                  <span class="input-icon">TOP</span>
+                  <input type="text" id="topModuleInput" placeholder="Auto-detected if empty">
+                </div>
               </div>
             </div>
 
-            <!-- Optional UPF Power Intent Section -->
-            <div class="form-section upf-upload-section">
-              <div class="section-title-row">
-                <label class="section-label"><span>⚡</span> UPF Power Intent <span class="tag-optional">Optional</span></label>
-                <span class="badge-status" id="upfStatusBadge">Not Loaded (RTL Only)</span>
-              </div>
+            <!-- Section 2: Optional UPF Power Intent -->
+            <div class="form-section-header">
+              <span class="section-title">UPF Power Intent <span class="tag-optional">Optional</span></span>
+            </div>
 
-              <div class="file-dropzone upf-dropzone" id="upfDropzone">
+            <div class="form-group">
+              <div class="upload-dropzone upf-dropzone" id="upfDropzone">
                 <input type="file" id="upfFileInput" accept=".upf" style="display:none;">
                 <div class="dropzone-content">
                   <span class="dropzone-icon">⚡</span>
-                  <span class="dropzone-text">Drag & drop IEEE 1801 .upf file here, or <button type="button" class="btn-link" id="btnBrowseUpf">browse</button></span>
-                  <span class="dropzone-hint">Enables power domains, isolation, level shifters, retention & power state tables</span>
+                  <span class="dropzone-text"><strong>Attach UPF File (.upf)</strong> or drag & drop</span>
+                  <span class="dropzone-hint">Optional: Activates power domain isolation, level shifter & retention checks</span>
                 </div>
               </div>
-
-              <!-- UPF File Pill -->
-              <div class="upf-file-pill" id="upfFilePill" style="display:none;">
-                <span class="pill-upf-icon">⚡</span>
-                <span class="pill-upf-name" id="upfFileName">design.upf</span>
-                <button type="button" class="btn-chip-remove" id="btnRemoveUpf" title="Remove UPF">&times;</button>
+              <div class="file-chips-container" id="upfChipsContainer"></div>
+              <div class="input-with-icon" style="margin-top: 0.4rem;">
+                <span class="input-icon">UPF</span>
+                <input type="text" id="upfPathInput" placeholder="Optional path to .upf file">
               </div>
-
-              <div class="input-with-icon path-fallback-row">
-                <span class="input-icon">📑</span>
-                <input type="text" id="upfPathInput" value="" placeholder="Or enter .upf file path (optional)">
-              </div>
-            </div>
-
-            <!-- Top-Level Module Resolution & Project Validation -->
-            <div class="form-row">
-              <div class="form-group half">
-                <label for="topModuleInput">Top-Level Module <span class="tag-optional">Auto-Detected</span></label>
-                <div class="input-with-icon">
-                  <span class="input-icon">🎯</span>
-                  <input type="text" id="topModuleInput" value="" placeholder="Leave empty for auto-detection">
-                </div>
-              </div>
-
-              <div class="form-group half" style="display:flex; align-items:flex-end;">
-                <button type="button" class="btn btn-secondary btn-validate" id="btnValidateProject" style="width:100%; height:42px;">
-                  <span>🔎</span> Validate Project & Hierarchy
-                </button>
-              </div>
-            </div>
-
-            <!-- Project Validation Drawer / Card -->
-            <div class="project-validation-card" id="projectValidationCard" style="display:none;">
-              <div class="val-header">
-                <span class="val-title" id="valTitle">⚡ Project Hierarchy Validation</span>
-                <button type="button" class="btn-val-close" id="btnCloseVal">&times;</button>
-              </div>
-              <div class="val-body" id="valBody"></div>
             </div>
 
             <div class="form-group">

@@ -181,6 +181,16 @@ class ReportGeneratorAgent(BaseAgent):
                     priority=issue.severity,
                 ))
 
+            if rtl_analysis.power:
+                for p_issue in rtl_analysis.power.all_issues:
+                    fixes.append(RecommendedFix(
+                        action=p_issue.description,
+                        file=p_issue.file,
+                        module=p_issue.module,
+                        priority="critical" if p_issue.severity in ("critical", "error") else "high",
+                        code_suggestion=p_issue.recommendation,
+                    ))
+
         # Build prevention measures
         prevention = [
             PreventionMeasure(
@@ -206,6 +216,9 @@ class ReportGeneratorAgent(BaseAgent):
             for x in rtl_analysis.xtrace.x_origins:
                 affected_signals.append(x.origin_signal)
                 affected_signals.extend(x.affected_outputs)
+            if rtl_analysis.power:
+                for p_issue in rtl_analysis.power.all_issues:
+                    affected_signals.extend(p_issue.signals)
 
         # Build evidence chain
         evidence = list(classification.evidence)
@@ -225,6 +238,14 @@ class ReportGeneratorAgent(BaseAgent):
                     source="rtl",
                     reference=f"{x.file}:{x.line_number}",
                     description=f"Signal '{x.origin_signal}' never reset in module '{x.origin_module}'",
+                ))
+        if rtl_analysis and rtl_analysis.power:
+            for p_issue in rtl_analysis.power.all_issues:
+                evidence.append(EvidenceItem(
+                    source="upf_power_intent",
+                    reference=p_issue.domain or "UPF",
+                    description=p_issue.description,
+                    snippet=p_issue.recommendation,
                 ))
 
         # Determine primary RTL file and line

@@ -13,7 +13,7 @@ persistence, error handling, and graceful degradation.
 """
 
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, Sequence
 from datetime import datetime
 
 from verisight.config import get_config, VeriSightConfig
@@ -56,6 +56,7 @@ def consensus_arbiter(
         or (len(rtl_analysis.cdc.crossings) > 0 and rtl_analysis.cdc.severity == "high")
         or any(iss.severity in ("high", "critical") for iss in rtl_analysis.functional.issues)
         or any(iss.severity in ("high", "critical") for iss in rtl_analysis.protocol.issues)
+        or (rtl_analysis.power is not None and any(iss.severity in ("high", "critical", "error") for iss in rtl_analysis.power.all_issues))
         or (rtl_analysis.confidence >= 70 and bool(rtl_analysis.primary_root_cause))
     )
 
@@ -207,32 +208,26 @@ class VeriSightPipeline:
     def run(
         self,
         spec_path: Optional[str] = None,
-        rtl_path: Optional[Union[str, List[str]]] = None,
+        rtl_path: Optional[Union[str, Sequence[str]]] = None,
         tb_path: Optional[str] = None,
         log_path: Optional[str] = None,
         coverage_path: Optional[str] = None,
         vcd_path: Optional[str] = None,
-        upf_path: Optional[Union[str, List[str]]] = None,
-        rtl_files: Optional[List[str]] = None,
-        upf_files: Optional[List[str]] = None,
-        top_module: Optional[str] = None,
+        upf_path: Optional[Union[str, Sequence[str]]] = None,
     ) -> ErrorReport:
         """
         Execute the full debugging pipeline.
 
         Args:
             spec_path: Path to design specification (.md).
-            rtl_path: Path to RTL source file(s), directory, or list of files.
+            rtl_path: Path to RTL source file(s) or directory.
             tb_path: Path to UVM testbench file(s) or directory.
             log_path: Path to simulation log file.
             coverage_path: Optional path to coverage report.
             vcd_path: Optional path to a simulation waveform (VCD), parsed
                 into knowledge.vcd for Agent 2/3 to use as debugging evidence,
                 independent of whether real x-tracer analysis is enabled.
-            upf_path: Optional path to UPF power-intent file(s) or directory.
-            rtl_files: Optional explicit list of RTL files.
-            upf_files: Optional explicit list of UPF files.
-            top_module: Optional top-level module name override.
+            upf_path: Optional path to UPF power intent file(s).
 
         Returns:
             ErrorReport — the final debugging report.
@@ -260,18 +255,15 @@ class VeriSightPipeline:
                 coverage_path=coverage_path,
                 vcd_path=vcd_path,
                 upf_path=upf_path,
-                rtl_files=rtl_files,
-                upf_files=upf_files,
-                top_module=top_module,
             )
 
             if self.config.pipeline.save_intermediates:
                 save_json(self.knowledge.spec, output_dir / "spec.json")
                 save_json(self.knowledge.rtl, output_dir / "rtl.json")
-                if self.knowledge.upf:
-                    save_json(self.knowledge.upf, output_dir / "upf.json")
                 save_json(self.knowledge.tb, output_dir / "tb.json")
                 save_json(self.knowledge.logs, output_dir / "log.json")
+                if self.knowledge.upf:
+                    save_json(self.knowledge.upf, output_dir / "upf.json")
                 if self.knowledge.vcd:
                     save_json(self.knowledge.vcd, output_dir / "vcd_summary.json")
                 save_json(self.knowledge, output_dir / "knowledge.json")
@@ -302,8 +294,6 @@ class VeriSightPipeline:
             self.rtl_analysis = self.agent3.execute(
                 self.knowledge, initial_classification
             )
-            if self.config.pipeline.save_intermediates and self.rtl_analysis and self.rtl_analysis.power_intent:
-                save_json(self.rtl_analysis.power_intent, output_dir / "power_intent.json")
         except Exception as e:
             logger.error(f"Agent 3 failed: {e}")
             self.rtl_analysis = None

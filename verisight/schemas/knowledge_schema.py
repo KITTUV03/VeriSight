@@ -85,6 +85,10 @@ class UnifiedKnowledge(BaseModel):
         default=None,
         description="Post-processed VCD waveform data (user-supplied or --simulate-generated)"
     )
+    upf: Optional[UPFKnowledge] = Field(
+        default=None,
+        description="Optional UPF power intent knowledge"
+    )
     rag_context: Optional[RAGContext] = Field(
         default=None,
         description="Context from RAG knowledge base"

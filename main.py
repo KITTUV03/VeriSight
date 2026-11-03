@@ -99,8 +99,13 @@ Examples:
     )
     parser.add_argument(
         "--rtl",
+        nargs="+",
+        help="Path to one or more RTL source files or directory",
+    )
+    parser.add_argument(
+        "--upf",
         type=str,
-        help="Path to RTL source file or directory",
+        help="Optional path to UPF (Unified Power Format) power intent file (.upf)",
     )
     parser.add_argument(
         "--tb",
@@ -302,8 +307,15 @@ def validate_inputs(args) -> bool:
         console.print(f"[red]Error:[/red] Spec file not found: {args.spec}")
         valid = False
 
-    if args.rtl and not Path(args.rtl).exists():
-        console.print(f"[red]Error:[/red] RTL path not found: {args.rtl}")
+    if args.rtl:
+        rtl_items = args.rtl if isinstance(args.rtl, list) else [args.rtl]
+        for r_item in rtl_items:
+            if not Path(r_item).exists():
+                console.print(f"[red]Error:[/red] RTL path not found: {r_item}")
+                valid = False
+
+    if getattr(args, "upf", None) and not Path(args.upf).exists():
+        console.print(f"[red]Error:[/red] UPF file not found: {args.upf}")
         valid = False
 
     if args.tb and not Path(args.tb).exists():
@@ -520,6 +532,7 @@ def main():
             rtl_path=args.rtl,
             tb_path=args.tb,
             spec_path=args.spec,
+            upf_path=getattr(args, "upf", None),
             simulator=args.simulator,
             top_module=args.sim_top or args.top or "",
             uvm_home=args.uvm_home or os.getenv("VERISIGHT_UVM_HOME", ""),
@@ -666,6 +679,7 @@ def main():
     console.print(f"  [dim]Model:[/]     {config.llm.model_name}")
     console.print(f"  [dim]Spec:[/]     {args.spec or 'not provided'}")
     console.print(f"  [dim]RTL:[/]      {args.rtl or 'not provided'}")
+    console.print(f"  [dim]UPF:[/]      {getattr(args, 'upf', None) or 'not provided (RTL-only)'}")
     console.print(f"  [dim]TB:[/]       {args.tb or 'not provided'}")
     console.print(f"  [dim]Log:[/]      {args.log or 'not provided'}")
     console.print(f"  [dim]Coverage:[/] {args.coverage or 'not provided'}")
@@ -686,6 +700,7 @@ def main():
             log_path=args.log,
             coverage_path=args.coverage,
             vcd_path=vcd_for_knowledge or "",
+            upf_path=getattr(args, "upf", None),
         )
 
         # Print final summary

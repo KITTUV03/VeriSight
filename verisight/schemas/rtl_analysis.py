@@ -300,51 +300,40 @@ class MiscResult(BaseModel):
     summary: str = Field(default="", description="Human-readable summary")
 
 
-# ─── Module 8: Power-Aware Intent Analysis ─────────────────────────
+# ─── Module 8: Power Intent & Low-Power Verification ──────────────
 
-class PowerIntentIssue(BaseModel):
-    """An issue identified during power-aware intent analysis."""
-    issue_type: str = Field(
-        description="Type: unisolated_crossing/missing_level_shifter/retention_hazard/power_state_violation/domain_mismatch"
-    )
-    severity: str = Field(description="Severity: critical/high/medium/low")
-    description: str = Field(description="Description of the power-aware defect")
-    source_domain: str = Field(default="", description="Source power domain")
-    dest_domain: str = Field(default="", description="Destination power domain")
-    signal: str = Field(default="", description="Associated signal or register")
-    module: str = Field(default="", description="Associated module")
-    file: str = Field(default="", description="Source file")
-    line_number: int = Field(default=0, description="Source line number")
-    recommendation: str = Field(default="", description="Recommended mitigation")
+class PowerIssue(BaseModel):
+    """An issue detected during low-power / UPF verification."""
+    severity: str = Field(default="high", description="Severity: critical/high/medium/low/warning")
+    category: str = Field(description="Category: isolation/level_shift/retention/sequencing/hierarchy_mismatch/power_switch")
+    domain: str = Field(default="", description="Power domain affected")
+    module: str = Field(default="", description="RTL module affected")
+    instance: str = Field(default="", description="Instance path affected")
+    signals: List[str] = Field(default_factory=list, description="Signals involved in the issue")
+    line_number: int = Field(default=0, description="Source line number if known")
+    file: str = Field(default="", description="Source file if known")
+    description: str = Field(description="Detailed explanation of the defect")
+    recommendation: str = Field(default="", description="Recommended repair or corrective action")
 
 
-class PowerIntentResult(BaseModel):
-    """Power-Aware Intent analysis results (power_intent.json)."""
-    power_domains: List[str] = Field(
-        default_factory=list,
-        description="Active power domains"
-    )
-    domain_crossings_count: int = Field(
-        default=0,
-        description="Total cross-domain signals analyzed"
-    )
-    issues: List[PowerIntentIssue] = Field(
-        default_factory=list,
-        description="All power-aware issues identified"
-    )
-    unisolated_crossings_count: int = Field(default=0)
-    missing_level_shifters_count: int = Field(default=0)
-    retention_hazards_count: int = Field(default=0)
-    invalid_power_states_count: int = Field(default=0)
-    severity: str = Field(default="none", description="Overall power severity: none/low/medium/high/critical")
-    summary: str = Field(default="", description="Executive summary of power-aware analysis")
+class PowerAnalysisResult(BaseModel):
+    """Output of low-power and UPF intent analysis."""
+    domains_analyzed: List[str] = Field(default_factory=list, description="List of analyzed power domains")
+    isolation_issues: List[PowerIssue] = Field(default_factory=list, description="Missing or invalid isolation strategies")
+    level_shift_issues: List[PowerIssue] = Field(default_factory=list, description="Missing level shifters across voltage domains")
+    retention_issues: List[PowerIssue] = Field(default_factory=list, description="Retention register save/restore issues")
+    sequencing_issues: List[PowerIssue] = Field(default_factory=list, description="Power state sequencing or switch control issues")
+    hierarchy_mismatches: List[PowerIssue] = Field(default_factory=list, description="RTL-UPF hierarchy inconsistencies")
+    all_issues: List[PowerIssue] = Field(default_factory=list, description="All aggregated power issues")
+    summary: str = Field(default="", description="Human-readable power analysis summary")
+    power_aware_sim_checks: List[Dict[str, Any]] = Field(default_factory=list, description="Correlated simulation log checks")
 
 
 # ─── Aggregated RTL Analysis ───────────────────────────────────────
 
 class RTLAnalysis(BaseModel):
     """
-    Aggregated RTL analysis across all 7 sub-modules.
+    Aggregated RTL analysis across all sub-modules.
     Combined output from Agent 3.
     """
     xtrace: XTraceResult = Field(
@@ -375,10 +364,6 @@ class RTLAnalysis(BaseModel):
         default_factory=MiscResult,
         description="Miscellaneous analysis"
     )
-    power_intent: Optional[PowerIntentResult] = Field(
-        default=None,
-        description="Power-aware intent analysis (when UPF provided)"
-    )
     traceweave: Optional[Dict[str, Any]] = Field(
         default=None,
         description="TraceWeave correlated failure-waveform-RTL evidence"
@@ -386,6 +371,10 @@ class RTLAnalysis(BaseModel):
     fault_localization: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Spectrum-Based Fault Localization (CirFix SBFL) ranking"
+    )
+    power: Optional[PowerAnalysisResult] = Field(
+        default=None,
+        description="Optional UPF power intent and low-power verification analysis"
     )
     primary_root_cause: str = Field(
         default="",

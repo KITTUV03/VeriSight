@@ -1,33 +1,38 @@
 """
-UPF (Unified Power Format - IEEE 1801) Parser for VeriSight.
+UPF (Unified Power Format — IEEE 1801) Parser for VeriSight.
 
-Parses UPF power-intent files and extracts:
-- Power domains (create_power_domain)
-- Supply ports and nets (create_supply_port, create_supply_net, connect_supply_net)
-- Supply sets (create_supply_set)
-- Power switches (create_power_switch)
-- Isolation strategies (set_isolation, set_isolation_control)
-- Level shifter strategies (set_level_shifter)
-- Retention strategies (set_retention, set_retention_control)
-- Power states and Power State Tables (add_power_state, create_pst, add_pst_state)
+Parses power intent specifications (.upf files) and extracts:
+- Power domains (with hierarchical scoping and element binding)
+- Supply ports, nets, and supply sets
+- Power switches (gating logic and control/ack signals)
+- Isolation strategies (clamp values, applies_to, control signals)
+- Level shifter strategies (voltage domain rules, boundaries)
+- Retention strategies (save/restore controls, retention supply nets)
+- Power State Tables (PST) and power states
 
-Resolves UPF power-intent against the actual RTL design hierarchy:
-- Binds power domains to RTL instances and modules
-- Discovers signals crossing power domain boundaries
-- Validates isolation, level shifting, and state retention
-- Emits actionable diagnostics with filename and line numbers
-Deterministic parser — no external EDA tool or LLM required.
+Resolves UPF power domains against the actual RTL design hierarchy,
+providing rich structured diagnostics for invalid syntax or hierarchy mismatches.
 """
+
+from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union, Set, Any
+from typing import List, Dict, Optional, Sequence, Union, Tuple, Any
 
 from verisight.schemas.upf_schema import (
-    UPFKnowledge, PowerDomain, SupplyPort, SupplyNet, SupplySet,
-    PowerSwitch, IsolationStrategy, LevelShifterStrategy,
-    RetentionStrategy, PowerState, PowerStateTable, DomainCrossing,
-    UPFValidationIssue,
+    UPFKnowledge,
+    PowerDomain,
+    SupplyPort,
+    SupplyNet,
+    SupplySet,
+    PowerSwitch,
+    IsolationStrategy,
+    LevelShifterStrategy,
+    RetentionStrategy,
+    PowerStateTable,
+    PowerState,
+    UPFDiagnostic,
 )
 from verisight.schemas.rtl_schema import RTLKnowledge
 from verisight.utils.file_utils import read_file, discover_files, UPF_EXTENSIONS
@@ -36,795 +41,639 @@ from verisight.utils.logger import get_logger
 logger = get_logger("upf_parser")
 
 
-def parse_upf(
-    path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
-    files: Optional[List[Union[str, Path]]] = None,
-    rtl_knowledge: Optional[RTLKnowledge] = None,
-    upf_path: Optional[Union[str, Path, List[Union[str, Path]]]] = None,
-    upf_files: Optional[List[Union[str, Path]]] = None,
-    **kwargs,
-) -> UPFKnowledge:
+def _tokenize_upf_line(text: str) -> List[str]:
     """
-    Parse one or more UPF power-intent files and correlate with RTL hierarchy.
-
-    Args:
-        path: Path to a .upf file, directory containing UPF, or list of paths.
-        files: Optional explicit list of UPF file paths.
-        rtl_knowledge: Optional parsed RTLKnowledge to resolve hierarchy against.
-
-    Returns:
-        UPFKnowledge Pydantic model with power domains, strategies, crossings, and diagnostics.
+    Tokenize a UPF/Tcl command line respecting {braced} and "quoted" groups.
     """
-    path = path or upf_path or kwargs.get("upf")
-    files = files or upf_files
-    resolved_paths: List[Path] = []
-
-    def _add_target(target: Union[str, Path]):
-        if isinstance(target, (list, tuple)):
-            for item in target:
-                _add_target(item)
-            return
-
-        p = Path(target)
-        if p.is_file():
-            if p not in resolved_paths:
-                resolved_paths.append(p)
-        elif p.is_dir():
-            found = discover_files(p, UPF_EXTENSIONS)
-            for f in found:
-                if f not in resolved_paths:
-                    resolved_paths.append(f)
-        else:
-            logger.warning(f"UPF target path does not exist on disk: {target}")
-
-    if files:
-        _add_target(files)
-    if path:
-        _add_target(path)
-
-    if not resolved_paths:
-        logger.info("parse_upf: No UPF files provided")
-        return UPFKnowledge(
-            file_list=[],
-            summary="No UPF power-intent specification provided.",
-            is_valid=True,
-        )
-
-    logger.info(f"Parsing UPF power intent ({len(resolved_paths)} file(s))")
-
-    file_list: List[str] = []
-    power_domains: List[PowerDomain] = []
-    supply_ports: List[SupplyPort] = []
-    supply_nets: List[SupplyNet] = []
-    supply_sets: List[SupplySet] = []
-    power_switches: List[PowerSwitch] = []
-    isolation_strategies: List[IsolationStrategy] = []
-    level_shifter_strategies: List[LevelShifterStrategy] = []
-    retention_strategies: List[RetentionStrategy] = []
-    power_states: List[PowerState] = []
-    power_state_tables: List[PowerStateTable] = []
-    validation_issues: List[UPFValidationIssue] = []
-
-    for upf_file in resolved_paths:
-        file_list.append(str(upf_file))
-        raw_text = read_file(upf_file)
-        if not raw_text:
-            validation_issues.append(UPFValidationIssue(
-                severity="warning",
-                issue_type="syntax_error",
-                description=f"Empty UPF file: {upf_file.name}",
-                file=str(upf_file),
-            ))
-            continue
-
-        commands = _tokenize_upf_commands(raw_text, str(upf_file), validation_issues)
-
-        for cmd, line_num, raw_line in commands:
-            _parse_command(
-                cmd=cmd,
-                line_num=line_num,
-                raw_line=raw_line,
-                filepath=str(upf_file),
-                power_domains=power_domains,
-                supply_ports=supply_ports,
-                supply_nets=supply_nets,
-                supply_sets=supply_sets,
-                power_switches=power_switches,
-                isolation_strategies=isolation_strategies,
-                level_shifter_strategies=level_shifter_strategies,
-                retention_strategies=retention_strategies,
-                power_states=power_states,
-                power_state_tables=power_state_tables,
-                validation_issues=validation_issues,
-            )
-
-    # ── Resolve against RTL Hierarchy (if RTL knowledge is present) ───
-    resolved_hierarchy: Dict[str, str] = {}
-    domain_crossings: List[DomainCrossing] = []
-
-    if rtl_knowledge and rtl_knowledge.modules:
-        resolved_hierarchy, domain_crossings = _resolve_upf_with_rtl(
-            rtl_knowledge=rtl_knowledge,
-            power_domains=power_domains,
-            isolation_strategies=isolation_strategies,
-            level_shifter_strategies=level_shifter_strategies,
-            retention_strategies=retention_strategies,
-            power_switches=power_switches,
-            power_state_tables=power_state_tables,
-            validation_issues=validation_issues,
-            file_list=file_list,
-        )
-
-    # Check validity
-    has_errors = any(issue.severity == "error" for issue in validation_issues)
-    is_valid = not has_errors
-
-    # Generate summary
-    summary_parts = [
-        f"Parsed {len(power_domains)} power domain(s)",
-        f"{len(supply_nets)} supply net(s)",
-        f"{len(power_switches)} power switch(es)",
-        f"{len(isolation_strategies)} isolation strategy(ies)",
-        f"{len(level_shifter_strategies)} level shifter(s)",
-        f"{len(retention_strategies)} retention strategy(ies)",
-    ]
-    if domain_crossings:
-        summary_parts.append(f"{len(domain_crossings)} cross-domain signal(s)")
-    if validation_issues:
-        summary_parts.append(f"{len(validation_issues)} validation diagnostic(s)")
-
-    summary_str = f"UPF Power Intent: {', '.join(summary_parts)}."
-
-    knowledge = UPFKnowledge(
-        file_list=file_list,
-        power_domains=power_domains,
-        supply_ports=supply_ports,
-        supply_nets=supply_nets,
-        supply_sets=supply_sets,
-        power_switches=power_switches,
-        isolation_strategies=isolation_strategies,
-        level_shifter_strategies=level_shifter_strategies,
-        retention_strategies=retention_strategies,
-        power_states=power_states,
-        power_state_tables=power_state_tables,
-        resolved_hierarchy=resolved_hierarchy,
-        domain_crossings=domain_crossings,
-        validation_issues=validation_issues,
-        summary=summary_str,
-        is_valid=is_valid,
-    )
-
-    logger.info(summary_str)
-    return knowledge
-
-
-def _tokenize_upf_commands(
-    content: str, filepath: str, validation_issues: List[UPFValidationIssue]
-) -> List[Tuple[List[str], int, str]]:
-    """
-    Tokenize UPF source lines, handling comments (#), line continuations (\\),
-    and grouping curly braces/quotes.
-    """
-    commands: List[Tuple[List[str], int, str]] = []
-    lines = content.splitlines()
-
-    current_tokens: List[str] = []
-    current_start_line: int = 1
-    current_raw: List[str] = []
-
+    tokens = []
     i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        line_num = i + 1
-
-        # Skip empty lines or pure comments if not continuing
-        if not current_tokens and (not line or line.startswith("#")):
+    n = len(text)
+    while i < n:
+        # Skip whitespace
+        while i < n and text[i].isspace():
             i += 1
+        if i >= n:
+            break
+
+        char = text[i]
+        if char == "{":
+            # Match balanced braces
+            depth = 1
+            start = i + 1
+            i += 1
+            while i < n and depth > 0:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                i += 1
+            token_content = text[start:i-1 if depth == 0 else i].strip()
+            tokens.append(token_content)
+        elif char == '"':
+            # Match quoted string
+            start = i + 1
+            i += 1
+            while i < n and text[i] != '"':
+                if text[i] == "\\" and i + 1 < n:
+                    i += 2
+                else:
+                    i += 1
+            token_content = text[start:i].strip()
+            if i < n and text[i] == '"':
+                i += 1
+            tokens.append(token_content)
+        else:
+            # Regular token until next whitespace
+            start = i
+            while i < n and not text[i].isspace() and text[i] not in "{}\"":
+                i += 1
+            token_content = text[start:i].strip()
+            if token_content:
+                tokens.append(token_content)
+    return tokens
+
+
+def _join_upf_lines(raw_content: str) -> List[Tuple[int, str]]:
+    """
+    Strips line-end comments (#) and joins lines ending in backslash (\\).
+    Returns list of (start_line_no, command_str).
+    """
+    commands: List[Tuple[int, str]] = []
+    current_cmd: List[str] = []
+    current_start_line = 0
+
+    lines = raw_content.splitlines()
+    for idx, line in enumerate(lines, start=1):
+        # Strip comments unless inside quotes/braces
+        clean_line = line
+        if "#" in line:
+            # Simple comment strip outside braces/quotes
+            in_quote = False
+            brace_count = 0
+            cut_idx = len(line)
+            for c_i, c in enumerate(line):
+                if c == '"':
+                    in_quote = not in_quote
+                elif c == '{' and not in_quote:
+                    brace_count += 1
+                elif c == '}' and not in_quote:
+                    brace_count = max(0, brace_count - 1)
+                elif c == '#' and not in_quote and brace_count == 0:
+                    cut_idx = c_i
+                    break
+            clean_line = line[:cut_idx]
+
+        clean_line = clean_line.strip()
+        if not clean_line:
             continue
 
-        if not current_tokens:
-            current_start_line = line_num
+        if not current_cmd:
+            current_start_line = idx
 
-        # Check line continuation
-        is_continued = line.endswith("\\")
-        if is_continued:
-            line_part = line[:-1].strip()
+        if clean_line.endswith("\\"):
+            current_cmd.append(clean_line[:-1].strip())
         else:
-            line_part = line
+            current_cmd.append(clean_line)
+            full_statement = " ".join(current_cmd).strip()
+            # Split semicolon-delimited commands
+            for part in full_statement.split(";"):
+                part_clean = part.strip()
+                if part_clean:
+                    commands.append((current_start_line, part_clean))
+            current_cmd = []
 
-        # Strip inline comments (outside quotes or braces)
-        line_part = _strip_upf_comment(line_part)
-
-        current_raw.append(line_part)
-
-        # Tokenize line part
-        tokens = _tokenize_line(line_part)
-        current_tokens.extend(tokens)
-
-        if not is_continued:
-            if current_tokens:
-                # Merge tokens that belong to braces e.g. { ... }
-                normalized_tokens = _normalize_braced_tokens(current_tokens)
-                commands.append((normalized_tokens, current_start_line, " ".join(current_raw)))
-            current_tokens = []
-            current_raw = []
-
-        i += 1
-
-    if current_tokens:
-        normalized_tokens = _normalize_braced_tokens(current_tokens)
-        commands.append((normalized_tokens, current_start_line, " ".join(current_raw)))
+    if current_cmd:
+        full_statement = " ".join(current_cmd).strip()
+        for part in full_statement.split(";"):
+            part_clean = part.strip()
+            if part_clean:
+                commands.append((current_start_line, part_clean))
 
     return commands
 
 
-def _strip_upf_comment(line: str) -> str:
-    """Strip '#' comments that are not inside curly braces or double quotes."""
-    res = []
-    in_quote = False
-    in_brace = 0
-    for char in line:
-        if char == '"':
-            in_quote = not in_quote
-        elif char == '{':
-            in_brace += 1
-        elif char == '}':
-            in_brace = max(0, in_brace - 1)
-        elif char == '#' and not in_quote and in_brace == 0:
-            break
-        res.append(char)
-    return "".join(res).strip()
-
-
-def _tokenize_line(line: str) -> List[str]:
-    """Tokenize a line respecting double quotes and curly braces."""
-    tokens = []
-    buf = []
-    in_quote = False
-    brace_depth = 0
-
-    for char in line:
-        if char == '"':
-            in_quote = not in_quote
-            buf.append(char)
-        elif char == '{' and not in_quote:
-            brace_depth += 1
-            buf.append(char)
-        elif char == '}' and not in_quote:
-            brace_depth = max(0, brace_depth - 1)
-            buf.append(char)
-        elif char.isspace() and not in_quote and brace_depth == 0:
-            if buf:
-                tokens.append("".join(buf))
-                buf = []
+def _parse_named_args(tokens: List[str]) -> Tuple[List[str], Dict[str, Any]]:
+    """
+    Parse a list of command tokens into positional arguments and a dict of flag -> value.
+    Flags without value are treated as boolean True.
+    """
+    positional = []
+    kwargs = {}
+    i = 0
+    n = len(tokens)
+    while i < n:
+        tok = tokens[i]
+        if tok.startswith("-"):
+            flag = tok.lstrip("-")
+            # Check if next token exists and is not a flag
+            if i + 1 < n and not tokens[i + 1].startswith("-"):
+                val = tokens[i + 1]
+                # If val has multiple items or is braced, split into list
+                kwargs[flag] = val
+                i += 2
+            else:
+                kwargs[flag] = True
+                i += 1
         else:
-            buf.append(char)
-
-    if buf:
-        tokens.append("".join(buf))
-
-    return tokens
+            positional.append(tok)
+            i += 1
+    return positional, kwargs
 
 
-def _normalize_braced_tokens(tokens: List[str]) -> List[str]:
-    """Clean enclosing braces and quotes from arguments."""
-    normalized = []
-    for tok in tokens:
-        if tok.startswith("{") and tok.endswith("}"):
-            normalized.append(tok[1:-1].strip())
-        elif tok.startswith('"') and tok.endswith('"'):
-            normalized.append(tok[1:-1].strip())
+def parse_upf(
+    paths: Union[str, Path, Sequence[Union[str, Path]]],
+    rtl_knowledge: Optional[RTLKnowledge] = None,
+) -> UPFKnowledge:
+    """
+    Parse UPF power intent specification file(s) and correlate against RTL hierarchy.
+
+    Args:
+        paths: Single path, directory, or sequence of UPF file paths.
+        rtl_knowledge: Optional parsed RTL knowledge to resolve hierarchy & cross-check.
+
+    Returns:
+        UPFKnowledge populated with domains, strategies, and diagnostics.
+    """
+    # 1. Resolve all input files
+    target_files: List[Path] = []
+    if isinstance(paths, (str, Path)):
+        p = Path(paths)
+        if p.is_dir():
+            target_files.extend(discover_files(p, UPF_EXTENSIONS))
+        elif p.exists():
+            target_files.append(p)
         else:
-            normalized.append(tok)
-    return normalized
+            logger.warning(f"UPF file not found: {paths}")
+    elif isinstance(paths, Sequence):
+        for item in paths:
+            p = Path(item)
+            if p.is_dir():
+                target_files.extend(discover_files(p, UPF_EXTENSIONS))
+            elif p.exists():
+                target_files.append(p)
+            else:
+                logger.warning(f"UPF file not found: {item}")
 
+    file_paths_str = [str(f) for f in target_files]
+    knowledge = UPFKnowledge(file_paths=file_paths_str)
 
-def _get_flag_value(tokens: List[str], flag: str, default: str = "") -> str:
-    """Extract argument for a specific flag (e.g. -domain <name>)."""
-    for i, tok in enumerate(tokens):
-        if tok == flag and i + 1 < len(tokens):
-            return tokens[i + 1]
-    return default
-
-
-def _get_flag_list(tokens: List[str], flag: str) -> List[str]:
-    """Extract list argument for a specific flag (e.g. -elements { a b c })."""
-    for i, tok in enumerate(tokens):
-        if tok == flag and i + 1 < len(tokens):
-            val = tokens[i + 1].strip()
-            # Split by whitespace or commas
-            items = [item.strip() for item in re.split(r"[\s,]+", val) if item.strip()]
-            return items
-    return []
-
-
-def _parse_command(
-    cmd: List[str],
-    line_num: int,
-    raw_line: str,
-    filepath: str,
-    power_domains: List[PowerDomain],
-    supply_ports: List[SupplyPort],
-    supply_nets: List[SupplyNet],
-    supply_sets: List[SupplySet],
-    power_switches: List[PowerSwitch],
-    isolation_strategies: List[IsolationStrategy],
-    level_shifter_strategies: List[LevelShifterStrategy],
-    retention_strategies: List[RetentionStrategy],
-    power_states: List[PowerState],
-    power_state_tables: List[PowerStateTable],
-    validation_issues: List[UPFValidationIssue],
-):
-    """Parse a single tokenized UPF command."""
-    if not cmd:
-        return
-
-    name_cmd = cmd[0].lower()
-
-    # 1. create_power_domain
-    if name_cmd == "create_power_domain":
-        if len(cmd) < 2:
-            validation_issues.append(UPFValidationIssue(
+    if not target_files:
+        if paths:
+            knowledge.diagnostics.append(UPFDiagnostic(
                 severity="error",
-                issue_type="syntax_error",
-                description="create_power_domain requires a domain name argument",
-                file=filepath,
-                line_number=line_num,
+                message=f"Provided UPF file path does not exist: {paths}",
+                file=str(paths),
+                code="UPF_FILE_NOT_FOUND",
             ))
-            return
+            knowledge.is_valid = False
+        return knowledge
 
-        dom_name = cmd[1]
-        scope = _get_flag_value(cmd, "-scope", "")
-        include_scope = "-include_scope" in cmd
-        elements = _get_flag_list(cmd, "-elements")
+    current_scope = ""
 
-        # Check for duplicate domain name
-        if any(d.name == dom_name for d in power_domains):
-            validation_issues.append(UPFValidationIssue(
+    # 2. Parse UPF files
+    for upf_file in target_files:
+        raw = read_file(upf_file)
+        if not raw or not raw.strip():
+            knowledge.diagnostics.append(UPFDiagnostic(
                 severity="warning",
-                issue_type="syntax_error",
-                description=f"Duplicate power domain '{dom_name}' redefined at line {line_num}",
-                file=filepath,
-                line_number=line_num,
-                element=dom_name,
+                message=f"UPF file '{upf_file.name}' is empty.",
+                file=str(upf_file),
+                line_number=1,
+                code="UPF_EMPTY_FILE",
             ))
+            continue
 
-        power_domains.append(PowerDomain(
-            name=dom_name,
-            scope=scope,
-            elements=elements,
-            is_default=include_scope or (not elements and (dom_name.upper() in ("PD_TOP", "TOP_PD", "DEFAULT"))),
-        ))
+        commands = _join_upf_lines(raw)
+        for line_no, cmd_str in commands:
+            tokens = _tokenize_upf_line(cmd_str)
+            if not tokens:
+                continue
 
-    # 2. create_supply_port
-    elif name_cmd == "create_supply_port":
-        if len(cmd) < 2:
-            return
-        port_name = cmd[1]
-        direction = _get_flag_value(cmd, "-direction", "in")
-        domain = _get_flag_value(cmd, "-domain", "")
-        supply_ports.append(SupplyPort(
-            name=port_name,
-            direction=direction,
-            domain=domain,
-        ))
+            cmd = tokens[0].lower()
+            pos_args, kwargs = _parse_named_args(tokens[1:])
 
-    # 3. create_supply_net
-    elif name_cmd == "create_supply_net":
-        if len(cmd) < 2:
-            return
-        net_name = cmd[1]
-        domain = _get_flag_value(cmd, "-domain", "")
-        resolve = _get_flag_value(cmd, "-resolve", "unresolved")
-        is_gnd = any(g in net_name.upper() for g in ("VSS", "GND", "GROUND"))
-        is_pwr = any(p in net_name.upper() for p in ("VDD", "VCC", "POWER"))
-        supply_nets.append(SupplyNet(
-            name=net_name,
-            domain=domain,
-            is_ground=is_gnd,
-            is_power=is_pwr,
-            resolved_type=resolve,
-        ))
+            try:
+                if cmd == "set_scope":
+                    current_scope = pos_args[0] if pos_args else kwargs.get("scope", "")
 
-    # 4. set_domain_supply_net
-    elif name_cmd == "set_domain_supply_net":
-        dom_name = cmd[1] if len(cmd) > 1 and not cmd[1].startswith("-") else _get_flag_value(cmd, "-domain")
-        pwr_net = _get_flag_value(cmd, "-primary_power_net")
-        gnd_net = _get_flag_value(cmd, "-primary_ground_net")
-        for d in power_domains:
-            if d.name == dom_name:
-                if pwr_net:
-                    d.primary_power_net = pwr_net
-                if gnd_net:
-                    d.primary_ground_net = gnd_net
+                elif cmd == "create_power_domain":
+                    domain_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    if not domain_name:
+                        knowledge.diagnostics.append(UPFDiagnostic(
+                            severity="error",
+                            message="Missing power domain name in 'create_power_domain'",
+                            file=str(upf_file),
+                            line_number=line_no,
+                            code="UPF_SYNTAX_DOMAIN",
+                        ))
+                        knowledge.is_valid = False
+                        continue
 
-    # 5. create_supply_set
-    elif name_cmd == "create_supply_set":
-        if len(cmd) < 2:
-            return
-        set_name = cmd[1]
-        # Match -function {power VDD} -function {ground VSS}
-        pwr_match = re.search(r"-function\s*\{?\s*power\s+([\w.]+)\s*\}?", raw_line)
-        gnd_match = re.search(r"-function\s*\{?\s*ground\s+([\w.]+)\s*\}?", raw_line)
-        pwr_net = pwr_match.group(1) if pwr_match else ""
-        gnd_net = gnd_match.group(1) if gnd_match else ""
+                    raw_elements = kwargs.get("elements", "")
+                    elements = []
+                    if raw_elements:
+                        if isinstance(raw_elements, str):
+                            elements = raw_elements.replace("{", "").replace("}", "").split()
+                        elif isinstance(raw_elements, list):
+                            elements = [str(x) for x in raw_elements]
 
-        supply_sets.append(SupplySet(
-            name=set_name,
-            power_net=pwr_net,
-            ground_net=gnd_net,
-        ))
+                    is_top = (
+                        "include_scope" in kwargs
+                        or domain_name.upper() in ("TOP", "DEFAULT", "PD_TOP")
+                        or not elements
+                    )
 
-    # 6. create_power_switch
-    elif name_cmd == "create_power_switch":
-        if len(cmd) < 2:
-            return
-        sw_name = cmd[1]
-        dom_name = _get_flag_value(cmd, "-domain")
-        in_port = _get_flag_value(cmd, "-input_supply_port")
-        out_port = _get_flag_value(cmd, "-output_supply_port")
-        ctl_match = re.search(r"-control_port\s*\{?\s*([\w.]+)(?:\s+([\w.]+))?\s*\}?", raw_line)
-        ctl_port = (ctl_match.group(2) or ctl_match.group(1)) if ctl_match else _get_flag_value(cmd, "-control_port")
-        on_state = _get_flag_value(cmd, "-on_state")
-        if not on_state:
-            on_match = re.search(r"-on_state\s*\{([^}]+)\}", raw_line)
-            on_state = on_match.group(1).strip() if on_match else ""
+                    domain = PowerDomain(
+                        name=domain_name,
+                        scope=kwargs.get("scope", current_scope),
+                        elements=elements,
+                        is_top=is_top,
+                        include_scope="include_scope" in kwargs,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    )
+                    knowledge.power_domains.append(domain)
 
-        power_switches.append(PowerSwitch(
-            name=sw_name,
-            domain=dom_name,
-            in_port=in_port,
-            out_port=out_port,
-            control_port=ctl_port,
-            on_state=on_state,
-        ))
+                elif cmd == "create_supply_port":
+                    port_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    direction = kwargs.get("direction", "in")
+                    domain = kwargs.get("domain", None)
+                    knowledge.supply_ports.append(SupplyPort(
+                        name=port_name,
+                        direction=direction,
+                        domain=domain,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-    # 7. set_isolation
-    elif name_cmd == "set_isolation":
-        if len(cmd) < 2:
-            return
-        iso_name = cmd[1]
-        dom_name = _get_flag_value(cmd, "-domain")
-        clamp_val = _get_flag_value(cmd, "-clamp_value", "0")
-        applies_to = _get_flag_value(cmd, "-applies_to", "outputs")
-        location = _get_flag_value(cmd, "-location", "from")
-        elements = _get_flag_list(cmd, "-elements")
-        iso_sig = _get_flag_value(cmd, "-isolation_signal", "")
-        iso_sense = _get_flag_value(cmd, "-isolation_sense", "high")
+                elif cmd == "create_supply_net":
+                    net_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    domain = kwargs.get("domain", None)
+                    is_reuse = "reuse" in kwargs
+                    knowledge.supply_nets.append(SupplyNet(
+                        name=net_name,
+                        domain=domain,
+                        is_reuse=is_reuse,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-        isolation_strategies.append(IsolationStrategy(
-            name=iso_name,
-            domain=dom_name,
-            isolation_signal=iso_sig,
-            isolation_sense=iso_sense,
-            clamp_value=clamp_val,
-            elements=elements,
-            applies_to=applies_to,
-            location=location,
-        ))
+                elif cmd == "connect_supply_net":
+                    net_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    raw_ports = kwargs.get("ports", "")
+                    ports = []
+                    if raw_ports:
+                        if isinstance(raw_ports, str):
+                            ports = raw_ports.replace("{", "").replace("}", "").split()
+                        elif isinstance(raw_ports, list):
+                            ports = [str(p) for p in raw_ports]
+                    for sn in knowledge.supply_nets:
+                        if sn.name == net_name:
+                            sn.connected_ports.extend(ports)
 
-    # 8. set_isolation_control
-    elif name_cmd == "set_isolation_control":
-        if len(cmd) < 2:
-            return
-        iso_name = cmd[1]
-        iso_sig = _get_flag_value(cmd, "-isolation_signal")
-        iso_sense = _get_flag_value(cmd, "-isolation_sense", "high")
-        location = _get_flag_value(cmd, "-location", "")
+                elif cmd == "create_supply_set":
+                    set_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    p_net = ""
+                    g_net = ""
+                    func_spec = kwargs.get("function", "")
+                    if isinstance(func_spec, str):
+                        parts = func_spec.split()
+                        if "power" in parts and len(parts) > parts.index("power") + 1:
+                            p_net = parts[parts.index("power") + 1]
+                        if "ground" in parts and len(parts) > parts.index("ground") + 1:
+                            g_net = parts[parts.index("ground") + 1]
+                    knowledge.supply_sets.append(SupplySet(
+                        name=set_name,
+                        power_net=p_net,
+                        ground_net=g_net,
+                        domain=kwargs.get("domain", None),
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-        for strat in isolation_strategies:
-            if strat.name == iso_name:
-                if iso_sig:
-                    strat.isolation_signal = iso_sig
-                if iso_sense:
-                    strat.isolation_sense = iso_sense
-                if location:
-                    strat.location = location
+                elif cmd == "set_domain_supply_net":
+                    dom_name = pos_args[0] if pos_args else kwargs.get("domain", "")
+                    p_net = kwargs.get("primary_power_net", "")
+                    g_net = kwargs.get("primary_ground_net", "")
+                    found = False
+                    for pd in knowledge.power_domains:
+                        if pd.name == dom_name:
+                            pd.primary_power_net = p_net
+                            pd.primary_ground_net = g_net
+                            found = True
+                    if not found and dom_name:
+                        knowledge.diagnostics.append(UPFDiagnostic(
+                            severity="warning",
+                            message=f"set_domain_supply_net references undeclared power domain '{dom_name}'",
+                            file=str(upf_file),
+                            line_number=line_no,
+                            code="UPF_UNRESOLVED_DOMAIN",
+                        ))
 
-    # 9. set_level_shifter
-    elif name_cmd == "set_level_shifter":
-        if len(cmd) < 2:
-            return
-        ls_name = cmd[1]
-        dom_name = _get_flag_value(cmd, "-domain")
-        rule = _get_flag_value(cmd, "-rule", "both")
-        applies_to = _get_flag_value(cmd, "-applies_to", "both")
-        elements = _get_flag_list(cmd, "-elements")
-        threshold = _get_flag_value(cmd, "-threshold", "")
+                elif cmd == "create_power_switch":
+                    sw_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    dom = kwargs.get("domain", "")
+                    in_port = str(kwargs.get("input_supply_port", "")).replace("{", "").replace("}", "").strip()
+                    out_port = str(kwargs.get("output_supply_port", "")).replace("{", "").replace("}", "").strip()
+                    ctrl = str(kwargs.get("control_port", "")).replace("{", "").replace("}", "").strip()
+                    ack = str(kwargs.get("ack_port", "")).replace("{", "").replace("}", "").strip()
+                    on_st = str(kwargs.get("on_state", "")).replace("{", "").replace("}", "").strip()
 
-        level_shifter_strategies.append(LevelShifterStrategy(
-            name=ls_name,
-            domain=dom_name,
-            rule=rule,
-            applies_to=applies_to,
-            elements=elements,
-            threshold=threshold,
-        ))
+                    knowledge.power_switches.append(PowerSwitch(
+                        name=sw_name,
+                        domain=dom,
+                        input_supply_port=in_port,
+                        output_supply_port=out_port,
+                        control_port=ctrl,
+                        ack_port=ack,
+                        on_state=on_st,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-    # 10. set_retention
-    elif name_cmd == "set_retention":
-        if len(cmd) < 2:
-            return
-        ret_name = cmd[1]
-        dom_name = _get_flag_value(cmd, "-domain")
-        pwr_net = _get_flag_value(cmd, "-retention_power_net")
-        gnd_net = _get_flag_value(cmd, "-retention_ground_net")
-        elements = _get_flag_list(cmd, "-elements")
+                elif cmd == "set_isolation":
+                    iso_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    dom = kwargs.get("domain", "")
+                    clamp = str(kwargs.get("clamp_value", "0")).lower()
+                    applies = str(kwargs.get("applies_to", "outputs")).lower()
+                    loc = str(kwargs.get("location", "self")).lower()
+                    raw_elem = kwargs.get("elements", "")
+                    elems = []
+                    if raw_elem:
+                        elems = str(raw_elem).replace("{", "").replace("}", "").split()
 
-        retention_strategies.append(RetentionStrategy(
-            name=ret_name,
-            domain=dom_name,
-            retention_power_net=pwr_net,
-            retention_ground_net=gnd_net,
-            elements=elements,
-        ))
+                    sig = kwargs.get("isolation_signal", "")
+                    sense = kwargs.get("isolation_sense", "high")
 
-    # 11. set_retention_control
-    elif name_cmd == "set_retention_control":
-        if len(cmd) < 2:
-            return
-        ret_name = cmd[1]
-        save_match = re.search(r"-save_signal\s*\{?\s*([\w.]+)\s*\}?", raw_line)
-        restore_match = re.search(r"-restore_signal\s*\{?\s*([\w.]+)\s*\}?", raw_line)
-        save_sig = save_match.group(1) if save_match else ""
-        restore_sig = restore_match.group(1) if restore_match else ""
+                    knowledge.isolation_strategies.append(IsolationStrategy(
+                        name=iso_name,
+                        domain=dom,
+                        clamp_value=clamp,
+                        applies_to=applies,
+                        location=loc,
+                        elements=elems,
+                        isolation_signal=sig,
+                        isolation_sense=sense,
+                        isolation_power_net=kwargs.get("isolation_power_net", ""),
+                        isolation_ground_net=kwargs.get("isolation_ground_net", ""),
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-        for ret in retention_strategies:
-            if ret.name == ret_name:
-                if save_sig:
-                    ret.save_signal = save_sig
-                if restore_sig:
-                    ret.restore_signal = restore_sig
+                elif cmd == "set_isolation_control":
+                    iso_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    sig = str(kwargs.get("isolation_signal", ""))
+                    sense = str(kwargs.get("isolation_sense", "high"))
+                    found = False
+                    for iso in knowledge.isolation_strategies:
+                        if iso.name == iso_name:
+                            iso.isolation_signal = sig
+                            iso.isolation_sense = sense
+                            found = True
+                    if not found and iso_name:
+                        knowledge.diagnostics.append(UPFDiagnostic(
+                            severity="warning",
+                            message=f"set_isolation_control references undeclared isolation strategy '{iso_name}'",
+                            file=str(upf_file),
+                            line_number=line_no,
+                            code="UPF_UNRESOLVED_STRATEGY",
+                        ))
 
-    # 12. add_power_state
-    elif name_cmd == "add_power_state":
-        if len(cmd) < 2:
-            return
-        obj_ref = cmd[1]
-        # Match -state { STATE_NAME LOGIC_EXPR ... }
-        state_match = re.search(r"-state\s*\{?\s*(\w+)\s+([^}]+)\}?", raw_line)
-        if state_match:
-            s_name = state_match.group(1)
-            s_expr = state_match.group(2).strip()
-            simstate = "NORMAL"
-            if "OFF" in s_name.upper() or "OFF" in s_expr.upper():
-                simstate = "OFF"
-            elif "CORRUPT" in s_expr.upper() or "SLEEP" in s_name.upper():
-                simstate = "CORRUPT"
+                elif cmd == "set_level_shifter":
+                    ls_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    dom = kwargs.get("domain", "")
+                    applies = str(kwargs.get("applies_to", "inputs")).lower()
+                    rule = str(kwargs.get("rule", "both")).lower()
+                    loc = str(kwargs.get("location", "self")).lower()
+                    raw_elem = kwargs.get("elements", "")
+                    elems = []
+                    if raw_elem:
+                        elems = str(raw_elem).replace("{", "").replace("}", "").split()
 
-            power_states.append(PowerState(
-                name=s_name,
-                object_ref=obj_ref,
-                logic_expression=s_expr,
-                simstate=simstate,
-            ))
+                    knowledge.level_shifters.append(LevelShifterStrategy(
+                        name=ls_name,
+                        domain=dom,
+                        applies_to=applies,
+                        rule=rule,
+                        location=loc,
+                        elements=elems,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-    # 13. create_pst
-    elif name_cmd == "create_pst":
-        if len(cmd) < 2:
-            return
-        pst_name = cmd[1]
-        supplies = _get_flag_list(cmd, "-supplies")
-        power_state_tables.append(PowerStateTable(
-            name=pst_name,
-            supplies=supplies,
-            states=[],
-        ))
+                elif cmd == "set_retention":
+                    ret_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    dom = kwargs.get("domain", "")
+                    p_net = kwargs.get("retention_power_net", "")
+                    g_net = kwargs.get("retention_ground_net", "")
+                    save = str(kwargs.get("save_signal", "")).replace("{", "").replace("}", "")
+                    restore = str(kwargs.get("restore_signal", "")).replace("{", "").replace("}", "")
+                    raw_elem = kwargs.get("elements", "")
+                    elems = []
+                    if raw_elem:
+                        elems = str(raw_elem).replace("{", "").replace("}", "").split()
 
-    # 14. add_pst_state
-    elif name_cmd == "add_pst_state":
-        if len(cmd) < 2:
-            return
-        state_name = cmd[1]
-        pst_name = _get_flag_value(cmd, "-pst")
-        state_vals = _get_flag_list(cmd, "-state")
+                    knowledge.retention_strategies.append(RetentionStrategy(
+                        name=ret_name,
+                        domain=dom,
+                        retention_power_net=p_net,
+                        retention_ground_net=g_net,
+                        save_signal=save,
+                        restore_signal=restore,
+                        elements=elems,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
 
-        for pst in power_state_tables:
-            if pst.name == pst_name:
-                row_dict: Dict[str, str] = {"state": state_name}
-                for idx, sup in enumerate(pst.supplies):
-                    if idx < len(state_vals):
-                        row_dict[sup] = state_vals[idx]
-                    else:
-                        row_dict[sup] = "UNKNOWN"
-                pst.states.append(row_dict)
+                elif cmd == "set_retention_control":
+                    ret_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    save = str(kwargs.get("save_signal", "")).replace("{", "").replace("}", "")
+                    restore = str(kwargs.get("restore_signal", "")).replace("{", "").replace("}", "")
+                    for ret in knowledge.retention_strategies:
+                        if ret.name == ret_name:
+                            ret.save_signal = save
+                            ret.restore_signal = restore
+
+                elif cmd == "create_pst":
+                    pst_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    raw_supplies = kwargs.get("supplies", "")
+                    supplies = []
+                    if raw_supplies:
+                        supplies = str(raw_supplies).replace("{", "").replace("}", "").split()
+                    knowledge.power_state_tables.append(PowerStateTable(
+                        name=pst_name,
+                        supplies=supplies,
+                        states={},
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
+
+                elif cmd == "add_pst_state":
+                    st_name = pos_args[0] if pos_args else kwargs.get("name", "")
+                    pst_target = kwargs.get("pst", "")
+                    raw_st = kwargs.get("state", "")
+                    supply_states = []
+                    if raw_st:
+                        supply_states = str(raw_st).replace("{", "").replace("}", "").split()
+                    for pst in knowledge.power_state_tables:
+                        if pst.name == pst_target:
+                            pst.states[st_name] = supply_states
+
+                elif cmd == "add_power_state":
+                    target_obj = pos_args[0] if pos_args else kwargs.get("name", "")
+                    state_name = kwargs.get("state", "")
+                    is_off = "off" in cmd_str.lower()
+                    knowledge.power_states.append(PowerState(
+                        name=state_name or target_obj,
+                        domain_or_pst=target_obj,
+                        is_off=is_off,
+                        file=str(upf_file),
+                        line_number=line_no,
+                    ))
+
+            except Exception as e:
+                knowledge.diagnostics.append(UPFDiagnostic(
+                    severity="error",
+                    message=f"Failed to parse UPF command '{cmd}': {e}",
+                    file=str(upf_file),
+                    line_number=line_no,
+                    code="UPF_CMD_PARSE_ERROR",
+                ))
+                knowledge.is_valid = False
+
+    # 3. Hierarchy Cross-Validation & RTL Mapping
+    if rtl_knowledge is not None:
+        validate_upf_against_rtl(knowledge, rtl_knowledge)
+
+    logger.info(
+        f"UPF Parsed: {len(knowledge.power_domains)} domains, "
+        f"{len(knowledge.power_switches)} switches, "
+        f"{len(knowledge.isolation_strategies)} isolation, "
+        f"{len(knowledge.level_shifters)} level shifters, "
+        f"{len(knowledge.retention_strategies)} retention, "
+        f"{len(knowledge.diagnostics)} diagnostics"
+    )
+
+    return knowledge
 
 
-def _resolve_upf_with_rtl(
+def validate_upf_against_rtl(
+    upf_knowledge: UPFKnowledge,
     rtl_knowledge: RTLKnowledge,
-    power_domains: List[PowerDomain],
-    isolation_strategies: List[IsolationStrategy],
-    level_shifter_strategies: List[LevelShifterStrategy],
-    retention_strategies: List[RetentionStrategy],
-    power_switches: List[PowerSwitch],
-    power_state_tables: List[PowerStateTable],
-    validation_issues: List[UPFValidationIssue],
-    file_list: List[str],
-) -> Tuple[Dict[str, str], List[DomainCrossing]]:
+) -> List[UPFDiagnostic]:
     """
-    Resolve UPF elements against the actual RTL design hierarchy and identify
-    domain boundary crossings and potential power-aware hazards.
+    Resolve and validate UPF power-domain hierarchy, elements, and control
+    signals against the actual RTL design hierarchy.
     """
-    resolved_hierarchy: Dict[str, str] = {}
-    domain_crossings: List[DomainCrossing] = []
-    primary_upf_file = file_list[0] if file_list else "design.upf"
+    diagnostics = upf_knowledge.diagnostics
 
-    # Map of module name -> module
-    module_map = {m.name: m for m in rtl_knowledge.modules}
-    top_mod_name = rtl_knowledge.top_module
+    # 1. Collect all RTL module names, instance names, and signals
+    rtl_modules_by_name = {m.name: m for m in rtl_knowledge.modules}
+    top_module_name = rtl_knowledge.top_module or (rtl_knowledge.modules[0].name if rtl_knowledge.modules else "")
 
-    # Identify default / top power domain
-    top_domain = None
-    for dom in power_domains:
-        if dom.is_default or dom.name.upper() in ("PD_TOP", "TOP_PD"):
-            top_domain = dom
-            break
-    if not top_domain and power_domains:
-        top_domain = power_domains[0]
-
-    # ── 1. Map RTL Modules / Instances to Power Domains ───────────────
-    # Collect all instantiated paths in RTL
-    all_instances: Dict[str, str] = {}  # instance_name -> module_name
+    # Instances mapped {instance_name: module_type}
+    rtl_instances: Dict[str, str] = {}
     for m in rtl_knowledge.modules:
         for inst in m.instantiations:
             inst_name = inst.get("instance", "")
-            mod_name = inst.get("module", "")
-            if inst_name and mod_name:
-                all_instances[inst_name] = mod_name
+            mod_type = inst.get("module", "")
+            if inst_name:
+                rtl_instances[inst_name] = mod_type
+                # Also include hierarchical dot paths
+                rtl_instances[f"{m.name}.{inst_name}"] = mod_type
 
-    for dom in power_domains:
-        for elem in dom.elements:
-            elem_clean = elem.strip().lstrip("/")
-            elem_leaf = elem_clean.split("/")[-1]
+    # 2. Resolve power domain elements to RTL instances
+    for pd in upf_knowledge.power_domains:
+        if pd.is_top:
+            if top_module_name:
+                pd.associated_modules.append(top_module_name)
+                upf_knowledge.resolved_hierarchy[top_module_name] = pd.name
+                upf_knowledge.resolved_hierarchy["top"] = pd.name
 
-            # Verify element exists in RTL
-            matched_module = None
-            if elem_clean in module_map:
-                matched_module = elem_clean
-            elif elem_leaf in module_map:
-                matched_module = elem_leaf
-            elif elem_clean in all_instances:
-                matched_module = all_instances[elem_clean]
-            elif elem_leaf in all_instances:
-                matched_module = all_instances[elem_leaf]
+        for elem in pd.elements:
+            # Check if elem exists in RTL instances or modules
+            clean_elem = elem.strip("{}")
+            matched_mod = ""
 
-            if matched_module:
-                resolved_hierarchy[elem_clean] = dom.name
-                resolved_hierarchy[matched_module] = dom.name
+            if clean_elem in rtl_instances:
+                matched_mod = rtl_instances[clean_elem]
+            elif any(clean_elem == inst_k.split(".")[-1] for inst_k in rtl_instances):
+                for inst_k, mod_t in rtl_instances.items():
+                    if inst_k.split(".")[-1] == clean_elem:
+                        matched_mod = mod_t
+                        break
+            elif clean_elem in rtl_modules_by_name:
+                matched_mod = clean_elem
+
+            if matched_mod:
+                pd.associated_modules.append(matched_mod)
+                upf_knowledge.resolved_hierarchy[clean_elem] = pd.name
             else:
-                # Element in UPF does not exist in RTL hierarchy!
-                validation_issues.append(UPFValidationIssue(
-                    severity="error",
-                    issue_type="missing_element",
-                    description=(
-                        f"UPF domain '{dom.name}' references element '{elem}', but no matching "
-                        f"module or instance was found in RTL hierarchy."
+                diagnostics.append(UPFDiagnostic(
+                    severity="warning",
+                    message=(
+                        f"Power domain '{pd.name}' references element '{clean_elem}' "
+                        f"which was not found in RTL module hierarchy."
                     ),
-                    file=primary_upf_file,
-                    element=elem,
+                    file=pd.file,
+                    line_number=pd.line_number,
+                    code="UPF_ELEMENT_NOT_IN_RTL",
                 ))
 
-    # Map remaining modules (including top) to default domain
-    for m in rtl_knowledge.modules:
-        if m.name not in resolved_hierarchy and top_domain:
-            resolved_hierarchy[m.name] = top_domain.name
+    # 3. Check power switch controls against RTL signals
+    for ps in upf_knowledge.power_switches:
+        ctrl = ps.control_port
+        # Extract signal name if format is 'port signal'
+        ctrl_sig = ctrl.split()[-1] if ctrl else ""
+        if ctrl_sig and rtl_knowledge.modules:
+            # Check if signal exists in any module port or assignment
+            sig_basename = ctrl_sig.split(".")[-1].replace("!", "").replace("~", "")
+            found = False
+            for m in rtl_knowledge.modules:
+                all_sigs = {p.name for p in m.ports}
+                for ab in m.always_blocks:
+                    all_sigs.update(ab.signals_written)
+                    all_sigs.update(ab.signals_read)
+                if sig_basename in all_sigs:
+                    found = True
+                    break
+            if not found:
+                diagnostics.append(UPFDiagnostic(
+                    severity="warning",
+                    message=(
+                        f"Power switch '{ps.name}' control port '{ctrl_sig}' "
+                        f"is not declared in RTL signals."
+                    ),
+                    file=ps.file,
+                    line_number=ps.line_number,
+                    code="UPF_SWITCH_CTRL_UNRESOLVED",
+                ))
 
-    # ── 2. Discover Domain Crossings from RTL Port Interconnections ───
-    # Check top-level and parent instantiations where two modules talk to each other
-    for parent_mod in rtl_knowledge.modules:
-        parent_domain = resolved_hierarchy.get(parent_mod.name, top_domain.name if top_domain else "DEFAULT")
+    # 4. Check isolation control signals
+    for iso in upf_knowledge.isolation_strategies:
+        sig = iso.isolation_signal
+        if sig and rtl_knowledge.modules:
+            sig_basename = sig.split(".")[-1].replace("!", "").replace("~", "")
+            found = False
+            for m in rtl_knowledge.modules:
+                all_sigs = {p.name for p in m.ports}
+                for ab in m.always_blocks:
+                    all_sigs.update(ab.signals_written)
+                    all_sigs.update(ab.signals_read)
+                if sig_basename in all_sigs:
+                    found = True
+                    break
+            if not found:
+                diagnostics.append(UPFDiagnostic(
+                    severity="warning",
+                    message=(
+                        f"Isolation strategy '{iso.name}' control signal '{sig}' "
+                        f"is not declared in RTL signals."
+                    ),
+                    file=iso.file,
+                    line_number=iso.line_number,
+                    code="UPF_ISO_SIGNAL_UNRESOLVED",
+                ))
 
-        for inst in parent_mod.instantiations:
-            child_mod_name = inst.get("module", "")
-            child_inst_name = inst.get("instance", "")
-            child_mod = module_map.get(child_mod_name)
-            if not child_mod:
-                continue
+    return diagnostics
 
-            child_domain = (
-                resolved_hierarchy.get(child_inst_name)
-                or resolved_hierarchy.get(child_mod_name)
-                or parent_domain
-            )
-
-            # Check if crossing occurs between parent domain and child domain
-            if child_domain != parent_domain:
-                for port in child_mod.ports:
-                    is_output = port.direction == "output"
-                    src_dom = child_domain if is_output else parent_domain
-                    dst_dom = parent_domain if is_output else child_domain
-
-                    # Look for isolation strategy covering this domain & port
-                    has_iso = False
-                    iso_strat_name = ""
-                    for iso in isolation_strategies:
-                        if iso.domain == src_dom:
-                            if not iso.elements or port.name in iso.elements:
-                                has_iso = True
-                                iso_strat_name = iso.name
-                                break
-
-                    # Look for level shifter covering this domain & port
-                    has_ls = False
-                    ls_strat_name = ""
-                    for ls in level_shifter_strategies:
-                        if ls.domain == src_dom or ls.domain == dst_dom:
-                            if not ls.elements or port.name in ls.elements:
-                                has_ls = True
-                                ls_strat_name = ls.name
-                                break
-
-                    crossing_issues = []
-                    # Check if switch exists (can power down) without isolation
-                    src_is_switchable = any(sw.domain == src_dom for sw in power_switches)
-                    if src_is_switchable and not has_iso:
-                        issue_msg = (
-                            f"Signal '{port.name}' from switchable domain '{src_dom}' to '{dst_dom}' "
-                            f"lacks an isolation strategy (missing clamp when '{src_dom}' is OFF)."
-                        )
-                        crossing_issues.append(issue_msg)
-                        validation_issues.append(UPFValidationIssue(
-                            severity="error",
-                            issue_type="missing_isolation",
-                            description=issue_msg,
-                            file=child_mod.file,
-                            element=port.name,
-                        ))
-
-                    domain_crossings.append(DomainCrossing(
-                        signal=port.name,
-                        width=port.width,
-                        source_domain=src_dom,
-                        dest_domain=dst_dom,
-                        source_module=child_mod.name if is_output else parent_mod.name,
-                        dest_module=parent_mod.name if is_output else child_mod.name,
-                        has_isolation=has_iso,
-                        isolation_strategy=iso_strat_name,
-                        has_level_shifter=has_ls,
-                        level_shifter_strategy=ls_strat_name,
-                        issues=crossing_issues,
-                    ))
-
-    # ── 3. Retention Verification ─────────────────────────────────────
-    for sw in power_switches:
-        # Domain has power gating. Check if it has a retention strategy
-        has_ret = any(ret.domain == sw.domain for ret in retention_strategies)
-        if not has_ret:
-            validation_issues.append(UPFValidationIssue(
-                severity="warning",
-                issue_type="retention_hazard",
-                description=(
-                    f"Power domain '{sw.domain}' is switchable (power switch '{sw.name}'), "
-                    f"but no retention strategy is specified. Sequential state will be lost on power-down."
-                ),
-                file=primary_upf_file,
-                element=sw.domain,
-            ))
-        else:
-            # Check save/restore control signals
-            for ret in retention_strategies:
-                if ret.domain == sw.domain:
-                    if not ret.save_signal or not ret.restore_signal:
-                        validation_issues.append(UPFValidationIssue(
-                            severity="error",
-                            issue_type="retention_hazard",
-                            description=(
-                                f"Retention strategy '{ret.name}' for domain '{ret.domain}' "
-                                f"must define both save_signal and restore_signal."
-                            ),
-                            file=primary_upf_file,
-                            element=ret.name,
-                        ))
-
-    # ── 4. Power State Table (PST) Consistency Checks ─────────────────
-    for pst in power_state_tables:
-        if not pst.states:
-            validation_issues.append(UPFValidationIssue(
-                severity="warning",
-                issue_type="pst_violation",
-                description=f"Power state table '{pst.name}' contains no declared states.",
-                file=primary_upf_file,
-                element=pst.name,
-            ))
-
-    return resolved_hierarchy, domain_crossings

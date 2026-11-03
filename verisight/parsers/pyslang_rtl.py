@@ -545,5 +545,6 @@ def build_rtl_knowledge(result: CompileResult, file_list: List[str]) -> RTLKnowl
         file_list=file_list,
         total_lines=total_lines,
         global_issues=global_issues,
+        top_candidates=top_candidates,
     )
     return knowledge

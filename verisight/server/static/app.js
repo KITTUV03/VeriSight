@@ -14,9 +14,8 @@
     systemStatus: null,
     currentPatch: null,
     targetRtlFile: 'examples/rtl/alu.sv',
-    rtlFiles: [{ name: 'alu.sv', path: 'examples/rtl/alu.sv' }],
-    upfFile: null,
-    topModule: '',
+    uploadedRtlFiles: [],
+    uploadedUpfFile: null,
   };
 
   // DOM Elements Cache
@@ -30,28 +29,6 @@
     btnPresetAlu: document.getElementById('btnPresetAlu'),
     btnPresetFifo: document.getElementById('btnPresetFifo'),
     btnPresetCustom: document.getElementById('btnPresetCustom'),
-    // Multi-File & UPF Mode Elements
-    analysisModeBanner: document.getElementById('analysisModeBanner'),
-    modeTitle: document.getElementById('modeTitle'),
-    modeDesc: document.getElementById('modeDesc'),
-    rtlDropzone: document.getElementById('rtlDropzone'),
-    rtlFileInput: document.getElementById('rtlFileInput'),
-    btnBrowseRtl: document.getElementById('btnBrowseRtl'),
-    rtlFilesList: document.getElementById('rtlFilesList'),
-    rtlFileCount: document.getElementById('rtlFileCount'),
-    upfDropzone: document.getElementById('upfDropzone'),
-    upfFileInput: document.getElementById('upfFileInput'),
-    btnBrowseUpf: document.getElementById('btnBrowseUpf'),
-    upfStatusBadge: document.getElementById('upfStatusBadge'),
-    upfFilePill: document.getElementById('upfFilePill'),
-    upfFileName: document.getElementById('upfFileName'),
-    btnRemoveUpf: document.getElementById('btnRemoveUpf'),
-    upfPathInput: document.getElementById('upfPathInput'),
-    topModuleInput: document.getElementById('topModuleInput'),
-    btnValidateProject: document.getElementById('btnValidateProject'),
-    projectValidationCard: document.getElementById('projectValidationCard'),
-    btnCloseVal: document.getElementById('btnCloseVal'),
-    valBody: document.getElementById('valBody'),
     // Sim Form
     rtlInput: document.getElementById('rtlPathInput'),
     tbInput: document.getElementById('tbPathInput'),
@@ -62,6 +39,17 @@
     btnLaunchSim: document.getElementById('btnLaunchSim'),
     simSpinner: document.getElementById('simSpinner'),
     btnSimText: document.getElementById('btnSimText'),
+    // Multi-File & UPF Elements
+    analysisModeBadge: document.getElementById('analysisModeBadge'),
+    fileCountBadge: document.getElementById('fileCountBadge'),
+    rtlDropzone: document.getElementById('rtlDropzone'),
+    rtlFileInput: document.getElementById('rtlFileInput'),
+    rtlChipsContainer: document.getElementById('rtlChipsContainer'),
+    topModuleInput: document.getElementById('topModuleInput'),
+    upfDropzone: document.getElementById('upfDropzone'),
+    upfFileInput: document.getElementById('upfFileInput'),
+    upfChipsContainer: document.getElementById('upfChipsContainer'),
+    upfPathInput: document.getElementById('upfPathInput'),
     // Terminal
     terminal: document.getElementById('terminalOutput'),
     btnClearTerm: document.getElementById('btnClearTerm'),
@@ -171,9 +159,6 @@
       els.specInput.value = 'examples/specs/alu_spec.md';
       els.outDirInput.value = 'output/closed_loop';
       state.targetRtlFile = 'examples/rtl/alu.sv';
-      state.rtlFiles = [{ name: 'alu.sv', path: 'examples/rtl/alu.sv' }];
-      state.upfFile = null;
-      els.upfPathInput.value = '';
     } else if (name === 'fifo') {
       els.btnPresetFifo.classList.add('active');
       els.rtlInput.value = 'projects/fifo/rtl/fifo.sv';
@@ -181,264 +166,189 @@
       els.specInput.value = 'projects/fifo/specs/spec.md';
       els.outDirInput.value = 'output/demo_fifo_closed_loop';
       state.targetRtlFile = 'projects/fifo/rtl/fifo.sv';
-      state.rtlFiles = [{ name: 'fifo.sv', path: 'projects/fifo/rtl/fifo.sv' }];
-      state.upfFile = null;
-      els.upfPathInput.value = '';
     } else {
       els.btnPresetCustom.classList.add('active');
       els.rtlInput.value = '';
       els.tbInput.value = '';
       els.specInput.value = '';
       els.outDirInput.value = 'output/custom_sim';
-      state.rtlFiles = [];
-      state.upfFile = null;
-      els.upfPathInput.value = '';
-    }
-    renderRtlFiles();
-    updateModeUI();
-  }
-
-  // Multi-File & UPF Helpers
-  async function uploadFiles(fileList) {
-    const formData = new FormData();
-    for (const f of fileList) {
-      formData.append('files', f);
-    }
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) throw new Error('Upload failed');
-      return await res.json();
-    } catch (e) {
-      showToast('File upload error: ' + e.message, 'error');
-      return null;
     }
   }
 
-  async function handleRtlFiles(files) {
-    if (!files || files.length === 0) return;
-    const upRes = await uploadFiles(files);
-    if (upRes && upRes.rtl_files) {
-      for (const p of upRes.rtl_files) {
-        const name = p.split('/').pop();
-        if (!state.rtlFiles.some(f => f.path === p)) {
-          state.rtlFiles.push({ name, path: p });
-        }
-      }
-      if (upRes.upf_files && upRes.upf_files.length > 0) {
-        const upfP = upRes.upf_files[0];
-        state.upfFile = { name: upfP.split('/').pop(), path: upfP };
-        els.upfPathInput.value = upfP;
-      }
-      renderRtlFiles();
-      updateModeUI();
-      showToast(`Added ${upRes.rtl_files.length} RTL file(s)`, 'success');
-    }
-  }
-
-  async function handleUpfFile(files) {
-    if (!files || files.length === 0) return;
-    const upRes = await uploadFiles(files);
-    if (upRes) {
-      if (upRes.upf_files && upRes.upf_files.length > 0) {
-        const p = upRes.upf_files[0];
-        state.upfFile = { name: p.split('/').pop(), path: p };
-        els.upfPathInput.value = p;
-        updateModeUI();
-        showToast('UPF Power Intent loaded', 'success');
-      } else if (upRes.rtl_files && upRes.rtl_files.length > 0) {
-        showToast('Selected file is RTL, not .upf', 'error');
+  function updateModeBadge() {
+    const hasUpf = state.uploadedUpfFile !== null || (els.upfPathInput && els.upfPathInput.value.trim() !== '');
+    if (els.analysisModeBadge) {
+      if (hasUpf) {
+        els.analysisModeBadge.textContent = '⚡ RTL + UPF Power-Aware';
+        els.analysisModeBadge.className = 'card-badge mode-badge-power';
+      } else {
+        els.analysisModeBadge.textContent = 'RTL-Only Analysis';
+        els.analysisModeBadge.className = 'card-badge mode-badge-rtl';
       }
     }
+    const rtlCount = state.uploadedRtlFiles.length > 0 ? state.uploadedRtlFiles.length : (els.rtlInput.value.trim() ? 1 : 0);
+    if (els.fileCountBadge) {
+      els.fileCountBadge.textContent = `${rtlCount} RTL File${rtlCount === 1 ? '' : 's'}`;
+    }
   }
 
-  function removeRtlFile(index) {
-    state.rtlFiles.splice(index, 1);
-    renderRtlFiles();
-    updateModeUI();
-  }
-
-  function removeUpfFile() {
-    state.upfFile = null;
-    els.upfPathInput.value = '';
-    updateModeUI();
-    showToast('Removed UPF file (Switched to RTL-Only Mode)', 'info');
-  }
-
-  function renderRtlFiles() {
-    els.rtlFilesList.innerHTML = '';
-    state.rtlFiles.forEach((file, idx) => {
+  function renderRtlChips() {
+    if (!els.rtlChipsContainer) return;
+    els.rtlChipsContainer.innerHTML = '';
+    state.uploadedRtlFiles.forEach((file, idx) => {
       const chip = document.createElement('div');
       chip.className = 'file-chip';
+      const sizeKb = (file.size / 1024).toFixed(1);
       chip.innerHTML = `
-        <span class="chip-name" title="${file.path}">${file.name}</span>
-        <button type="button" class="btn-chip-remove" title="Remove ${file.name}">&times;</button>
+        <span class="file-chip-name">${file.name}</span>
+        <span class="file-chip-size text-muted">(${sizeKb} KB)</span>
+        <span class="file-chip-remove" title="Remove file" data-idx="${idx}">&times;</span>
       `;
-      chip.querySelector('.btn-chip-remove').addEventListener('click', () => removeRtlFile(idx));
-      els.rtlFilesList.appendChild(chip);
-    });
-    const count = state.rtlFiles.length;
-    els.rtlFileCount.textContent = `${count} file${count === 1 ? '' : 's'}`;
-    if (count > 0) {
-      els.rtlInput.value = state.rtlFiles.map(f => f.path).join(', ');
-    }
-  }
-
-  function updateModeUI() {
-    const hasUpf = !!(state.upfFile || (els.upfPathInput && els.upfPathInput.value.trim()));
-    if (hasUpf) {
-      els.analysisModeBanner.className = 'analysis-mode-banner mode-upf';
-      els.modeTitle.textContent = '⚡ RTL + UPF Power-Aware Analysis Mode';
-      els.modeDesc.textContent = 'Active IEEE 1801 power intent: correlates power domains, isolation, level shifters, retention & power state tables with RTL.';
-      els.upfStatusBadge.textContent = 'Active (Power-Aware)';
-      els.upfStatusBadge.className = 'badge-status active';
-      if (state.upfFile) {
-        els.upfFilePill.style.display = 'flex';
-        els.upfFileName.textContent = state.upfFile.name;
-      }
-    } else {
-      els.analysisModeBanner.className = 'analysis-mode-banner mode-rtl';
-      els.modeTitle.textContent = '🟢 RTL-Only Analysis Mode';
-      els.modeDesc.textContent = 'Standard functional verification and root-cause debugging without power intent.';
-      els.upfStatusBadge.textContent = 'Not Loaded (RTL Only)';
-      els.upfStatusBadge.className = 'badge-status';
-      els.upfFilePill.style.display = 'none';
-    }
-  }
-
-  async function validateProject() {
-    const rtlPaths = state.rtlFiles.length > 0 
-      ? state.rtlFiles.map(f => f.path) 
-      : (els.rtlInput.value.trim() ? els.rtlInput.value.trim().split(',').map(s => s.trim()) : []);
-    const upfPath = state.upfFile ? state.upfFile.path : (els.upfPathInput ? els.upfPathInput.value.trim() : '');
-    const topMod = els.topModuleInput.value.trim();
-
-    if (rtlPaths.length === 0) {
-      showToast('Please add at least one RTL file before validating', 'error');
-      return;
-    }
-
-    els.btnValidateProject.disabled = true;
-    els.btnValidateProject.innerHTML = '<span>⏳</span> Validating...';
-
-    try {
-      const res = await fetch('/api/validate-project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rtl_files: rtlPaths,
-          upf_path: upfPath || null,
-          top_module: topMod || null,
-        }),
+      chip.querySelector('.file-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.uploadedRtlFiles.splice(idx, 1);
+        renderRtlChips();
+        updateModeBadge();
       });
-      const data = await res.json();
-      els.btnValidateProject.disabled = false;
-      els.btnValidateProject.innerHTML = '<span>🔎</span> Validate Project & Hierarchy';
+      els.rtlChipsContainer.appendChild(chip);
+    });
+    updateModeBadge();
+  }
 
-      if (!data.valid) {
-        showToast('Validation failed: ' + (data.errors ? data.errors.join(', ') : 'Unknown error'), 'error');
-        return;
-      }
-
-      if (data.top_module && !els.topModuleInput.value.trim()) {
-        els.topModuleInput.value = data.top_module;
-      }
-
-      els.projectValidationCard.style.display = 'block';
-      let issuesHtml = '';
-      if (data.upf_issues && data.upf_issues.length > 0) {
-        issuesHtml = '<div class="val-issues-box"><strong>Power Intent Diagnostics:</strong>' +
-          data.upf_issues.map(iss => `
-            <div class="val-issue-row ${iss.severity}">
-              <span>[${iss.severity.toUpperCase()}]</span>
-              <span>${iss.description}</span>
-            </div>
-          `).join('') + '</div>';
-      }
-
-      let missingHtml = '';
-      if (data.missing_dependencies && data.missing_dependencies.length > 0) {
-        missingHtml = '<div class="val-issue-row error"><strong>Missing Dependencies:</strong> ' +
-          data.missing_dependencies.join(', ') + '</div>';
-      }
-
-      els.valBody.innerHTML = `
-        <div class="val-grid">
-          <div class="val-stat"><span class="val-stat-label">Mode</span><span class="val-stat-val" style="color:${data.mode === 'rtl_upf' ? '#c084fc' : 'var(--emerald-bright)'}">${data.mode === 'rtl_upf' ? '⚡ RTL + UPF' : '🟢 RTL-Only'}</span></div>
-          <div class="val-stat"><span class="val-stat-label">Top Module</span><span class="val-stat-val" style="color:var(--cyan-bright)">${data.top_module || 'None'}</span></div>
-          <div class="val-stat"><span class="val-stat-label">Modules</span><span class="val-stat-val">${data.modules ? data.modules.length : 0}</span></div>
-          <div class="val-stat"><span class="val-stat-label">Packages</span><span class="val-stat-val">${data.packages ? data.packages.length : 0}</span></div>
-          <div class="val-stat"><span class="val-stat-label">Power Domains</span><span class="val-stat-val">${data.power_domains ? data.power_domains.length : 0}</span></div>
-          <div class="val-stat"><span class="val-stat-label">Crossings</span><span class="val-stat-val">${data.domain_crossings ? data.domain_crossings.length : 0}</span></div>
-        </div>
-        ${missingHtml}
-        ${issuesHtml}
+  function renderUpfChip() {
+    if (!els.upfChipsContainer) return;
+    els.upfChipsContainer.innerHTML = '';
+    if (state.uploadedUpfFile) {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip chip-upf';
+      const sizeKb = (state.uploadedUpfFile.size / 1024).toFixed(1);
+      chip.innerHTML = `
+        <span class="file-chip-name">⚡ ${state.uploadedUpfFile.name}</span>
+        <span class="file-chip-size text-muted">(${sizeKb} KB)</span>
+        <span class="file-chip-remove" title="Remove UPF">&times;</span>
       `;
-
-      showToast('Project hierarchy validated successfully', 'success');
-    } catch (e) {
-      els.btnValidateProject.disabled = false;
-      els.btnValidateProject.innerHTML = '<span>🔎</span> Validate Project & Hierarchy';
-      showToast('Validation request failed: ' + e.message, 'error');
+      chip.querySelector('.file-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.uploadedUpfFile = null;
+        if (els.upfFileInput) els.upfFileInput.value = '';
+        renderUpfChip();
+        updateModeBadge();
+      });
+      els.upfChipsContainer.appendChild(chip);
     }
+    updateModeBadge();
   }
 
   // Launch Simulation
   async function launchSimulation() {
-    const rtlList = state.rtlFiles.length > 0 
-      ? state.rtlFiles.map(f => f.path) 
-      : (els.rtlInput.value.trim() ? els.rtlInput.value.trim().split(',').map(s => s.trim()) : []);
-    const upfPath = state.upfFile ? state.upfFile.path : (els.upfPathInput ? els.upfPathInput.value.trim() : '');
-    const topMod = els.topModuleInput.value.trim();
+    let rtl = els.rtlInput.value.trim();
     const tb = els.tbInput.value.trim();
     const spec = els.specInput.value.trim();
+    let upf = els.upfPathInput ? els.upfPathInput.value.trim() : '';
+    const topMod = els.topModuleInput ? els.topModuleInput.value.trim() : '';
     const simulator = els.simSelect.value;
     const sec = els.secSelect.value;
     const outDir = els.outDirInput.value.trim();
 
-    if (rtlList.length === 0 || !tb) {
-      showToast('Please specify both RTL source file(s) and Testbench path', 'error');
+    if (!tb) {
+      showToast('Please specify a Testbench path (.sv)', 'error');
       return;
     }
 
-    state.targetRtlFile = rtlList[0];
+    if (state.uploadedRtlFiles.length === 0 && !rtl) {
+      showToast('Please select or specify at least one RTL source file', 'error');
+      return;
+    }
 
     // UI Loading state
     els.btnLaunchSim.disabled = true;
     els.simSpinner.style.display = 'inline-block';
     els.btnSimText.textContent = 'Simulating & Diagnosing...';
 
-    logTerminal(`\n[${new Date().toLocaleTimeString()}] 🚀 Launching Closed-Loop Simulation...`, 'prompt');
-    logTerminal(`[INFO] Mode:        ${upfPath ? '⚡ RTL + UPF Power-Aware Mode' : '🟢 RTL-Only Mode'}`);
-    logTerminal(`[INFO] RTL Sources: ${rtlList.join(', ')} (${rtlList.length} files)`);
-    if (upfPath) {
-      logTerminal(`[INFO] UPF Intent:  ${upfPath}`);
+    // Step A: If user selected files via file picker / drag-and-drop, upload them first
+    let stagedRtlFiles = null;
+    if (state.uploadedRtlFiles.length > 0) {
+      logTerminal(`\n[${new Date().toLocaleTimeString()}] [UPLOAD] Ingesting ${state.uploadedRtlFiles.length} project RTL file(s)...`, 'prompt');
+      
+      try {
+        const rtlFilePayloads = await Promise.all(
+          state.uploadedRtlFiles.map(async f => ({
+            name: f.name,
+            content: await f.text(),
+          }))
+        );
+        let upfPayload = null;
+        if (state.uploadedUpfFile) {
+          upfPayload = {
+            name: state.uploadedUpfFile.name,
+            content: await state.uploadedUpfFile.text(),
+          };
+        }
+
+        const upRes = await fetch('/api/project/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rtl_files: rtlFilePayloads,
+            upf_file: upfPayload,
+            top_module: topMod || null,
+          }),
+        });
+        if (!upRes.ok) {
+          const upErr = await upRes.json();
+          throw new Error(upErr.detail || 'Project upload failed');
+        }
+        const upData = await upRes.json();
+        rtl = upData.suggested_rtl_path;
+        if (upData.suggested_upf_path) {
+          upf = upData.suggested_upf_path;
+        }
+        stagedRtlFiles = upData.rtl_files.map(f => f.path);
+        logTerminal(`[INFO] RTL Ingestion Complete: ${upData.file_count} files, top module: ${upData.top_module || 'auto'}`);
+        if (upData.upf_info) {
+          logTerminal(`[INFO] UPF Power Intent Parsed: ${upData.upf_info.domains.length} power domain(s), valid=${upData.upf_info.is_valid}`);
+        }
+        if (upData.missing_dependencies && upData.missing_dependencies.length > 0) {
+          logTerminal(`[WARN] Missing dependencies: ${upData.missing_dependencies.join(', ')}`, 'warning');
+        }
+      } catch (uploadErr) {
+        els.btnLaunchSim.disabled = false;
+        els.simSpinner.style.display = 'none';
+        els.btnSimText.textContent = 'Launch Closed-Loop Simulation';
+        showToast(uploadErr.message, 'error');
+        logTerminal(`[ERROR] Project upload failed: ${uploadErr.message}`, 'error');
+        return;
+      }
     }
-    if (topMod) {
-      logTerminal(`[INFO] Top Module:  ${topMod}`);
-    }
+
+    state.targetRtlFile = rtl;
+
+    logTerminal(`\n[${new Date().toLocaleTimeString()}] [RUN] Launching Closed-Loop Simulation...`, 'prompt');
+    logTerminal(`[INFO] Mode:        ${upf ? '[POWER-AWARE] RTL + UPF Verified' : '[RTL-ONLY] RTL Functional Triage'}`);
+    logTerminal(`[INFO] RTL Source:  ${rtl}`);
+    if (upf) logTerminal(`[INFO] UPF Intent:  ${upf}`);
     logTerminal(`[INFO] Testbench:   ${tb}`);
     logTerminal(`[INFO] Simulator:   ${simulator.toUpperCase()}`);
-    logTerminal(`[INFO] Security:    ${sec === 'airgap' ? '🛡️ Sovereign Air-Gap (Local)' : 'Cloud API'}`);
-
+    logTerminal(`[INFO] Security:    ${sec === 'airgap' ? '[AIR-GAP] Sovereign Air-Gap (Local)' : 'Cloud API'}`);
 
     try {
+      const simPayload = {
+        rtl_path: rtl,
+        rtl_files: stagedRtlFiles,
+        tb_path: tb,
+        spec_path: spec || null,
+        upf_path: upf || null,
+        top_module: topMod || null,
+        simulator: simulator,
+        output_dir: outDir,
+        airgap: sec === 'airgap',
+        provider: sec === 'claude' ? 'anthropic' : 'gemini',
+      };
+
       const res = await fetch('/api/sim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rtl_files: rtlList,
-          upf_path: upfPath || null,
-          top_module: topMod || null,
-          tb_path: tb,
-          spec_path: spec || null,
-          simulator: simulator,
-          output_dir: outDir,
-          airgap: sec === 'airgap',
-          provider: sec === 'claude' ? 'anthropic' : 'gemini',
-        }),
+        body: JSON.stringify(simPayload),
       });
 
       if (!res.ok) {
@@ -457,6 +367,9 @@
       logTerminal(`\n[SUCCESS] Closed-Loop Run Complete in ${result.duration_s}s!`, 'success');
       logTerminal(`[RCA] Diagnosis: ${result.classification} (${result.confidence}% confidence)`);
       logTerminal(`[RCA] Root Cause: ${result.root_cause}`);
+      if (result.mode === 'power_aware') {
+        logTerminal(`[POWER] UPF Power Intent Verified & Correlated with Design Hierarchy!`, 'success');
+      }
 
       // Update HUD Results
       els.hudResults.style.display = 'block';
@@ -845,51 +758,77 @@
     els.btnPresetFifo.addEventListener('click', () => applyPreset('fifo'));
     els.btnPresetCustom.addEventListener('click', () => applyPreset('custom'));
 
-    // Multi-File RTL Upload
-    if (els.btnBrowseRtl && els.rtlFileInput) {
-      els.btnBrowseRtl.addEventListener('click', () => els.rtlFileInput.click());
-      els.rtlFileInput.addEventListener('change', (e) => handleRtlFiles(e.target.files));
-    }
-    if (els.rtlDropzone) {
-      els.rtlDropzone.addEventListener('dragover', (e) => { e.preventDefault(); els.rtlDropzone.classList.add('drag-over'); });
-      els.rtlDropzone.addEventListener('dragleave', () => els.rtlDropzone.classList.remove('drag-over'));
+    // RTL Dropzone & File Input
+    if (els.rtlDropzone && els.rtlFileInput) {
+      els.rtlDropzone.addEventListener('click', () => els.rtlFileInput.click());
+      els.rtlFileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        files.forEach(f => {
+          if (!state.uploadedRtlFiles.some(existing => existing.name === f.name)) {
+            state.uploadedRtlFiles.push(f);
+          }
+        });
+        renderRtlChips();
+      });
+      ['dragenter', 'dragover'].forEach(evt => {
+        els.rtlDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.rtlDropzone.classList.add('dropzone-hover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        els.rtlDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.rtlDropzone.classList.remove('dropzone-hover');
+        });
+      });
       els.rtlDropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        els.rtlDropzone.classList.remove('drag-over');
-        handleRtlFiles(e.dataTransfer.files);
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach(f => {
+          if (!state.uploadedRtlFiles.some(existing => existing.name === f.name)) {
+            state.uploadedRtlFiles.push(f);
+          }
+        });
+        renderRtlChips();
       });
     }
 
-    // Optional UPF Upload
-    if (els.btnBrowseUpf && els.upfFileInput) {
-      els.btnBrowseUpf.addEventListener('click', () => els.upfFileInput.click());
-      els.upfFileInput.addEventListener('change', (e) => handleUpfFile(e.target.files));
-    }
-    if (els.upfDropzone) {
-      els.upfDropzone.addEventListener('dragover', (e) => { e.preventDefault(); els.upfDropzone.classList.add('drag-over'); });
-      els.upfDropzone.addEventListener('dragleave', () => els.upfDropzone.classList.remove('drag-over'));
+    // UPF Dropzone & File Input
+    if (els.upfDropzone && els.upfFileInput) {
+      els.upfDropzone.addEventListener('click', () => els.upfFileInput.click());
+      els.upfFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          state.uploadedUpfFile = e.target.files[0];
+          renderUpfChip();
+        }
+      });
+      ['dragenter', 'dragover'].forEach(evt => {
+        els.upfDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.upfDropzone.classList.add('dropzone-hover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        els.upfDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.upfDropzone.classList.remove('dropzone-hover');
+        });
+      });
       els.upfDropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        els.upfDropzone.classList.remove('drag-over');
-        handleUpfFile(e.dataTransfer.files);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          state.uploadedUpfFile = e.dataTransfer.files[0];
+          renderUpfChip();
+        }
       });
-    }
-    if (els.btnRemoveUpf) {
-      els.btnRemoveUpf.addEventListener('click', removeUpfFile);
-    }
-    if (els.upfPathInput) {
-      els.upfPathInput.addEventListener('input', updateModeUI);
     }
 
-    // Project Validation
-    if (els.btnValidateProject) {
-      els.btnValidateProject.addEventListener('click', validateProject);
+    if (els.upfPathInput) {
+      els.upfPathInput.addEventListener('input', updateModeBadge);
     }
-    if (els.btnCloseVal) {
-      els.btnCloseVal.addEventListener('click', () => {
-        els.projectValidationCard.style.display = 'none';
-      });
+    if (els.rtlInput) {
+      els.rtlInput.addEventListener('input', updateModeBadge);
     }
+    updateModeBadge();
 
     // Simulation
     els.btnLaunchSim.addEventListener('click', launchSimulation);
@@ -929,8 +868,6 @@
   // Initialization
   function init() {
     initListeners();
-    renderRtlFiles();
-    updateModeUI();
     fetchStatus();
     loadPastRuns();
   }
