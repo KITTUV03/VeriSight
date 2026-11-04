@@ -12,13 +12,13 @@ def get_font(size, bold=False):
         return ImageFont.load_default()
 
 def create_workflow_gif():
-    # Sequence: 1. Welcome Menu -> 2. Agent 1 Debug Input -> 3. RCA Triage Result -> 4. Automated Patch -> 5. Closed-Loop Pass
+    # Sequence: 1. Welcome Menu -> 2. Agent 2 Plan Results -> 3. Spec-Driven TB -> 4. RCA Triage Result -> 5. Automated Patch
     steps = [
-        ("docs/screenshots/screenshot_01_welcome_menu.png", "STEP 1: Autonomous Silicon Verification Launcher (6 Multi-Agent Workflows)", (34, 197, 94)),
-        ("docs/screenshots/screenshot_03_agent1_debug_inputs.png", "STEP 2: Multi-Modal Ingestion (Log, RTL, Testbench, Waveforms VCD)", (14, 165, 233)),
-        ("docs/screenshots/screenshot_04_agent1_debug_results.png", "STEP 3: 9-Rule Deterministic RCA Engine (95% Confidence, RTL Bug Isolated)", (234, 179, 8)),
-        ("docs/screenshots/screenshot_13_automated_patch.png", "STEP 4: Unified Git Patch Synthesis & Zero-Touch Sandbox Validation", (168, 85, 247)),
-        ("docs/screenshots/screenshot_07_workflow3_closed_loop.png", "STEP 5: Closed-Loop Regression Re-Run (All Assertions Clean PASS)", (34, 197, 94))
+        ("docs/screenshots/screenshot_01_welcome_menu.png", "STEP 1: Autonomous Silicon Verification Launcher (3 Core Engines)", (34, 197, 94)),
+        ("docs/screenshots/screenshot_06_agent2_plan_results.png", "STEP 2: Autonomous Verification Plan (50+ Tests, Coverage & SVA)", (14, 165, 233)),
+        ("docs/screenshots/screenshot_16_spec_driven_tb.png", "STEP 3: Spec-Driven UVM Testbench Synthesis & Scoreboard", (234, 179, 8)),
+        ("docs/screenshots/screenshot_04_agent1_debug_results.png", "STEP 4: 9-Rule Deterministic RCA Engine (95% Confidence, RTL Bug Isolated)", (168, 85, 247)),
+        ("docs/screenshots/screenshot_13_automated_patch.png", "STEP 5: Unified Git Patch Synthesis & Zero-Touch Sandbox Validation", (34, 197, 94))
     ]
     
     target_w, target_h = 1000, 560
@@ -72,7 +72,7 @@ def create_coverage_gif():
         (68, "AI Dynamic Stimulus Ingestion", "VeriSight Agent 2 Directed Constraints Active", (245, 158, 11)),
         (85, "Bayesian Coverage Hole Search", "Hitting Rare Multi-Beat Backpressure States", (14, 165, 233)),
         (96, "Corner-Case Resolution", "Async Reset Glitch & FIFO Concurrent RW Hit", (99, 102, 241)),
-        (100, "100% Coverage Closure Sign-Off", "All 22 Features, 45 Tests, 23 SVA Properties Verified", (34, 197, 94))
+        (100, "100% Coverage Closure Sign-Off", "All 22 Features, 52 Tests, 34 SVA Properties Verified", (34, 197, 94))
     ]
     
     frames = []

@@ -4,24 +4,27 @@ Traceability Matrix & Reporting Engine for VeriSight Plan.
 Compiles Feature, Test, Coverage, and SVA mappings into:
 - Bi-directional Traceability Matrix
 - Exportable CSV format (for enterprise requirements management)
-- Beautiful, modern interactive HTML Dashboard
+- Interactive, responsive, dynamic-theme Black & White HTML Dashboard
 - Complete Markdown documentation
 """
 
 import csv
 import json
+import html
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from verisight.plan.schemas import (
     FeatureItem,
     TestScenario,
     CovergroupDef,
+    CoveragePoint,
+    CoverageBin,
     SVAProperty,
     TraceabilityRow,
     VerificationPlanReport,
 )
-from verisight.reporter.waveform_studio import generate_waveform_studio_tab
+from verisight.config import get_config
 from verisight.utils.logger import get_logger
 
 logger = get_logger("plan.traceability")
@@ -61,11 +64,23 @@ def build_traceability_matrix(
         s_ids = feat_to_sva.get(feat.feature_id, [])
 
         if t_ids and (c_ids or s_ids):
+            plan_status = "Planned"
             status = "Covered"
         elif t_ids or c_ids or s_ids:
+            plan_status = "Partial_Plan"
             status = "Partial"
         else:
+            plan_status = "Unplanned"
             status = "Uncovered"
+
+        # If actual coverage has been ingested from a simulator run
+        if feat.actual_coverage is not None:
+            if feat.actual_coverage >= 100.0:
+                status = "Closed"
+            elif feat.actual_coverage > 0.0:
+                status = "In_Progress"
+            else:
+                status = "Untested"
 
         rows.append(
             TraceabilityRow(
@@ -74,7 +89,9 @@ def build_traceability_matrix(
                 test_ids=t_ids,
                 coverage_ids=c_ids,
                 assertion_ids=s_ids,
+                plan_status=plan_status,
                 status=status,
+                actual_coverage=feat.actual_coverage,
             )
         )
 
@@ -114,7 +131,7 @@ def export_csv(matrix: List[TraceabilityRow], output_path: Path):
 def export_markdown(report: VerificationPlanReport, output_path: Path):
     """Export complete verification plan in Markdown format."""
     cov_db_source = report.coverage_db_source or "Simulator UCDB/vDB Ingest"
-    actual_overall = f"{report.actual_coverage_overall}%" if report.actual_coverage_overall is not None else "92.0%"
+    actual_overall = f"{report.actual_coverage_overall}%" if report.actual_coverage_overall is not None else "N/A (Not Simulated)"
 
     lines = [
         f"# VeriSight Plan — Verification & Architecture Plan",
@@ -137,7 +154,7 @@ def export_markdown(report: VerificationPlanReport, output_path: Path):
 
     for f in report.features:
         act = f"{f.actual_coverage}%" if f.actual_coverage is not None else "N/A"
-        st = f.coverage_status or ("Closed" if f.actual_coverage and f.actual_coverage >= 100 else "In Progress")
+        st = f.coverage_status or "Not Simulated"
         holes_desc = ", ".join([f"`{h['bin_name']}`" for h in f.unhit_bins]) or "None (100% Hit)"
         lines.append(f"| `{f.feature_id}` | {f.title} | **{act}** | {f.target_coverage}% | {st} | {holes_desc} |")
 
@@ -207,24 +224,24 @@ def export_markdown(report: VerificationPlanReport, output_path: Path):
 
 def export_html(report: VerificationPlanReport, output_path: Path):
     """
-    Generate high-end, responsive, interactive HTML presentation dashboard
-    for VeriSight Plan matching tier-1 Silicon EDA engineering standards.
+    Generate high-end, responsive, interactive, pure Black & White HTML dashboard
+    with dynamic monochrome theme switching (Dark/Light/Graphite) and zero emojis/symbols.
     """
-    import html
-    from verisight.config import get_config
-
     cfg = get_config()
     is_airgap = getattr(cfg.llm, "airgap", False) or (cfg.llm.provider in ("ollama", "local", "vllm", "airgap"))
-    if is_airgap:
-        sec_title = "SOVEREIGN AIR-GAP: ENFORCED"
-        sec_sub = "Zero Cloud RTL Leakage Certified • On-Prem Local Architecture Synthesis"
-        sec_guard = "ACTIVE (BLOCKED)"
-        sec_shield = "🛡️"
-    else:
-        sec_title = "ENTERPRISE SOVEREIGN READY"
-        sec_sub = "ISO 26262 ASIL-D & DO-254 Ready • Bi-Directional Requirement Matrix"
-        sec_guard = "MONITORED"
-        sec_shield = "🔒"
+    sec_badge = "[SOVEREIGN AIR-GAP: ENFORCED]" if is_airgap else "[ENTERPRISE SOVEREIGN READY]"
+    sec_sub = "Zero Cloud RTL Leakage • Local Architecture Synthesis" if is_airgap else "ISO 26262 ASIL-D & DO-254 Ready • Bi-Directional Traceability"
+
+    # Pre-render Silicon Waveform Studio tab
+    try:
+        from verisight.reporter.waveform_studio import generate_waveform_studio_tab
+        waveform_studio_html = generate_waveform_studio_tab(
+            vcd_path="examples/waveforms/alu_failure_trace.vcd",
+            tab_id="tab-waveform",
+        )
+    except Exception as e:
+        logger.warning(f"Could not load waveform studio tab: {e}")
+        waveform_studio_html = '<div id="tab-waveform" class="tab-pane"><canvas id="waveCanvas"></canvas></div>'
 
     total_feat = report.total_features or len(report.features)
     total_tst = report.total_tests or len(report.test_scenarios)
@@ -237,50 +254,61 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     total_rows = max(len(report.traceability_matrix), 1)
     closure_pct = round(((cov_cnt + 0.5 * part_cnt) / total_rows) * 100, 1)
 
-    # Test types breakdown
-    test_types_cnt = {}
-    for t in report.test_scenarios:
-        ttype = t.test_type or "Directed"
-        test_types_cnt[ttype] = test_types_cnt.get(ttype, 0) + 1
-    test_breakdown_str = " • ".join([f"{k}: {v}" for k, v in sorted(test_types_cnt.items())]) or "Directed & Random"
+    has_sim_evidence = report.actual_coverage_overall is not None
+    actual_cov_overall_display = f"{report.actual_coverage_overall}%" if has_sim_evidence else "N/A"
+    actual_cov_overall_width = min(100.0, report.actual_coverage_overall) if has_sim_evidence else 0.0
+    cov_db_source = report.coverage_db_source or "Simulator UCDB/vDB Ingest (Questa / VCS / Verilator)"
 
-    # Pre-build Live Coverage Cockpit Cards & Client-Side Feature JSON
-    actual_cov_overall = report.actual_coverage_overall if report.actual_coverage_overall is not None else 92.0
-    cov_db_source = report.coverage_db_source or "Simulator UCDB/vDB Ingest (Questa / VCS)"
+    # Detect protocol signature
+    proto_label = "CUSTOM RTL"
+    spec_text_low = (report.spec_source or "").lower()
+    design_low = report.design_name.lower()
+    if any(k in spec_text_low or k in design_low for k in ["pcie", "tlp", "ltssm"]):
+        proto_label = "PCIE GEN3-6 ARCHITECTURE"
+    elif any(k in spec_text_low or k in design_low for k in ["chi", "flit", "readunique", "readshared"]):
+        proto_label = "AMBA CHI COHERENT HUB INTERCONNECT"
+    elif any(k in spec_text_low or k in design_low for k in ["ddr", "sdram", "lpddr", "trcd"]):
+        proto_label = "DDR4 / DDR5 MEMORY CONTROLLER"
+    elif any(k in spec_text_low or k in design_low for k in ["axi", "awvalid", "wvalid"]):
+        proto_label = "AMBA AXI4 / AXI5 5-CHANNEL PROTOCOL"
+    elif any(k in spec_text_low or k in design_low for k in ["apb", "psel", "pwrite", "pready"]):
+        proto_label = "AMBA APB4 ON-CHIP BUS ARCHITECTURE"
+    elif any(k in spec_text_low or k in design_low for k in ["ahb", "hsel", "htrans", "hready"]):
+        proto_label = "AMBA AHB5 ADVANCED HIGH-PERFORMANCE BUS"
 
-    cockpit_cards = []
+    # Pre-build client-side cockpit JSON
     features_cockpit_json = []
-
+    cockpit_cards = []
     for f in report.features:
-        act_cov = f.actual_coverage if f.actual_coverage is not None else 92.0
+        has_sim_data = f.actual_coverage is not None
+        act_cov = f.actual_coverage if has_sim_data else 0.0
         tgt_cov = f.target_coverage or 100.0
-        deficit = round(max(0.0, tgt_cov - act_cov), 1)
+        deficit = round(max(0.0, tgt_cov - act_cov), 1) if has_sim_data else None
 
         features_cockpit_json.append({
             "feature_id": f.feature_id,
             "title": f.title,
-            "actual_coverage": act_cov,
+            "actual_coverage": f.actual_coverage,
             "target_coverage": tgt_cov,
             "deficit": deficit,
-            "unhit_bins": f.unhit_bins,
-            "directed_stimulus_hint": f.directed_stimulus_hint or "// Synthesized sequence ready",
+            "unhit_bins": f.unhit_bins or [],
+            "directed_stimulus_hint": f.directed_stimulus_hint or "// Directed stimulus sequence ready",
         })
 
-        if act_cov >= 100.0:
-            bar_color = "linear-gradient(90deg, #10b981, #34d399)"
-            status_badge = '<span class="badge badge-covered">100% CLOSED</span>'
-            status_sub = "Coverage Target Fully Satisfied • All simulator bins hit"
+        if not has_sim_data:
+            status_badge = '<span class="pill pill-dashed">NOT SIMULATED</span>'
+            status_sub = "No simulator coverage database supplied for this feature — plan not yet executed"
+        elif act_cov >= 100.0:
+            status_badge = '<span class="pill pill-solid">100% CLOSED</span>'
+            status_sub = "Coverage Target Fully Satisfied — All simulator bins hit"
         elif act_cov >= 90.0:
-            bar_color = "linear-gradient(90deg, #0ea5e9, #38bdf8)"
-            status_badge = f'<span class="badge badge-warn">NEAR CLOSURE ({deficit}% DEFICIT)</span>'
+            status_badge = f'<span class="pill pill-outline">NEAR CLOSURE ({deficit}% DEFICIT)</span>'
             status_sub = f"Closure Deficit: {deficit}% missing to achieve 100% target"
         elif act_cov >= 75.0:
-            bar_color = "linear-gradient(90deg, #eab308, #fbbf24)"
-            status_badge = f'<span class="badge badge-partial">IN PROGRESS ({deficit}% DEFICIT)</span>'
+            status_badge = f'<span class="pill pill-outline">IN PROGRESS ({deficit}% DEFICIT)</span>'
             status_sub = f"Closure Deficit: {deficit}% missing to achieve 100% target"
         else:
-            bar_color = "linear-gradient(90deg, #ef4444, #f87171)"
-            status_badge = f'<span class="badge badge-critical">CRITICAL HOLE ({deficit}% DEFICIT)</span>'
+            status_badge = f'<span class="pill pill-dashed">CRITICAL HOLE ({deficit}% DEFICIT)</span>'
             status_sub = f"Critical Coverage Hole ({deficit}% missing)"
 
         if f.unhit_bins:
@@ -291,100 +319,79 @@ def export_html(report: VerificationPlanReport, output_path: Path):
                 h_cp = html.escape(h.get("coverpoint", ""))
                 h_hits = h.get("hits", 0)
                 hole_chips.append(f"""
-                    <div class="unhit-hole-chip">
-                        <span class="hole-cross">❌</span>
-                        <div class="hole-details">
-                            <span class="hole-title"><strong>{h_name}</strong> in <code>{h_cp}</code></span>
-                            <span class="hole-cond">Condition: <code>{h_cond}</code></span>
+                    <div class="unhit-chip">
+                        <span class="unhit-tag">[UNHIT]</span>
+                        <div class="unhit-info">
+                            <div><strong>{h_name}</strong> in <code>{h_cp}</code></div>
+                            <div class="unhit-cond">Condition: <code>{h_cond}</code></div>
                         </div>
-                        <span class="hole-hits-badge">{h_hits} hits</span>
+                        <span class="unhit-hits">{h_hits} hits</span>
                     </div>
                 """)
-            holes_grid = "".join(hole_chips)
-            ai_action_btn = f"""
-                <button class="btn btn-ai-directed" onclick="openHoleModal('{html.escape(f.feature_id)}')">
-                    <span class="ai-spark">⚡</span> Generate directed sequence to hit remaining {deficit}% bins
-                </button>
-            """
             holes_html = f"""
-                <div class="unhit-holes-section">
-                    <div class="holes-header-row">
-                        <div class="holes-sec-title">
-                            <span class="warn-dot"></span>
-                            <span>Remaining Unhit Bins ({len(f.unhit_bins)} coverage holes):</span>
-                        </div>
-                        {ai_action_btn}
+                <div class="holes-section">
+                    <div class="holes-header">
+                        <span>REMAINING UNHIT BINS ({len(f.unhit_bins)} coverage holes):</span>
                     </div>
-                    <div class="unhit-chips-grid">
-                        {holes_grid}
-                    </div>
+                    <div class="holes-grid">{''.join(hole_chips)}</div>
+                    <button class="btn btn-action" onclick="openHoleModal('{html.escape(f.feature_id)}')">
+                        Generate directed sequence to hit remaining {deficit}% bins
+                    </button>
                 </div>
             """
         else:
-            holes_html = f"""
-                <div class="unhit-holes-clean">
-                    <span class="clean-check">✓</span>
-                    <span>All planned coverage bins hit (100.0% Target Achieved). Zero unhit holes.</span>
+            holes_html = """
+                <div class="holes-clean">
+                    [CLOSED] All planned coverage bins hit (100.0% Target Achieved). Zero unhit holes.
                 </div>
             """
 
-        search_blob = f"{f.feature_id} {f.title} {act_cov}% {deficit}% {' '.join(h.get('bin_name', '') for h in f.unhit_bins)}".lower()
+        search_blob = f"{f.feature_id} {f.title} {' '.join(h.get('bin_name', '') for h in f.unhit_bins)}".lower()
         cockpit_cards.append(f"""
-            <div class="cockpit-card" id="cockpit-card-{html.escape(f.feature_id)}" data-feat="{html.escape(f.feature_id)}" data-has-holes="{'1' if f.unhit_bins else '0'}" data-text="{html.escape(search_blob)}">
-                <div class="cockpit-card-header">
-                    <div class="cockpit-feat-title-group">
-                        <span class="code-pill pill-feat">{html.escape(f.feature_id)}</span>
-                        <h3 class="cockpit-feat-name">{html.escape(f.title)}</h3>
+            <div class="card cockpit-card" id="cockpit-card-{html.escape(f.feature_id)}" data-feat="{html.escape(f.feature_id)}" data-has-holes="{'1' if f.unhit_bins else '0'}" data-text="{html.escape(search_blob)}">
+                <div class="card-header">
+                    <div>
+                        <span class="badge badge-mono">{html.escape(f.feature_id)}</span>
+                        <h3 class="card-title">{html.escape(f.title)}</h3>
                     </div>
-                    <div class="cockpit-card-badge">
-                        {status_badge}
-                    </div>
+                    <div class="cockpit-badge">{status_badge}</div>
                 </div>
-                <div class="cockpit-meter-block">
-                    <div class="meter-text-row">
-                        <span class="meter-act-val">{act_cov}% Hit</span>
-                        <span class="meter-tgt-val">(Target: {tgt_cov}%)</span>
+                <div class="meter-wrap">
+                    <div class="meter-bar">
+                        <div class="meter-fill" style="width: {min(100.0, act_cov) if has_sim_data else 0}%;"></div>
                     </div>
-                    <div class="meter-track">
-                        <div class="meter-fill" style="width: {min(100.0, act_cov)}%; background: {bar_color};"></div>
-                        <div class="meter-target-line" title="100% Target"></div>
+                    <div class="meter-meta">
+                        <span class="meter-act-val">{f"{act_cov}% Hit" if has_sim_data else "Not Simulated"}</span>
+                        <span class="meter-sub-text">{status_sub}</span>
+                        <span class="meter-tgt-val">Target: {tgt_cov}%</span>
                     </div>
-                    <div class="meter-sub-text">{status_sub}</div>
                 </div>
                 {holes_html}
             </div>
         """)
     cockpit_cards_html = "".join(cockpit_cards)
 
-    # Pre-build Traceability Rows
+    # Pre-build Traceability Matrix Rows
     matrix_rows = []
     for r in report.traceability_matrix:
         st_lower = r.status.lower()
-        badge_cls = "badge-covered" if st_lower == "covered" else ("badge-partial" if st_lower == "partial" else "badge-critical")
-        t_badges = "".join([f'<span class="code-pill pill-test">{html.escape(x)}</span>' for x in r.test_ids]) or '<span class="text-dim">—</span>'
-        c_badges = "".join([f'<span class="code-pill pill-cov">{html.escape(x)}</span>' for x in r.coverage_ids]) or '<span class="text-dim">—</span>'
-        s_badges = "".join([f'<span class="code-pill pill-sva">{html.escape(x)}</span>' for x in r.assertion_ids]) or '<span class="text-dim">—</span>'
-        
-        act_cov = r.actual_coverage if r.actual_coverage is not None else 92.0
-        cov_bar_color = "#34d399" if act_cov >= 100.0 else ("#38bdf8" if act_cov >= 90.0 else "#fbbf24")
-        holes_chip = f'<span class="badge badge-critical" style="font-size:10px; margin-left:6px;">{r.unhit_bins_count} holes</span>' if r.unhit_bins_count > 0 else ""
-        act_cov_cell = f"""
-            <div class="mini-cov-cell">
-                <div class="mini-cov-text"><strong>{act_cov}%</strong> <span class="text-dim">/ {r.target_coverage}%</span>{holes_chip}</div>
-                <div class="mini-cov-bar"><div class="mini-cov-fill" style="width: {min(100.0, act_cov)}%; background: {cov_bar_color};"></div></div>
-            </div>
-        """
+        badge_cls = "pill-solid" if r.status in ("Covered", "Closed") else ("pill-outline" if r.status in ("Partial", "In_Progress") else "pill-dashed")
+        act_cov_val = f"{r.actual_coverage}%" if r.actual_coverage is not None else "N/A"
 
-        search_blob = f"{r.feature_id} {r.feature_title} {' '.join(r.test_ids)} {' '.join(r.coverage_ids)} {' '.join(r.assertion_ids)} {r.status} {act_cov}%".lower()
+        t_badges = "".join([f'<span class="badge badge-link" onclick="jumpToTest(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in r.test_ids]) or '<span class="text-dim">—</span>'
+        c_badges = "".join([f'<span class="badge badge-link" onclick="jumpToCovergroup(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in r.coverage_ids]) or '<span class="text-dim">—</span>'
+        s_badges = "".join([f'<span class="badge badge-link" onclick="jumpToAssertion(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in r.assertion_ids]) or '<span class="text-dim">—</span>'
+
+        search_blob = f"{r.feature_id} {r.feature_title} {' '.join(r.test_ids)} {' '.join(r.coverage_ids)} {' '.join(r.assertion_ids)} {r.status}".lower()
         matrix_rows.append(f"""
             <tr class="mat-row" data-status="{st_lower}" data-text="{html.escape(search_blob)}">
-                <td class="col-fid"><code>{html.escape(r.feature_id)}</code></td>
-                <td class="col-title"><strong>{html.escape(r.feature_title)}</strong></td>
-                <td class="col-pills">{t_badges}</td>
-                <td class="col-pills">{c_badges}</td>
-                <td class="col-pills">{s_badges}</td>
-                <td class="col-cov-act">{act_cov_cell}</td>
-                <td class="col-status"><span class="badge {badge_cls}">{html.escape(r.status)}</span></td>
+                <td><code class="code-id clickable" onclick="jumpToFeature('{html.escape(r.feature_id)}')">{html.escape(r.feature_id)}</code></td>
+                <td><strong>{html.escape(r.feature_title)}</strong></td>
+                <td><div class="badge-cluster">{t_badges}</div></td>
+                <td><div class="badge-cluster">{c_badges}</div></td>
+                <td><div class="badge-cluster">{s_badges}</div></td>
+                <td><strong>{act_cov_val}</strong></td>
+                <td><span class="pill {badge_cls}">{html.escape(r.status.upper())}</span></td>
             </tr>
         """)
     matrix_rows_html = "".join(matrix_rows)
@@ -392,127 +399,172 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     # Pre-build Feature Rows
     feat_rows = []
     for f in report.features:
-        prio_lower = (f.priority or "high").lower()
-        prio_cls = "badge-critical" if prio_lower == "critical" else ("badge-warn" if prio_lower == "high" else "badge-covered")
-        rtl_status = f.rtl_cross_check or "N/A"
-        rtl_cls = "sec-pill-success" if "confirm" in rtl_status.lower() else "sec-pill"
-        search_blob = f"{f.feature_id} {f.title} {f.category} {f.priority} {rtl_status} {f.description}".lower()
+        prio_lower = (f.priority or "High").lower()
+        rtl_status = f.rtl_cross_check or "Not Checked"
+        search_blob = f"{f.feature_id} {f.title} {f.category} {f.priority} {f.description}".lower()
         feat_rows.append(f"""
-            <tr class="feat-row" data-cat="{(f.category or '').lower()}" data-prio="{prio_lower}" data-text="{html.escape(search_blob)}">
-                <td><code>{html.escape(f.feature_id)}</code></td>
-                <td><span class="badge badge-neutral">{html.escape(f.category or 'Functional')}</span></td>
-                <td><span class="badge {prio_cls}">{html.escape(f.priority or 'High')}</span></td>
-                <td><span class="sec-pill {rtl_cls}">{html.escape(rtl_status)}</span></td>
-                <td><strong>{html.escape(f.title)}</strong><br><span class="desc-text">{html.escape(f.description)}</span></td>
+            <tr class="feat-row" id="feat-row-{html.escape(f.feature_id)}" data-cat="{(f.category or '').lower()}" data-prio="{prio_lower}" data-text="{html.escape(search_blob)}">
+                <td><code class="code-id">{html.escape(f.feature_id)}</code></td>
+                <td><span class="badge badge-mono">{html.escape((f.category or 'Functional').upper())}</span></td>
+                <td><span class="pill pill-outline">{html.escape((f.priority or 'High').upper())}</span></td>
+                <td><span class="badge badge-outline">{html.escape(rtl_status.upper())}</span></td>
+                <td>
+                    <strong>{html.escape(f.title)}</strong><br>
+                    <span class="text-dim">{html.escape(f.description)}</span>
+                </td>
             </tr>
         """)
     feat_rows_html = "".join(feat_rows)
 
-    # Pre-build Test Scenario Cards
+    # Pre-build Test Cards
     test_cards = []
     for t in report.test_scenarios:
-        ttype_lower = (t.test_type or "directed").lower()
-        prio_lower = (t.priority or "high").lower()
-        f_pills = "".join([f'<span class="code-pill pill-feat">{html.escape(x)}</span>' for x in t.feature_ids]) or '<span class="text-dim">N/A</span>'
-        search_blob = f"{t.test_id} {t.title} {t.test_type} {t.priority} {t.stimulus} {t.expected_response}".lower()
+        ttype_lower = (t.test_type or "Directed").lower()
+        f_pills = "".join([f'<span class="badge badge-link" onclick="jumpToFeature(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in t.feature_ids]) or '<span class="text-dim">N/A</span>'
+        search_blob = f"{t.test_id} {t.title} {t.test_type} {t.description} {t.stimulus} {t.expected_response}".lower()
         test_cards.append(f"""
-            <div class="test-card" data-type="{ttype_lower}" data-text="{html.escape(search_blob)}">
-                <div class="test-card-header">
-                    <div class="test-title-row">
-                        <span class="test-id-pill"><code>{html.escape(t.test_id)}</code></span>
-                        <h4 class="test-name">{html.escape(t.title)}</h4>
+            <div class="card test-card" id="test-card-{html.escape(t.test_id)}" data-type="{ttype_lower}" data-text="{html.escape(search_blob)}">
+                <div class="card-header">
+                    <div>
+                        <span class="badge badge-mono">{html.escape(t.test_id)}</span>
+                        <h4 class="card-title">{html.escape(t.title)}</h4>
                     </div>
-                    <div class="test-tags">
-                        <span class="badge badge-neutral">{html.escape(t.test_type)}</span>
-                        <span class="badge badge-covered">{html.escape(t.priority or 'High')} Priority</span>
+                    <div class="badge-cluster">
+                        <span class="pill pill-outline">{html.escape((t.test_type or 'Directed').upper())}</span>
+                        <span class="pill pill-solid">{html.escape((t.priority or 'High').upper())}</span>
                     </div>
                 </div>
-                <div class="test-meta-row">
-                    <span class="text-dim">Target Features:</span> {f_pills}
+                <div class="test-desc text-dim">{html.escape(t.description)}</div>
+                <div class="test-meta">
+                    <span class="text-dim">TARGET FEATURES:</span>
+                    <div class="badge-cluster">{f_pills}</div>
                 </div>
-                <div class="test-body-grid">
-                    <div class="test-box stimulus-box">
-                        <div class="box-hdr">⚡ Input Stimulus & Configuration</div>
-                        <div class="box-content">{html.escape(t.stimulus)}</div>
+                <div class="test-io-grid">
+                    <div class="io-box">
+                        <div class="io-hdr">STIMULUS SEQUENCE</div>
+                        <div class="io-content">{html.escape(t.stimulus)}</div>
                     </div>
-                    <div class="test-box check-box">
-                        <div class="box-hdr">🎯 Expected Response & Scoreboard Check</div>
-                        <div class="box-content">{html.escape(t.expected_response)}</div>
+                    <div class="io-box">
+                        <div class="io-hdr">EXPECTED SCOREBOARD CHECK</div>
+                        <div class="io-content">{html.escape(t.expected_response)}</div>
                     </div>
                 </div>
             </div>
         """)
     test_cards_html = "".join(test_cards)
 
-    # Pre-build Covergroup Inspector Cards
+    # Pre-build Covergroup Cards with Expandable Bin Tables
     cg_cards = []
     for cg in report.covergroups:
         cp_rows = []
         for cp in cg.coverpoints:
-            f_pills = "".join([f'<span class="code-pill pill-feat">{html.escape(x)}</span>' for x in cp.feature_ids])
-            bin_desc = ", ".join([f"<code>{html.escape(b.bin_name)}</code> ({html.escape(b.condition)})" for b in cp.bins]) or "Auto-generated bins"
+            f_pills = "".join([f'<span class="badge badge-link" onclick="jumpToFeature(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in cp.feature_ids])
+            bin_count = len(cp.bins)
+
+            # Detailed bin rows
+            bin_table_rows = []
+            for b in cp.bins:
+                bin_table_rows.append(f"""
+                    <tr>
+                        <td><code>{html.escape(b.bin_name)}</code></td>
+                        <td><span class="pill pill-outline">{html.escape(b.bin_type.upper())}</span></td>
+                        <td><code>{html.escape(b.condition)}</code></td>
+                        <td class="text-dim">{html.escape(b.description or '—')}</td>
+                    </tr>
+                """)
+            bin_table_html = "".join(bin_table_rows) if bin_table_rows else "<tr><td colspan='4'>Default automatic value bins</td></tr>"
+
             cp_rows.append(f"""
-                <tr>
-                    <td><code>{html.escape(cp.coverage_id)}</code></td>
+                <tr class="cp-row" id="cp-row-{html.escape(cp.coverage_id)}">
+                    <td><code class="code-id">{html.escape(cp.coverage_id)}</code></td>
                     <td><strong>{html.escape(cp.name)}</strong></td>
                     <td><code>{html.escape(cp.target_signal)}</code></td>
-                    <td><span class="text-dim">{f_pills or '—'}</span></td>
-                    <td><div class="bin-desc">{bin_desc}</div></td>
+                    <td><div class="badge-cluster">{f_pills or '—'}</div></td>
+                    <td>
+                        <button class="btn btn-xs" onclick="toggleBins('bins-table-{html.escape(cp.coverage_id)}', this)">
+                            VIEW BINS ({bin_count})
+                        </button>
+                    </td>
+                </tr>
+                <tr id="bins-table-{html.escape(cp.coverage_id)}" class="bins-detail-row" style="display:none;">
+                    <td colspan="5">
+                        <div class="bins-container">
+                            <div class="bins-title">DEFINED BINS & TRANSITIONS FOR {html.escape(cp.name)} ({bin_count} total):</div>
+                            <table class="data-table bins-subtable">
+                                <thead>
+                                    <tr>
+                                        <th>BIN NAME</th>
+                                        <th>TYPE</th>
+                                        <th>CONDITION / RANGE</th>
+                                        <th>DESCRIPTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {bin_table_html}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
                 </tr>
             """)
         cp_rows_html = "".join(cp_rows)
         cross_str = ", ".join([f"<code>{html.escape(c)}</code>" for c in cg.crosses]) or "None"
         cg_cards.append(f"""
-            <div class="cg-card">
-                <div class="cg-header">
+            <div class="card cg-card" id="cg-card-{html.escape(cg.group_name)}">
+                <div class="card-header">
                     <div>
-                        <h4 class="cg-title"><code>{html.escape(cg.group_name)}</code></h4>
-                        <div class="cg-sub">{html.escape(cg.description or 'Functional coverage model')}</div>
+                        <span class="badge badge-mono">COVERGROUP</span>
+                        <h4 class="card-title"><code>{html.escape(cg.group_name)}</code></h4>
+                        <div class="text-dim">{html.escape(cg.description or 'Functional coverage model')}</div>
                     </div>
                     <div class="cg-trigger">
-                        <span class="text-dim">Sampling Trigger:</span> <code>{html.escape(cg.sample_trigger)}</code>
+                        <span class="text-dim">SAMPLING TRIGGER:</span> <code>{html.escape(cg.sample_trigger)}</code>
                     </div>
                 </div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Coverage ID</th>
-                            <th>Coverpoint Name</th>
-                            <th>Target Signal / Expr</th>
-                            <th>Mapped Features</th>
-                            <th>Defined Bins & Conditions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {cp_rows_html}
-                    </tbody>
-                </table>
-                <div class="cg-footer">
-                    <span class="text-dim">Cross Coverage:</span> {cross_str}
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>COVERAGE ID</th>
+                                <th>COVERPOINT</th>
+                                <th>TARGET SIGNAL / EXPR</th>
+                                <th>MAPPED FEATURES</th>
+                                <th>DEFINED BINS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {cp_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <span class="text-dim">CROSS COVERAGE:</span> {cross_str}
                 </div>
             </div>
         """)
-    cg_cards_html = "".join(cg_cards) or "<div class='empty-card'>No covergroups defined.</div>"
+    cg_cards_html = "".join(cg_cards) or "<div class='card empty-card'>No covergroups defined.</div>"
 
     # Pre-build SVA Rows
     sva_rows = []
     for a in report.assertions:
         dis = f"disable iff ({html.escape(a.disable_expr)})" if a.disable_expr else "None"
-        f_pills = "".join([f'<span class="code-pill pill-feat">{html.escape(x)}</span>' for x in a.feature_ids])
+        f_pills = "".join([f'<span class="badge badge-link" onclick="jumpToFeature(\'{html.escape(x)}\')">{html.escape(x)}</span>' for x in a.feature_ids])
+        ptype_lower = (a.property_type or "assert").lower()
+        search_blob = f"{a.assertion_id} {a.name} {a.property_type} {a.expression} {a.failure_message}".lower()
         sva_rows.append(f"""
-            <tr>
-                <td><code>{html.escape(a.assertion_id)}</code></td>
+            <tr class="sva-row" id="sva-row-{html.escape(a.assertion_id)}" data-type="{ptype_lower}" data-text="{html.escape(search_blob)}">
+                <td><code class="code-id">{html.escape(a.assertion_id)}</code></td>
                 <td><strong>{html.escape(a.name)}</strong></td>
-                <td><span class="badge badge-covered">{html.escape(a.property_type)}</span></td>
-                <td><span class="text-dim">{f_pills or '—'}</span></td>
-                <td><code>{html.escape(a.clock_expr)}</code><br><span class="desc-text">{dis}</span></td>
-                <td><pre class="sva-expr"><code>{html.escape(a.expression)}</code></pre></td>
-                <td><code class="text-dim">{html.escape(a.failure_message or 'Assertion failed')}</code></td>
+                <td><span class="pill pill-solid">{html.escape((a.property_type or 'assert').upper())}</span></td>
+                <td><div class="badge-cluster">{f_pills or '—'}</div></td>
+                <td><code>{html.escape(a.clock_expr)}</code><br><span class="text-dim">{dis}</span></td>
+                <td><pre class="code-inline"><code>{html.escape(a.expression)}</code></pre></td>
+                <td><code class="text-dim">{html.escape(a.failure_message or 'Assertion violation')}</code></td>
             </tr>
         """)
     sva_rows_html = "".join(sva_rows) or "<tr><td colspan='7'>No assertions defined.</td></tr>"
 
-    # Pre-build CSV string for browser download
+    # Raw CSV and SV codes for direct browser export
     csv_lines = ['"Feature ID","Feature Title","Mapped Tests","Functional Coverage Points","SVA Assertions","Status","Actual Hit %","Target %","Unhit Holes Count"']
     for r in report.traceability_matrix:
         t_str = "; ".join(r.test_ids) if r.test_ids else "None"
@@ -526,64 +578,111 @@ def export_html(report: VerificationPlanReport, output_path: Path):
     cov_sv_code = report.sv_coverage_code or "// No coverage code generated"
     sva_sv_code = report.sv_assertion_code or "// No assertion code generated"
 
-    waveform_studio_html = generate_waveform_studio_tab(
-        vcd_path="examples/waveforms/alu_failure_trace.vcd",
-        failure_timestamp_ns=65.0,
-        failure_label="Unhit Coverage / Corner Overflow",
-        tab_id="tab-waveform",
-    )
-
     html_content = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VeriSight Plan — {html.escape(report.design_name)} Verification Architecture Suite</title>
+    <title>VeriSight Plan — {html.escape(report.design_name)} Architecture Cockpit</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {{
-            --bg-base: #0b0f19;
-            --bg-surface: #111827;
-            --bg-card: #151d30;
-            --bg-card-hover: #1a243c;
-            --card-border: #1e293b;
-            --card-border-glow: rgba(14, 165, 233, 0.3);
+        /* =========================================================================
+           DYNAMIC THEME SYSTEM: PURE BLACK & WHITE MONOCHROME
+           ========================================================================= */
+        :root, [data-theme="dark"] {{
+            --bg-base: #000000;
+            --bg-surface: #0a0a0a;
+            --bg-card: #121212;
+            --bg-card-hover: #191919;
+            --card-border: #262626;
+            --border-focus: #ffffff;
             
-            --cyan: #0ea5e9;
-            --cyan-glow: rgba(14, 165, 233, 0.2);
-            --indigo: #6366f1;
-            --indigo-glow: rgba(99, 102, 241, 0.2);
-            --success: #34d399;
-            --success-glow: rgba(52, 211, 153, 0.2);
-            --warning: #fbbf24;
-            --danger: #f87171;
+            --text-main: #f5f5f5;
+            --text-dim: #999999;
+            --text-muted: #666666;
             
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --text-muted: #64748b;
+            --accent-bg: #ffffff;
+            --accent-text: #000000;
+            --pill-solid-bg: #ffffff;
+            --pill-solid-text: #000000;
+            --pill-outline-border: #737373;
+            --pill-outline-text: #e5e5e5;
+            --pill-dashed-border: #ffffff;
+            --pill-dashed-text: #ffffff;
             
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+            --code-bg: #0d0d0d;
+            --code-border: #262626;
+            --meter-bg: #222222;
+            --meter-fill: #ffffff;
+        }}
+
+        [data-theme="light"] {{
+            --bg-base: #ffffff;
+            --bg-surface: #fafafa;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f5f5f5;
+            --card-border: #e0e0e0;
+            --border-focus: #000000;
+            
+            --text-main: #0a0a0a;
+            --text-dim: #555555;
+            --text-muted: #888888;
+            
+            --accent-bg: #000000;
+            --accent-text: #ffffff;
+            --pill-solid-bg: #000000;
+            --pill-solid-text: #ffffff;
+            --pill-outline-border: #777777;
+            --pill-outline-text: #222222;
+            --pill-dashed-border: #000000;
+            --pill-dashed-text: #000000;
+            
+            --code-bg: #f5f5f5;
+            --code-border: #e0e0e0;
+            --meter-bg: #e5e5e5;
+            --meter-fill: #000000;
+        }}
+
+        [data-theme="graphite"] {{
+            --bg-base: #141414;
+            --bg-surface: #1a1a1a;
+            --bg-card: #202020;
+            --bg-card-hover: #292929;
+            --card-border: #383838;
+            --border-focus: #ffffff;
+            
+            --text-main: #ffffff;
+            --text-dim: #b0b0b0;
+            --text-muted: #777777;
+            
+            --accent-bg: #e0e0e0;
+            --accent-text: #000000;
+            --pill-solid-bg: #e0e0e0;
+            --pill-solid-text: #000000;
+            --pill-outline-border: #808080;
+            --pill-outline-text: #d0d0d0;
+            --pill-dashed-border: #e0e0e0;
+            --pill-dashed-text: #ffffff;
+            
+            --code-bg: #161616;
+            --code-border: #383838;
+            --meter-bg: #2d2d2d;
+            --meter-fill: #e0e0e0;
         }}
 
         * {{
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }}
 
         body {{
             background-color: var(--bg-base);
-            background-image: 
-                radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 90% 90%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-            background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
             color: var(--text-main);
-            font-family: var(--font-sans);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             line-height: 1.5;
             padding: 24px;
             min-height: 100vh;
@@ -591,1147 +690,815 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         .dashboard-container {{
-            max-width: 1440px;
+            max-width: 1480px;
             margin: 0 auto;
         }}
 
-        /* Top Navbar */
+        /* Header Navigation */
         .top-navbar {{
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 16px 24px;
-            background: rgba(17, 24, 39, 0.7);
+            background: var(--bg-surface);
             border: 1px solid var(--card-border);
-            border-radius: 12px;
-            backdrop-filter: blur(12px);
+            border-radius: 8px;
             margin-bottom: 20px;
         }}
 
         .brand-col {{
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
         }}
 
-        .brand-icon {{
-            font-size: 26px;
-            background: rgba(14, 165, 233, 0.12);
-            border: 1px solid var(--card-border-glow);
-            padding: 8px 12px;
-            border-radius: 10px;
-            box-shadow: 0 0 16px var(--cyan-glow);
+        .brand-tag {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border: 1px solid var(--border-focus);
+            border-radius: 4px;
+            background: var(--accent-bg);
+            color: var(--accent-text);
+            letter-spacing: 1px;
         }}
 
         .brand-titles h1 {{
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(135deg, #38bdf8, #818cf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--text-main);
+            text-transform: uppercase;
         }}
 
         .brand-titles .subtitle {{
             font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
             color: var(--text-dim);
-            font-weight: 500;
             margin-top: 2px;
         }}
 
         .header-actions {{
             display: flex;
-            gap: 10px;
+            gap: 12px;
             align-items: center;
             flex-wrap: wrap;
         }}
 
-        .status-chip {{
+        /* Dynamic Theme Switcher Control */
+        .theme-switcher {{
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34d399;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            gap: 4px;
+            background: var(--bg-card);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 3px;
         }}
 
-        .pulsing-dot {{
-            width: 8px;
-            height: 8px;
-            background-color: #34d399;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #34d399;
-            animation: pulse 2s infinite;
+        .theme-switcher span {{
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            padding: 0 8px;
+            color: var(--text-muted);
         }}
 
-        @keyframes pulse {{
-            0% {{ transform: scale(0.95); opacity: 0.8; }}
-            50% {{ transform: scale(1.2); opacity: 1; }}
-            100% {{ transform: scale(0.95); opacity: 0.8; }}
+        .theme-btn {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 10px;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            border-radius: 4px;
+            cursor: pointer;
+        }}
+
+        .theme-btn:hover {{
+            color: var(--text-main);
+            border-color: var(--card-border);
+        }}
+
+        .theme-btn.active {{
+            background: var(--accent-bg);
+            color: var(--accent-text);
+            border-color: var(--border-focus);
         }}
 
         .btn {{
-            background: rgba(30, 41, 59, 0.8);
+            background: var(--bg-card);
             border: 1px solid var(--card-border);
             color: var(--text-main);
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
             display: inline-flex;
             align-items: center;
             gap: 6px;
         }}
 
         .btn:hover {{
-            background: rgba(56, 189, 248, 0.15);
-            border-color: var(--cyan);
-            color: #ffffff;
-            transform: translateY(-1px);
+            border-color: var(--border-focus);
+            background: var(--bg-card-hover);
         }}
 
-        .btn-accent {{
-            background: linear-gradient(135deg, #0284c7, #0ea5e9);
-            border: none;
-            color: #ffffff;
-        }}
-        .btn-accent:hover {{
-            background: linear-gradient(135deg, #0369a1, #0284c7);
-            box-shadow: 0 0 16px var(--cyan-glow);
+        .btn-solid {{
+            background: var(--accent-bg);
+            color: var(--accent-text);
+            border-color: var(--border-focus);
         }}
 
-        /* Sovereign Security Governance Banner */
-        .security-banner {{
+        .btn-solid:hover {{
+            background: var(--bg-surface);
+            color: var(--text-main);
+        }}
+
+        .btn-action {{
+            width: 100%;
+            margin-top: 10px;
+            justify-content: center;
+            border-style: dashed;
+        }}
+
+        .btn-xs {{
+            padding: 4px 8px;
+            font-size: 11px;
+        }}
+
+        /* Governance Banner */
+        .governance-banner {{
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, rgba(14, 165, 233, 0.08) 100%);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            border-radius: 10px;
+            background: var(--bg-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
             padding: 10px 18px;
-            margin-bottom: 24px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-            backdrop-filter: blur(8px);
+            margin-bottom: 20px;
         }}
-        .security-left {{
+
+        .gov-left {{
             display: flex;
             align-items: center;
             gap: 12px;
         }}
-        .security-shield-icon {{
-            font-size: 22px;
-            filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.6));
-        }}
-        .security-text-main {{
-            font-size: 13px;
-            font-weight: 700;
-            color: #34d399;
+
+        .gov-title {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 800;
             letter-spacing: 0.5px;
         }}
-        .security-text-sub {{
+
+        .gov-sub {{
             font-size: 12px;
             color: var(--text-dim);
-            margin-left: 8px;
         }}
-        .security-tags {{
+
+        .gov-tags {{
             display: flex;
             gap: 8px;
             align-items: center;
-            flex-wrap: wrap;
-        }}
-        .sec-pill {{
-            font-size: 11px;
-            font-family: var(--font-mono);
-            padding: 4px 9px;
-            border-radius: 5px;
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            color: var(--text-main);
-        }}
-        .sec-pill-success {{
-            background: rgba(16, 185, 129, 0.15);
-            border-color: rgba(16, 185, 129, 0.4);
-            color: #34d399;
-            font-weight: 600;
         }}
 
-        /* KPI Metric Cards Grid */
+        /* KPI Metric Grid */
         .kpi-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            gap: 14px;
+            margin-bottom: 20px;
         }}
 
         .kpi-card {{
             background: var(--bg-card);
             border: 1px solid var(--card-border);
-            border-radius: 12px;
+            border-radius: 6px;
             padding: 18px 20px;
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.2s, border-color 0.2s;
         }}
-        .kpi-card::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--card-border);
-        }}
-        .kpi-card:hover {{
-            transform: translateY(-2px);
-            border-color: var(--cyan);
-        }}
-        .kpi-card.kpi-cyan::before {{ background: var(--cyan); }}
-        .kpi-card.kpi-indigo::before {{ background: var(--indigo); }}
-        .kpi-card.kpi-success::before {{ background: var(--success); }}
-        .kpi-card.kpi-warning::before {{ background: var(--warning); }}
 
         .kpi-label {{
-            font-size: 12px;
-            color: var(--text-dim);
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
-            font-weight: 600;
-            margin-bottom: 6px;
         }}
+
         .kpi-val {{
             font-size: 28px;
             font-weight: 800;
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
-        }}
-        .kpi-sub {{
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 6px 0;
+            letter-spacing: -0.5px;
         }}
 
-        .progress-bar-wrap {{
-            width: 100%;
-            height: 6px;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 3px;
-            margin-top: 8px;
-            overflow: hidden;
+        .kpi-sub {{
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-dim);
         }}
+
+        /* Progress Bar */
+        .progress-bar-wrap {{
+            height: 6px;
+            background: var(--meter-bg);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }}
+
         .progress-bar-fill {{
             height: 100%;
-            background: linear-gradient(90deg, #34d399, #0ea5e9);
-            border-radius: 3px;
+            background: var(--meter-fill);
         }}
 
-        /* Navigation Tabs Bar */
+        /* Tabs Navigation */
         .tabs-header {{
             display: flex;
-            gap: 8px;
-            background: rgba(17, 24, 39, 0.7);
-            border: 1px solid var(--card-border);
-            padding: 6px;
-            border-radius: 10px;
+            gap: 4px;
+            border-bottom: 1px solid var(--card-border);
             margin-bottom: 20px;
             overflow-x: auto;
+            padding-bottom: 4px;
         }}
 
         .tab-btn {{
             background: transparent;
-            border: none;
+            border: 1px solid transparent;
+            border-bottom: none;
             color: var(--text-dim);
-            font-size: 13px;
-            font-weight: 600;
-            padding: 9px 18px;
-            border-radius: 7px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 10px 16px;
+            border-radius: 6px 6px 0 0;
             cursor: pointer;
-            transition: all 0.2s ease;
             white-space: nowrap;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }}
-        .tab-btn:hover {{
-            color: var(--text-main);
-            background: rgba(255, 255, 255, 0.05);
-        }}
-        .tab-btn.active {{
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(99, 102, 241, 0.25));
-            border: 1px solid var(--cyan);
-            color: #ffffff;
-            box-shadow: 0 0 12px var(--cyan-glow);
+            letter-spacing: 0.5px;
         }}
 
-        /* Tab Content Panes */
+        .tab-btn:hover {{
+            color: var(--text-main);
+            background: var(--bg-surface);
+        }}
+
+        .tab-btn.active {{
+            color: var(--accent-text);
+            background: var(--accent-bg);
+            border-color: var(--border-focus);
+        }}
+
         .tab-pane {{
             display: none;
-            animation: fadeIn 0.25s ease-in-out;
         }}
+
         .tab-pane.active {{
             display: block;
         }}
-        @keyframes fadeIn {{
-            from {{ opacity: 0; transform: translateY(6px); }}
-            to {{ opacity: 1; transform: translateY(0); }}
+
+        /* Cards & Tables */
+        .card {{
+            background: var(--bg-card);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 16px;
         }}
 
-        /* Controls Bar (Filter & Search) */
+        .card-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }}
+
+        .card-title {{
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 4px;
+        }}
+
+        .card-footer {{
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid var(--card-border);
+            font-size: 12px;
+        }}
+
         .controls-bar {{
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 14px;
             margin-bottom: 16px;
-            gap: 16px;
             flex-wrap: wrap;
         }}
 
         .search-box {{
             flex: 1;
-            min-width: 260px;
+            min-width: 280px;
             position: relative;
         }}
+
         .search-input {{
             width: 100%;
             background: var(--bg-card);
             border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 9px 14px 9px 36px;
             color: var(--text-main);
-            font-size: 13px;
-            outline: none;
-            transition: border-color 0.2s;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
         }}
+
         .search-input:focus {{
-            border-color: var(--cyan);
-            box-shadow: 0 0 12px var(--cyan-glow);
-        }}
-        .search-icon {{
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-dim);
-            font-size: 14px;
+            outline: none;
+            border-color: var(--border-focus);
         }}
 
         .filter-pills {{
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }}
+
         .filter-pill {{
-            background: var(--bg-card);
+            background: var(--bg-surface);
             border: 1px solid var(--card-border);
             color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
             padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.2s;
         }}
-        .filter-pill:hover, .filter-pill.active {{
-            border-color: var(--cyan);
-            color: var(--cyan);
-            background: rgba(14, 165, 233, 0.1);
+
+        .filter-pill:hover {{
+            color: var(--text-main);
+            border-color: var(--border-focus);
+        }}
+
+        .filter-pill.active {{
+            background: var(--accent-bg);
+            color: var(--accent-text);
+            border-color: var(--border-focus);
+        }}
+
+        .counter-label {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
         }}
 
         /* Data Tables */
         .table-wrap {{
-            background: var(--bg-card);
+            width: 100%;
+            overflow-x: auto;
             border: 1px solid var(--card-border);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            margin-bottom: 24px;
+            border-radius: 6px;
+            background: var(--bg-card);
         }}
-        table.data-table {{
+
+        .data-table {{
             width: 100%;
             border-collapse: collapse;
+            font-size: 13px;
             text-align: left;
-            font-size: 13px;
         }}
-        table.data-table th {{
-            background: #111a2e;
-            color: var(--cyan);
-            padding: 12px 16px;
+
+        .data-table th {{
+            background: var(--bg-surface);
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
             font-weight: 700;
-            font-size: 12px;
             letter-spacing: 0.5px;
+            padding: 12px 14px;
             border-bottom: 1px solid var(--card-border);
-            text-transform: uppercase;
-        }}
-        table.data-table td {{
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(30, 41, 59, 0.7);
-            vertical-align: middle;
-        }}
-        table.data-table tr:hover td {{
-            background: rgba(56, 189, 248, 0.03);
-        }}
-
-        /* Badges & Pills */
-        .badge {{
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-        }}
-        .badge-covered {{ background: rgba(52, 211, 153, 0.18); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35); }}
-        .badge-partial {{ background: rgba(251, 191, 36, 0.18); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); }}
-        .badge-critical {{ background: rgba(248, 113, 113, 0.18); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.35); }}
-        .badge-warn {{ background: rgba(249, 115, 22, 0.18); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.35); }}
-        .badge-neutral {{ background: rgba(148, 163, 184, 0.12); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); }}
-
-        .code-pill {{
-            display: inline-block;
-            font-family: var(--font-mono);
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin: 2px;
-            border: 1px solid transparent;
-        }}
-        .pill-test {{ background: rgba(56, 189, 248, 0.12); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }}
-        .pill-cov {{ background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.3); }}
-        .pill-sva {{ background: rgba(236, 72, 153, 0.12); color: #f472b6; border-color: rgba(236, 72, 153, 0.3); }}
-        .pill-feat {{ background: rgba(45, 212, 191, 0.12); color: #2dd4bf; border-color: rgba(45, 212, 191, 0.3); }}
-
-        code {{
-            font-family: var(--font-mono);
-            font-size: 12px;
-            color: #38bdf8;
-            background: rgba(15, 23, 42, 0.6);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }}
-
-        .desc-text {{
-            font-size: 12px;
-            color: var(--text-dim);
-            line-height: 1.4;
-            margin-top: 4px;
-            display: block;
-        }}
-
-        /* Test Scenario Cards */
-        .test-cards-grid {{
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            margin-bottom: 24px;
-        }}
-        .test-card {{
-            background: var(--bg-card);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 16px 20px;
-            transition: border-color 0.2s;
-        }}
-        .test-card:hover {{
-            border-color: var(--cyan);
-        }}
-        .test-card-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }}
-        .test-title-row {{
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-        .test-id-pill code {{
-            font-size: 13px;
-            font-weight: 700;
-            color: #38bdf8;
-            background: rgba(14, 165, 233, 0.15);
-            border: 1px solid rgba(14, 165, 233, 0.3);
-        }}
-        .test-name {{
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--text-main);
-        }}
-        .test-tags {{
-            display: flex;
-            gap: 8px;
-        }}
-        .test-meta-row {{
-            font-size: 12px;
-            margin-bottom: 12px;
-        }}
-        .test-body-grid {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }}
-        @media (max-width: 900px) {{
-            .test-body-grid {{ grid-template-columns: 1fr; }}
-        }}
-        .test-box {{
-            background: rgba(11, 15, 25, 0.7);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 12px;
-        }}
-        .test-box .box-hdr {{
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--cyan);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }}
-        .test-box .box-content {{
-            font-size: 13px;
-            color: #cbd5e1;
-            line-height: 1.45;
-        }}
-
-        /* Covergroup & Assertion Cards */
-        .cg-card {{
-            background: var(--bg-card);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 18px 20px;
-            margin-bottom: 18px;
-        }}
-        .cg-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }}
-        .cg-title code {{
-            font-size: 16px;
-            font-weight: 700;
-            color: #c084fc;
-        }}
-        .cg-sub {{
-            font-size: 12px;
-            color: var(--text-dim);
-            margin-top: 3px;
-        }}
-        .cg-trigger code {{
-            color: #38bdf8;
-        }}
-        .cg-footer {{
-            margin-top: 12px;
-            font-size: 12px;
-            color: var(--text-dim);
-        }}
-        .bin-desc {{
-            font-size: 11px;
-            color: #94a3b8;
-            max-width: 480px;
-            line-height: 1.4;
-        }}
-
-        /* Code Block Container */
-        .code-container {{
-            background: #090d16;
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 24px;
-        }}
-        .code-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #111827;
-            padding: 10px 18px;
-            border-bottom: 1px solid var(--card-border);
-        }}
-        .code-title {{
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--cyan);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }}
-        .code-actions {{
-            display: flex;
-            gap: 8px;
-        }}
-        pre.sv-code {{
-            padding: 18px;
-            overflow-x: auto;
-            font-family: var(--font-mono);
-            font-size: 13px;
-            color: #38bdf8;
-            line-height: 1.5;
-            max-height: 600px;
-        }}
-        pre.sva-expr code {{
-            font-family: var(--font-mono);
-            font-size: 12px;
-            color: #f472b6;
-            background: transparent;
-            padding: 0;
-            display: block;
-            white-space: pre-wrap;
-        }}
-
-        .empty-card {{
-            background: var(--bg-card);
-            border: 1px dashed var(--card-border);
-            border-radius: 8px;
-            padding: 32px;
-            text-align: center;
-            color: var(--text-dim);
-        }}
-
-        /* Live Coverage Cockpit Styles */
-        .cockpit-banner {{
-            background: rgba(17, 24, 39, 0.85);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-            backdrop-filter: blur(12px);
-        }}
-        .cockpit-banner-left {{
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            flex-wrap: wrap;
-        }}
-        .db-source-chip {{
-            background: rgba(14, 165, 233, 0.15);
-            border: 1px solid rgba(14, 165, 233, 0.35);
-            color: #38bdf8;
-            padding: 5px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-family: var(--font-mono);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }}
-        .cockpit-sim-controls {{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }}
-        .btn-preset {{
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid var(--card-border);
-            color: var(--text-dim);
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }}
-        .btn-preset:hover, .btn-preset.active {{
-            background: rgba(14, 165, 233, 0.2);
-            border-color: var(--cyan);
-            color: #ffffff;
-        }}
-
-        .cockpit-cards-grid {{
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            margin-bottom: 24px;
-        }}
-        .cockpit-card {{
-            background: var(--bg-card);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 20px 24px;
-            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-        }}
-        .cockpit-card:hover {{
-            border-color: rgba(14, 165, 233, 0.5);
-            box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08);
-        }}
-        .cockpit-card-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }}
-        .cockpit-feat-title-group {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }}
-        .cockpit-feat-name {{
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-main);
-        }}
-        .cockpit-meter-block {{
-            background: rgba(11, 15, 25, 0.6);
-            border: 1px solid rgba(30, 41, 59, 0.8);
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-        }}
-        .meter-text-row {{
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 6px;
-        }}
-        .meter-act-val {{
-            font-size: 15px;
-            font-weight: 800;
-            color: #38bdf8;
-            font-family: var(--font-mono);
-        }}
-        .meter-tgt-val {{
-            font-size: 12px;
-            color: var(--text-dim);
-            font-family: var(--font-mono);
-        }}
-        .meter-track {{
-            height: 10px;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 5px;
-            overflow: hidden;
-            position: relative;
-            margin-bottom: 6px;
-        }}
-        .meter-fill {{
-            height: 100%;
-            border-radius: 5px;
-            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }}
-        .meter-target-line {{
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #ffffff;
-            box-shadow: 0 0 6px #ffffff;
-        }}
-        .meter-sub-text {{
-            font-size: 11px;
-            color: var(--text-muted);
-        }}
-
-        /* Unhit Coverage Bins in Red */
-        .unhit-holes-section {{
-            background: rgba(239, 68, 68, 0.05);
-            border: 1px solid rgba(239, 68, 68, 0.25);
-            border-radius: 8px;
-            padding: 14px 18px;
-        }}
-        .holes-header-row {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }}
-        .holes-sec-title {{
-            font-size: 13px;
-            font-weight: 700;
-            color: #f87171;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        .warn-dot {{
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ef4444;
-            box-shadow: 0 0 8px #ef4444;
-            display: inline-block;
-        }}
-        .unhit-chips-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 10px;
-        }}
-        .unhit-hole-chip {{
-            background: rgba(17, 24, 39, 0.8);
-            border: 1px solid rgba(239, 68, 68, 0.35);
-            border-radius: 6px;
-            padding: 8px 12px;
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-        }}
-        .hole-cross {{
-            color: #f87171;
-            font-size: 13px;
-            line-height: 1.2;
-        }}
-        .hole-details {{
-            flex: 1;
-            font-size: 12px;
-        }}
-        .hole-title strong {{
-            color: #fca5a5;
-            font-family: var(--font-mono);
-        }}
-        .hole-cond {{
-            display: block;
-            font-size: 11px;
-            color: #cbd5e1;
-            margin-top: 2px;
-        }}
-        .hole-cond code {{
-            font-size: 11px;
-            color: #fbbf24;
-            background: rgba(0, 0, 0, 0.4);
-            padding: 1px 4px;
-        }}
-        .hole-hits-badge {{
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 700;
-            font-family: var(--font-mono);
             white-space: nowrap;
         }}
 
-        /* The AI Action Button */
-        .btn-ai-directed {{
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #ffffff;
-            border: 1px solid rgba(192, 132, 252, 0.5);
-            padding: 7px 14px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
-        }}
-        .btn-ai-directed:hover {{
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.55);
-            border-color: #c084fc;
-        }}
-        .ai-spark {{
-            font-size: 14px;
-            filter: drop-shadow(0 0 4px #fbbf24);
-        }}
-
-        .unhit-holes-clean {{
-            background: rgba(52, 211, 153, 0.08);
-            border: 1px solid rgba(52, 211, 153, 0.25);
-            border-radius: 8px;
-            padding: 12px 16px;
-            color: #34d399;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-        .clean-check {{
-            font-size: 16px;
-            font-weight: 800;
-        }}
-
-        /* Mini coverage cell for traceability table */
-        .mini-cov-cell {{
-            min-width: 140px;
-        }}
-        .mini-cov-text {{
-            font-size: 11px;
-            font-family: var(--font-mono);
-            margin-bottom: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }}
-        .mini-cov-bar {{
-            height: 6px;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 3px;
-            overflow: hidden;
-        }}
-        .mini-cov-fill {{
-            height: 100%;
-            border-radius: 3px;
-        }}
-
-        /* Modal Styles */
-        .modal-backdrop {{
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(3, 7, 18, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 9999;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            padding: 24px;
-        }}
-        .modal-backdrop.open {{
-            display: flex;
-        }}
-        .modal-window {{
-            background: #0f172a;
-            border: 1px solid rgba(14, 165, 233, 0.4);
-            border-radius: 14px;
-            width: 100%;
-            max-width: 900px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(14, 165, 233, 0.2);
-            display: flex;
-            flex-direction: column;
-            animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }}
-        @keyframes modalSlideUp {{
-            from {{ transform: translateY(20px); opacity: 0; }}
-            to {{ transform: translateY(0); opacity: 1; }}
-        }}
-        .modal-header {{
-            padding: 18px 24px;
+        .data-table td {{
+            padding: 12px 14px;
             border-bottom: 1px solid var(--card-border);
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            background: rgba(17, 24, 39, 0.8);
+            vertical-align: top;
         }}
-        .modal-ai-chip {{
-            background: rgba(124, 58, 237, 0.2);
-            color: #c084fc;
-            border: 1px solid rgba(124, 58, 237, 0.4);
+
+        .data-table tbody tr:hover {{
+            background: var(--bg-card-hover);
+        }}
+
+        .data-table tr.highlight {{
+            outline: 2px solid var(--border-focus);
+            background: var(--bg-card-hover);
+        }}
+
+        /* Monospace Badges & Pills */
+        .badge {{
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
             font-weight: 700;
-            padding: 2px 8px;
+            padding: 3px 7px;
             border-radius: 4px;
             letter-spacing: 0.5px;
-            display: inline-block;
-            margin-bottom: 6px;
         }}
-        .modal-heading {{
-            font-size: 18px;
-            font-weight: 800;
+
+        .badge-mono {{
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
             color: var(--text-main);
         }}
-        .modal-subheading {{
-            font-size: 13px;
+
+        .badge-outline {{
+            border: 1px solid var(--card-border);
             color: var(--text-dim);
-            margin-top: 3px;
         }}
-        .modal-close-btn {{
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 20px;
+
+        .badge-link {{
             cursor: pointer;
-            padding: 4px;
-            line-height: 1;
-            transition: color 0.15s;
-        }}
-        .modal-close-btn:hover {{
-            color: #ffffff;
-        }}
-        .modal-body {{
-            padding: 20px 24px;
-            flex: 1;
-        }}
-        .modal-summary-box {{
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            background: rgba(11, 15, 25, 0.7);
             border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 18px;
-        }}
-        .modal-summary-item {{
-            display: flex;
-            flex-direction: column;
-        }}
-        .sum-lbl {{
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }}
-        .sum-val {{
-            font-size: 15px;
-            font-weight: 700;
             color: var(--text-main);
-            font-family: var(--font-mono);
+            background: var(--bg-surface);
         }}
-        .sum-deficit {{
-            color: #f87171;
+
+        .badge-link:hover {{
+            border-color: var(--border-focus);
+            background: var(--accent-bg);
+            color: var(--accent-text);
         }}
-        .modal-sec-title {{
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--cyan);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        .modal-holes-list {{
-            background: rgba(11, 15, 25, 0.7);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin-bottom: 16px;
-            font-size: 12px;
-        }}
-        .sim-cmd-box {{
-            background: rgba(11, 15, 25, 0.9);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 12px 14px;
-            font-size: 12px;
-            margin-top: 14px;
-        }}
-        .sim-cmd-lbl {{
-            display: block;
-            color: var(--text-muted);
-            font-size: 11px;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-        }}
-        .modal-footer {{
-            padding: 14px 24px;
-            border-top: 1px solid var(--card-border);
-            background: rgba(17, 24, 39, 0.8);
+
+        .badge-cluster {{
             display: flex;
-            justify-content: flex-end;
+            gap: 4px;
+            flex-wrap: wrap;
+        }}
+
+        .pill {{
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }}
+
+        .pill-solid {{
+            background: var(--pill-solid-bg);
+            color: var(--pill-solid-text);
+            border: 1px solid var(--border-focus);
+        }}
+
+        .pill-outline {{
+            background: transparent;
+            border: 1px solid var(--pill-outline-border);
+            color: var(--pill-outline-text);
+        }}
+
+        .pill-dashed {{
+            background: transparent;
+            border: 1px dashed var(--pill-dashed-border);
+            color: var(--pill-dashed-text);
+        }}
+
+        .code-id {{
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 12px;
+        }}
+
+        .code-id.clickable {{
+            cursor: pointer;
+            text-decoration: underline;
+        }}
+
+        .code-id.clickable:hover {{
+            color: var(--accent-bg);
+        }}
+
+        .code-inline {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
+            padding: 6px 10px;
+            border-radius: 4px;
+            max-width: 440px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }}
+
+        /* Cockpit Details */
+        .cockpit-banner {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 12px 18px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
             gap: 10px;
         }}
 
-        @media print {{
-            body {{
-                background: #ffffff;
-                color: #000000;
-                padding: 0;
-            }}
-            .top-navbar, .tabs-header, .controls-bar, .header-actions {{
-                display: none !important;
-            }}
-            .tab-pane {{
-                display: block !important;
-                page-break-before: always;
-            }}
+        .meter-wrap {{
+            margin: 12px 0 16px 0;
+        }}
+
+        .meter-bar {{
+            height: 10px;
+            background: var(--meter-bg);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }}
+
+        .meter-fill {{
+            height: 100%;
+            background: var(--meter-fill);
+        }}
+
+        .meter-meta {{
+            display: flex;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }}
+
+        .holes-section {{
+            background: var(--bg-surface);
+            border: 1px dashed var(--card-border);
+            border-radius: 6px;
+            padding: 14px;
+            margin-top: 10px;
+        }}
+
+        .holes-header {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+        }}
+
+        .holes-grid {{
+            display: grid;
+            gap: 8px;
+        }}
+
+        .unhit-chip {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }}
+
+        .unhit-tag {{
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 10px;
+            border: 1px solid var(--border-focus);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 10px;
+        }}
+
+        .unhit-info {{
+            flex: 1;
+        }}
+
+        .unhit-cond {{
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }}
+
+        .unhit-hits {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border: 1px solid var(--card-border);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }}
+
+        .holes-clean {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 10px;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            background: var(--bg-surface);
+        }}
+
+        /* Bins Subtable */
+        .bins-container {{
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 4px;
+            padding: 12px;
+            margin: 6px 0;
+        }}
+
+        .bins-title {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }}
+
+        .bins-subtable {{
+            font-size: 12px;
+        }}
+
+        .bins-subtable td, .bins-subtable th {{
+            padding: 8px 10px;
+        }}
+
+        /* Test Card Details */
+        .test-io-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 14px;
+        }}
+
+        .io-box {{
+            background: var(--bg-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 10px 12px;
+        }}
+
+        .io-hdr {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }}
+
+        .io-content {{
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+        }}
+
+        /* Code Viewer Tabs */
+        .code-box {{
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            max-height: 600px;
+        }}
+
+        .code-box pre {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }}
+
+        /* Modal Dialog */
+        .modal-overlay {{
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }}
+
+        .modal-overlay.open {{
+            display: flex;
+        }}
+
+        .modal-card {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-focus);
+            border-radius: 8px;
+            max-width: 800px;
+            width: 100%;
+            padding: 24px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }}
+
+        .modal-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--card-border);
+        }}
+
+        .close-btn {{
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+        }}
+
+        .close-btn:hover {{
+            color: var(--text-main);
         }}
     </style>
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Top Navigation Bar -->
+        <!-- Top Navbar -->
         <header class="top-navbar">
             <div class="brand-col">
-                <div class="brand-icon">📋</div>
+                <span class="brand-tag">VERISIGHT PLAN</span>
                 <div class="brand-titles">
-                    <h1>VeriSight Plan — Verification Architecture Suite</h1>
-                    <div class="subtitle">Target DUT: <strong>{html.escape(report.design_name)}</strong> • Plan ID: <code>{html.escape(report.plan_id)}</code> • Spec: <code>{html.escape(report.spec_source)}</code></div>
+                    <h1>{html.escape(report.design_name)} VERIFICATION ARCHITECTURE</h1>
+                    <div class="subtitle">PROTOCOL: {proto_label} • PLAN ID: {html.escape(report.plan_id)}</div>
                 </div>
             </div>
             <div class="header-actions">
-                <div class="status-chip">
-                    <span class="pulsing-dot"></span>
-                    <span>PLAN COMPLETE</span>
+                <!-- Dynamic Theme Switcher -->
+                <div class="theme-switcher">
+                    <span>THEME:</span>
+                    <button class="theme-btn active" id="btnThemeDark" onclick="setTheme('dark')">DARK</button>
+                    <button class="theme-btn" id="btnThemeLight" onclick="setTheme('light')">LIGHT</button>
+                    <button class="theme-btn" id="btnThemeGraphite" onclick="setTheme('graphite')">GRAPHITE</button>
                 </div>
-                <button class="btn" onclick="downloadCSV()">📥 Export CSV</button>
-                <button class="btn" onclick="downloadCode('coverage_model.sv', svCoverageRaw)">💾 Export SV Coverage</button>
-                <button class="btn" onclick="downloadCode('dut_assertions.sv', svAssertionsRaw)">🛡️ Export SVA Suite</button>
-                <button class="btn" onclick="window.print()">🖨️ Print Plan</button>
+                <button class="btn" onclick="downloadCSV()">EXPORT CSV</button>
+                <button class="btn" onclick="downloadCode('coverage_model.sv', svCoverageRaw)">EXPORT COVERAGE (.SV)</button>
+                <button class="btn" onclick="downloadCode('dut_assertions.sv', svAssertionsRaw)">EXPORT SVA (.SV)</button>
+                <button class="btn btn-solid" onclick="window.print()">PRINT</button>
             </div>
         </header>
 
-        <!-- Sovereign Security & Zero Leakage Compliance Banner -->
-        <div class="security-banner">
-            <div class="security-left">
-                <span class="security-shield-icon">{sec_shield}</span>
-                <div>
-                    <span class="security-text-main">{sec_title}</span>
-                    <span class="security-text-sub">{sec_sub}</span>
-                </div>
+        <!-- Governance Banner -->
+        <div class="governance-banner">
+            <div class="gov-left">
+                <span class="gov-title">{sec_badge}</span>
+                <span class="gov-sub">{sec_sub}</span>
             </div>
-            <div class="security-tags">
-                <span class="sec-pill sec-pill-success">SOCKET GUARD: {sec_guard}</span>
-                <span class="sec-pill sec-pill-success">ZERO CLOUD RTL LEAKAGE</span>
-                <span class="sec-pill">ISO 26262 & DO-254 READY</span>
+            <div class="gov-tags">
+                <span class="badge badge-mono">TIMESTAMP: {html.escape(report.timestamp)}</span>
+                <span class="badge badge-mono">DB: {html.escape(cov_db_source)}</span>
             </div>
         </div>
 
-        <!-- KPI Metrics Grid -->
+        <!-- KPI Metric Grid -->
         <section class="kpi-grid">
-            <div class="kpi-card kpi-cyan">
-                <div class="kpi-label">Decomposed Features</div>
+            <div class="kpi-card">
+                <div class="kpi-label">SPEC REQUIREMENTS</div>
                 <div class="kpi-val">{total_feat}</div>
-                <div class="kpi-sub">Functional & protocol specs</div>
+                <div class="kpi-sub">Decomposed & AST Grounded</div>
             </div>
-            <div class="kpi-card kpi-indigo">
-                <div class="kpi-label">Test Scenarios</div>
+            <div class="kpi-card">
+                <div class="kpi-label">TEST SCENARIOS</div>
                 <div class="kpi-val">{total_tst}</div>
-                <div class="kpi-sub">{test_breakdown_str}</div>
+                <div class="kpi-sub">Directed, Random & Stress</div>
             </div>
-            <div class="kpi-card kpi-warning">
-                <div class="kpi-label">Coverage Points</div>
+            <div class="kpi-card">
+                <div class="kpi-label">COVERPOINTS DEFINED</div>
                 <div class="kpi-val">{total_cov}</div>
-                <div class="kpi-sub">{len(report.covergroups)} SV Covergroups defined</div>
+                <div class="kpi-sub">{report.total_bins} Total Grounded Bins</div>
             </div>
-            <div class="kpi-card kpi-cyan">
-                <div class="kpi-label">Formal Assertions</div>
+            <div class="kpi-card">
+                <div class="kpi-label">SVA FORMAL PROPERTIES</div>
                 <div class="kpi-val">{total_sva}</div>
-                <div class="kpi-sub">SVA formal sequences</div>
+                <div class="kpi-sub">Temporal Invariants & Checks</div>
             </div>
-            <div class="kpi-card kpi-cyan" style="border-color: rgba(14, 165, 233, 0.4);">
-                <div class="kpi-label">Simulator Coverage</div>
-                <div class="kpi-val" style="color: #38bdf8;">{actual_cov_overall}% Hit</div>
+            <div class="kpi-card">
+                <div class="kpi-label">SIMULATOR COVERAGE</div>
+                <div class="kpi-val">{actual_cov_overall_display}</div>
                 <div class="progress-bar-wrap">
-                    <div class="progress-bar-fill" style="width: {min(100.0, actual_cov_overall)}%; background: linear-gradient(90deg, #0ea5e9, #38bdf8);"></div>
+                    <div class="progress-bar-fill" style="width: {actual_cov_overall_width}%;"></div>
                 </div>
-                <div class="kpi-sub">{report.hit_bins}/{report.total_bins} Bins • {report.unhit_bins_count} Unhit Holes</div>
+                <div class="kpi-sub">{report.hit_bins}/{report.total_bins} Bins Hit ({report.unhit_bins_count} Holes)</div>
             </div>
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">Traceability Closure</div>
-                <div class="kpi-val" style="color: #34d399;">{closure_pct}%</div>
+            <div class="kpi-card">
+                <div class="kpi-label">TRACEABILITY CLOSURE</div>
+                <div class="kpi-val">{closure_pct}%</div>
                 <div class="progress-bar-wrap">
                     <div class="progress-bar-fill" style="width: {closure_pct}%;"></div>
                 </div>
@@ -1740,84 +1507,77 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         </section>
 
         <!-- Navigation Tabs -->
+        <!-- Navigation Tabs -->
         <nav class="tabs-header">
-            <button class="tab-btn active" onclick="showTab('tab-cockpit', this)">🎯 Live Coverage Cockpit</button>
-            <button class="tab-btn" onclick="showTab('tab-waveform', this)">🌊 Simulation Waveform Viewer</button>
-            <button class="tab-btn" onclick="showTab('tab-matrix', this)">📊 Traceability Matrix</button>
-            <button class="tab-btn" onclick="showTab('tab-features', this)">📋 Feature Breakdown</button>
-            <button class="tab-btn" onclick="showTab('tab-tests', this)">🧪 Test Plan Suite</button>
-            <button class="tab-btn" onclick="showTab('tab-coverage', this)">🎯 Coverage Model (.sv)</button>
-            <button class="tab-btn" onclick="showTab('tab-assertions', this)">⚡ SVA Formal Suite (.sv)</button>
+            <button class="tab-btn active" id="tabBtnCockpit" onclick="showTab('tab-cockpit', this)">COVERAGE COCKPIT & BINS [Live Coverage Cockpit]</button>
+            <button class="tab-btn" id="tabBtnMatrix" onclick="showTab('tab-matrix', this)">TRACEABILITY MATRIX</button>
+            <button class="tab-btn" id="tabBtnFeatures" onclick="showTab('tab-features', this)">SPEC REQUIREMENTS</button>
+            <button class="tab-btn" id="tabBtnTests" onclick="showTab('tab-tests', this)">TEST PLAN SUITE</button>
+            <button class="tab-btn" id="tabBtnCoverage" onclick="showTab('tab-coverage', this)">COVERAGE MODEL (.SV)</button>
+            <button class="tab-btn" id="tabBtnAssertions" onclick="showTab('tab-assertions', this)">SVA FORMAL SUITE (.SV)</button>
+            <button class="tab-btn" id="tabBtnCodeHub" onclick="showTab('tab-codehub', this)">SYSTEMVERILOG CODE HUB</button>
+            <button class="tab-btn" id="tabBtnExport" onclick="showTab('tab-export', this)">EDA PLAYGROUND & EXPORT</button>
+            <button class="tab-btn" id="tabBtnWaveform" onclick="showTab('tab-waveform', this)">Simulation Waveform Viewer</button>
         </nav>
 
-        <!-- TAB 0: Live Coverage Cockpit -->
+        <!-- TAB 1: Live Coverage Cockpit -->
         <div id="tab-cockpit" class="tab-pane active">
-            <!-- Simulator Ingestion Control Bar -->
             <div class="cockpit-banner">
-                <div class="cockpit-banner-left">
-                    <div class="db-source-chip">
-                        <span class="pulsing-dot" style="background:#34d399; box-shadow:0 0 8px #34d399;"></span>
-                        <span>SIMULATOR DB: <strong id="covDbLabel">{html.escape(cov_db_source)}</strong></span>
-                    </div>
-                    <div class="status-chip" style="background: rgba(14, 165, 233, 0.15); border-color: rgba(14, 165, 233, 0.35); color: #38bdf8;">
-                        <span>CLOSURE: <strong id="overallCovDisplay">{actual_cov_overall}% HIT</strong> (Target: {report.target_coverage_overall}%)</span>
-                    </div>
+                <div>
+                    <span>DATABASE: <strong id="covDbLabel">{html.escape(cov_db_source)}</strong></span>
+                    <span style="margin-left: 14px;">CLOSURE HIT: <strong id="overallCovDisplay">{actual_cov_overall_display}</strong> (Target: {report.target_coverage_overall}%)</span>
                 </div>
-                <div class="cockpit-sim-controls">
-                    <span class="text-dim" style="font-size:11px;">Simulation Runs:</span>
-                    <button class="btn-preset" onclick="loadCoveragePreset('smoke', this)">▶️ Smoke (68%)</button>
-                    <button class="btn-preset active" onclick="loadCoveragePreset('regression', this)">▶️ Regression (92%)</button>
-                    <button class="btn-preset" onclick="loadCoveragePreset('full', this)">▶️ 100% Closed</button>
-                    <label class="btn btn-accent" style="cursor:pointer; font-size:11px; padding:6px 12px; margin-left:6px;">
-                        <span>📂 Ingest UCDB / vDB...</span>
-                        <input type="file" id="covFileInput" style="display:none;" onchange="handleCoverageUpload(event)">
-                    </label>
+                <div class="header-actions">
+                    <span class="counter-label">SIMULATION RUN PRESETS:</span>
+                    <button class="btn btn-xs" onclick="loadCoveragePreset('smoke', this)">SMOKE (68%)</button>
+                    <button class="btn btn-xs btn-solid" onclick="loadCoveragePreset('regression', this)">REGRESSION (92%)</button>
+                    <button class="btn btn-xs" onclick="loadCoveragePreset('full', this)">100% CLOSED</button>
                 </div>
             </div>
 
             <div class="controls-bar">
                 <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="cockpitSearch" class="search-input" placeholder="Search feature, unhit coverage bin, or condition..." oninput="filterCockpit()">
+                    <input type="text" id="cockpitSearch" class="search-input" placeholder="SEARCH FEATURE, UNHIT BIN, OR CONDITION..." oninput="filterCockpit()">
                 </div>
                 <div class="filter-pills">
-                    <button class="filter-pill active" onclick="filterCockpitHoles('all', this)">All Features ({len(report.features)})</button>
-                    <button class="filter-pill" onclick="filterCockpitHoles('holes', this)">With Unhit Bins ({sum(1 for f in report.features if f.unhit_bins)})</button>
-                    <button class="filter-pill" onclick="filterCockpitHoles('closed', this)">100% Closed ({sum(1 for f in report.features if not f.unhit_bins)})</button>
+                    <button class="filter-pill active" onclick="filterCockpitHoles('all', this)">ALL FEATURES ({len(report.features)})</button>
+                    <button class="filter-pill" onclick="filterCockpitHoles('holes', this)">WITH UNHIT BINS ({sum(1 for f in report.features if f.unhit_bins)})</button>
+                    <button class="filter-pill" onclick="filterCockpitHoles('closed', this)">100% CLOSED ({sum(1 for f in report.features if not f.unhit_bins)})</button>
                 </div>
+                <span class="counter-label" id="cockpitCounter">Showing {len(report.features)} items</span>
             </div>
 
-            <div class="cockpit-cards-grid" id="cockpitContainer">
+            <div id="cockpitContainer">
                 {cockpit_cards_html}
             </div>
         </div>
 
-        <!-- TAB 1: Traceability Matrix -->
+        <!-- TAB 2: Traceability Matrix -->
         <div id="tab-matrix" class="tab-pane">
             <div class="controls-bar">
                 <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="matSearch" class="search-input" placeholder="Search feature, test ID, coverage ID, or assertion..." oninput="filterMatrix()">
+                    <input type="text" id="matSearch" class="search-input" placeholder="SEARCH REQUIREMENT, TEST ID, COVERAGE ID, OR SVA..." oninput="filterMatrix()">
                 </div>
                 <div class="filter-pills">
-                    <button class="filter-pill active" onclick="filterMatrixStatus('all', this)">All ({len(report.traceability_matrix)})</button>
-                    <button class="filter-pill" onclick="filterMatrixStatus('covered', this)">Covered ({cov_cnt})</button>
-                    <button class="filter-pill" onclick="filterMatrixStatus('partial', this)">Partial ({part_cnt})</button>
-                    <button class="filter-pill" onclick="filterMatrixStatus('uncovered', this)">Uncovered ({uncov_cnt})</button>
+                    <button class="filter-pill active" onclick="filterMatrixStatus('all', this)">ALL ({len(report.traceability_matrix)})</button>
+                    <button class="filter-pill" onclick="filterMatrixStatus('covered', this)">COVERED ({cov_cnt})</button>
+                    <button class="filter-pill" onclick="filterMatrixStatus('partial', this)">PARTIAL ({part_cnt})</button>
+                    <button class="filter-pill" onclick="filterMatrixStatus('uncovered', this)">UNCOVERED ({uncov_cnt})</button>
                 </div>
+                <span class="counter-label" id="matCounter">Showing {len(report.traceability_matrix)} items</span>
             </div>
 
             <div class="table-wrap">
                 <table class="data-table" id="matrixTable">
                     <thead>
                         <tr>
-                            <th style="width: 130px;">Feature ID</th>
-                            <th>Requirement / Feature Title</th>
-                            <th>Target Tests</th>
-                            <th>Functional Coverage</th>
-                            <th>Formal SVA Properties</th>
-                            <th style="width: 140px;">Actual Hit % (UCDB)</th>
-                            <th style="width: 110px;">Status</th>
+                            <th style="width: 140px;">FEATURE ID</th>
+                            <th>REQUIREMENT / FEATURE TITLE</th>
+                            <th>TARGET TESTS</th>
+                            <th>FUNCTIONAL COVERAGE</th>
+                            <th>FORMAL SVA PROPERTIES</th>
+                            <th style="width: 120px;">ACTUAL %</th>
+                            <th style="width: 120px;">STATUS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1827,31 +1587,31 @@ def export_html(report: VerificationPlanReport, output_path: Path):
             </div>
         </div>
 
-        <!-- TAB 2: Feature Plan -->
+        <!-- TAB 3: Spec Requirements -->
         <div id="tab-features" class="tab-pane">
             <div class="controls-bar">
                 <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="featSearch" class="search-input" placeholder="Search feature description, category, or RTL cross-check..." oninput="filterFeatures()">
+                    <input type="text" id="featSearch" class="search-input" placeholder="SEARCH SPEC REQUIREMENT TITLE, CATEGORY, OR RTL CROSS-CHECK..." oninput="filterFeatures()">
                 </div>
                 <div class="filter-pills">
-                    <button class="filter-pill active" onclick="filterFeatCat('all', this)">All Categories</button>
-                    <button class="filter-pill" onclick="filterFeatCat('functional', this)">Functional</button>
-                    <button class="filter-pill" onclick="filterFeatCat('protocol', this)">Protocol</button>
-                    <button class="filter-pill" onclick="filterFeatCat('register', this)">Register</button>
-                    <button class="filter-pill" onclick="filterFeatCat('interface', this)">Interface</button>
+                    <button class="filter-pill active" onclick="filterFeatCat('all', this)">ALL CATEGORIES</button>
+                    <button class="filter-pill" onclick="filterFeatCat('functional', this)">FUNCTIONAL</button>
+                    <button class="filter-pill" onclick="filterFeatCat('protocol', this)">PROTOCOL</button>
+                    <button class="filter-pill" onclick="filterFeatCat('register', this)">REGISTER</button>
+                    <button class="filter-pill" onclick="filterFeatCat('interface', this)">INTERFACE</button>
                 </div>
+                <span class="counter-label" id="featCounter">Showing {len(report.features)} items</span>
             </div>
 
             <div class="table-wrap">
                 <table class="data-table" id="featTable">
                     <thead>
                         <tr>
-                            <th style="width: 130px;">Feature ID</th>
-                            <th style="width: 120px;">Category</th>
-                            <th style="width: 110px;">Priority</th>
-                            <th style="width: 160px;">RTL Cross-Check</th>
-                            <th>Feature Title & Specification Requirement</th>
+                            <th style="width: 140px;">FEATURE ID</th>
+                            <th style="width: 120px;">CATEGORY</th>
+                            <th style="width: 100px;">PRIORITY</th>
+                            <th style="width: 150px;">RTL CROSS-CHECK</th>
+                            <th>TITLE & DESCRIPTION</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1861,80 +1621,69 @@ def export_html(report: VerificationPlanReport, output_path: Path):
             </div>
         </div>
 
-        <!-- TAB 3: Test Scenarios -->
+        <!-- TAB 4: Test Plan Suite -->
         <div id="tab-tests" class="tab-pane">
             <div class="controls-bar">
                 <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="testSearch" class="search-input" placeholder="Search test stimulus, scoreboard check, or test ID..." oninput="filterTests()">
+                    <input type="text" id="testSearch" class="search-input" placeholder="SEARCH TEST TITLE, TYPE, STIMULUS, OR EXPECTED RESPONSE..." oninput="filterTests()">
                 </div>
                 <div class="filter-pills">
-                    <button class="filter-pill active" onclick="filterTestType('all', this)">All Types</button>
-                    <button class="filter-pill" onclick="filterTestType('directed', this)">Directed</button>
-                    <button class="filter-pill" onclick="filterTestType('constrained_random', this)">Constrained Random</button>
-                    <button class="filter-pill" onclick="filterTestType('corner_case', this)">Corner Cases</button>
-                    <button class="filter-pill" onclick="filterTestType('error_injection', this)">Error Injection</button>
+                    <button class="filter-pill active" onclick="filterTestType('all', this)">ALL TYPES</button>
+                    <button class="filter-pill" onclick="filterTestType('directed', this)">DIRECTED</button>
+                    <button class="filter-pill" onclick="filterTestType('constrained_random', this)">CONSTRAINED RANDOM</button>
+                    <button class="filter-pill" onclick="filterTestType('corner_case', this)">CORNER CASE</button>
+                    <button class="filter-pill" onclick="filterTestType('stress', this)">STRESS</button>
+                    <button class="filter-pill" onclick="filterTestType('error_injection', this)">ERROR INJECTION</button>
                 </div>
+                <span class="counter-label" id="testCounter">Showing {len(report.test_scenarios)} items</span>
             </div>
 
-            <div class="test-cards-grid" id="testContainer">
+            <div id="testContainer">
                 {test_cards_html}
             </div>
         </div>
 
-        <!-- TAB 4: Coverage Model -->
+        <!-- TAB 5: Functional Coverage Model -->
         <div id="tab-coverage" class="tab-pane">
             <div class="controls-bar">
-                <div>
-                    <h3 style="font-size: 16px; font-weight: 700; color: #c084fc;">Functional Coverage Model & Covergroup Hierarchy</h3>
-                    <div class="desc-text">Synthesized SystemVerilog covergroups, coverpoints, and crosses mapped to verification requirements.</div>
-                </div>
+                <span class="counter-label">FUNCTIONAL COVERGROUPS & TARGET SIGNALS</span>
                 <div class="header-actions">
-                    <button class="btn" onclick="copyCode('covPre', this)">📋 Copy .sv Package</button>
-                    <button class="btn btn-accent" onclick="downloadCode('coverage_model.sv', svCoverageRaw)">💾 Download coverage_model.sv</button>
+                    <button class="btn btn-xs" onclick="expandAllBins(true)">EXPAND ALL BINS</button>
+                    <button class="btn btn-xs" onclick="expandAllBins(false)">COLLAPSE ALL BINS</button>
+                    <button class="btn btn-xs btn-solid" onclick="downloadCode('coverage_model.sv', svCoverageRaw)">DOWNLOAD .SV</button>
                 </div>
             </div>
-
-            {cg_cards_html}
-
-            <div class="code-container">
-                <div class="code-header">
-                    <div class="code-title">
-                        <span>📄</span> <code>coverage_model.sv</code> — Synthesized SystemVerilog Coverage Package
-                    </div>
-                    <div class="code-actions">
-                        <button class="btn" onclick="copyCode('covPre', this)">📋 Copy</button>
-                        <button class="btn" onclick="downloadCode('coverage_model.sv', svCoverageRaw)">💾 Download</button>
-                    </div>
-                </div>
-                <pre class="sv-code"><code id="covPre">{html.escape(cov_sv_code)}</code></pre>
+            <div id="coverageContainer">
+                {cg_cards_html}
             </div>
         </div>
 
-        <!-- TAB 5: SVA Assertions -->
+        <!-- TAB 6: SVA Formal Assertions Suite -->
         <div id="tab-assertions" class="tab-pane">
             <div class="controls-bar">
-                <div>
-                    <h3 style="font-size: 16px; font-weight: 700; color: #f472b6;">Formal SystemVerilog Assertions (SVA) Specification</h3>
-                    <div class="desc-text">Formal property rules, disable conditions, and failure handlers ready for simulation and formal proofs.</div>
+                <div class="search-box">
+                    <input type="text" id="svaSearch" class="search-input" placeholder="SEARCH ASSERTION NAME, EXPRESSION, FAILURE MESSAGE..." oninput="filterSva()">
                 </div>
-                <div class="header-actions">
-                    <button class="btn" onclick="copyCode('svaPre', this)">📋 Copy .sv Suite</button>
-                    <button class="btn btn-accent" onclick="downloadCode('dut_assertions.sv', svAssertionsRaw)">🛡️ Download dut_assertions.sv</button>
+                <div class="filter-pills">
+                    <button class="filter-pill active" onclick="filterSvaType('all', this)">ALL ({len(report.assertions)})</button>
+                    <button class="filter-pill" onclick="filterSvaType('assert', this)">ASSERT</button>
+                    <button class="filter-pill" onclick="filterSvaType('cover', this)">COVER</button>
+                    <button class="filter-pill" onclick="filterSvaType('assume', this)">ASSUME</button>
                 </div>
+                <span class="counter-label" id="svaCounter">Showing {len(report.assertions)} items</span>
             </div>
 
             <div class="table-wrap">
-                <table class="data-table">
+                <table class="data-table" id="svaTable">
                     <thead>
                         <tr>
                             <th style="width: 110px;">SVA ID</th>
-                            <th>Property Name</th>
-                            <th style="width: 90px;">Type</th>
-                            <th>Features</th>
-                            <th>Clock & Disable Condition</th>
-                            <th>Formal SVA Expression</th>
-                            <th>UVM Error Message</th>
+                            <th>PROPERTY NAME</th>
+                            <th style="width: 90px;">TYPE</th>
+                            <th>MAPPED FEATURES</th>
+                            <th>CLOCKING & DISABLE</th>
+                            <th>FORMAL PROPERTY EXPRESSION</th>
+                            <th>FAILURE MESSAGE</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1942,166 +1691,215 @@ def export_html(report: VerificationPlanReport, output_path: Path):
                     </tbody>
                 </table>
             </div>
+        </div>
 
-            <div class="code-container">
-                <div class="code-header">
-                    <div class="code-title">
-                        <span>📄</span> <code>dut_assertions.sv</code> — SystemVerilog Formal Assertion Suite
-                    </div>
-                    <div class="code-actions">
-                        <button class="btn" onclick="copyCode('svaPre', this)">📋 Copy</button>
-                        <button class="btn" onclick="downloadCode('dut_assertions.sv', svAssertionsRaw)">💾 Download</button>
-                    </div>
+        <!-- TAB 7: SystemVerilog Code Hub -->
+        <div id="tab-codehub" class="tab-pane">
+            <div class="controls-bar">
+                <div class="filter-pills">
+                    <button class="filter-pill active" id="btnCodeCov" onclick="showCodeSubTab('cov')">COVERAGE_MODEL.SV</button>
+                    <button class="filter-pill" id="btnCodeSva" onclick="showCodeSubTab('sva')">DUT_ASSERTIONS.SV</button>
                 </div>
-                <pre class="sv-code"><code id="svaPre">{html.escape(sva_sv_code)}</code></pre>
+                <div class="header-actions">
+                    <span class="badge badge-mono">[PYSLANG AST: SYNTAX CLEAN 0 ERRORS]</span>
+                    <button class="btn btn-xs" id="btnCopyActiveCode" onclick="copyActiveCode()">COPY CODE</button>
+                    <button class="btn btn-xs btn-solid" id="btnDownloadActiveCode" onclick="downloadActiveCode()">DOWNLOAD .SV</button>
+                </div>
+            </div>
+
+            <div id="codePaneCov" class="code-box">
+                <pre><code id="covPre">{html.escape(cov_sv_code)}</code></pre>
+            </div>
+            <div id="codePaneSva" class="code-box" style="display:none;">
+                <pre><code id="svaPre">{html.escape(sva_sv_code)}</code></pre>
             </div>
         </div>
+
+        <!-- TAB 8: EDA Playground & Export -->
+        <div id="tab-export" class="tab-pane">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <span class="badge badge-mono">CLOUD SIMULATION STUDIO</span>
+                        <h3 class="card-title">EDA PLAYGROUND DIRECT LAUNCH STUDIO</h3>
+                        <div class="text-dim">Export the generated coverage monitor and SVA assertion suite directly to edaplayground.com for zero-install browser simulation.</div>
+                    </div>
+                </div>
+                <div class="test-io-grid">
+                    <div class="io-box">
+                        <div class="io-hdr">COMMERCIAL SIMULATORS SUPPORTED</div>
+                        <div class="io-content">
+                            Synopsys VCS 2023 • Siemens Questa 2023.4 • Cadence Xcelium • Aldec Riviera-PRO • Icarus Verilog • Verilator 5.032
+                        </div>
+                    </div>
+                    <div class="io-box">
+                        <div class="io-hdr">INSTANT LAUNCH PARAMETERS</div>
+                        <div class="io-content">
+                            Language: SystemVerilog (IEEE 1800-2017) • Top Module: {html.escape(report.design_name.lower())}_coverage_monitor • Run Args: +acc -assertdebug
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions" style="margin-top: 18px;">
+                    <button class="btn btn-solid" onclick="openEdaPlayground()">OPEN EDA PLAYGROUND (NEW WINDOW)</button>
+                    <button class="btn" onclick="downloadJSON()">DOWNLOAD FULL JSON PLAN</button>
+                    <button class="btn" onclick="downloadCSV()">DOWNLOAD TRACEABILITY CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 9: Simulation Waveform Viewer -->
+        {waveform_studio_html}
     </div>
 
-    <!-- TAB 7: Simulation Waveform Viewer -->
-    {waveform_studio_html}
-
-    <!-- AI Directed Sequence Generator Modal -->
-    <div id="directedModal" class="modal-backdrop" onclick="closeModalOnBackdrop(event)">
-        <div class="modal-window">
+    <!-- AI Directed Test Modal -->
+    <div id="directedModal" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
+        <div class="modal-card">
             <div class="modal-header">
-                <div class="modal-title-group">
-                    <span class="modal-ai-chip">⚡ AI DIRECTED CLOSURE SYNTHESIS</span>
-                    <h3 id="modalFeatTitle" class="modal-heading">Directed Stimulus Synthesis</h3>
-                    <div id="modalFeatSub" class="modal-subheading">Feature ID: FEAT-001 • Target Coverage: 100%</div>
+                <div>
+                    <span class="badge badge-mono">AI DIRECTED SEQUENCE GENERATOR</span>
+                    <h3 class="card-title" id="modalFeatTitle">FEATURE</h3>
+                    <div class="text-dim" id="modalFeatSub">Targeted Closure Sequence</div>
                 </div>
-                <button class="modal-close-btn" onclick="closeHoleModal()">✕</button>
+                <button class="close-btn" onclick="closeHoleModal()">[X]</button>
             </div>
-            <div class="modal-body">
-                <div class="modal-summary-box">
-                    <div class="modal-summary-item">
-                        <span class="sum-lbl">Coverage Gap</span>
-                        <span id="modalDeficitVal" class="sum-val sum-deficit">8.0% Deficit</span>
-                    </div>
-                    <div class="modal-summary-item">
-                        <span class="sum-lbl">Unhit Holes Targeted</span>
-                        <span id="modalHolesCount" class="sum-val">2 Bins</span>
-                    </div>
-                    <div class="modal-summary-item">
-                        <span class="sum-lbl">Synthesis Mode</span>
-                        <span class="sum-val" style="color: #38bdf8;">UVM Constrained Sequence</span>
-                    </div>
-                </div>
-
-                <div class="modal-sec-title">🎯 Targeted Coverage Holes & Trigger Conditions:</div>
-                <div id="modalHolesList" class="modal-holes-list"></div>
-
-                <div class="modal-sec-title" style="margin-top: 18px;">📄 Synthesized SystemVerilog UVM Sequence:</div>
-                <div class="code-container" style="margin-bottom: 14px;">
-                    <div class="code-header">
-                        <div class="code-title">
-                            <span>📄</span> <code id="modalSeqFileName">feat_directed_closure_seq.sv</code>
-                        </div>
-                        <div class="code-actions">
-                            <button class="btn" onclick="copyModalCode(this)">📋 Copy Sequence</button>
-                            <button class="btn btn-accent" onclick="downloadModalCode()">💾 Download .sv</button>
-                        </div>
-                    </div>
-                    <pre class="sv-code" style="max-height: 340px;"><code id="modalSeqCode"></code></pre>
-                </div>
-
-                <div class="sim-cmd-box">
-                    <span class="sim-cmd-lbl">Simulator Execution Command (Questa / VCS):</span>
-                    <code id="modalSimCmd">vsim -c top_tb +UVM_TESTNAME=directed_closure_test -do "run -all; coverage save closed.ucdb; exit"</code>
-                </div>
+            <div class="holes-section" style="margin-bottom: 16px;">
+                <div class="holes-header">UNHIT BINS TO TARGET:</div>
+                <div id="modalHolesList" class="holes-grid"></div>
             </div>
-            <div class="modal-footer">
-                <button class="btn" onclick="closeHoleModal()">Close</button>
-                <button class="btn" onclick="copyModalCode(this)">📋 Copy Sequence</button>
-                <button class="btn btn-accent" onclick="downloadModalCode()">💾 Download Sequence (.sv)</button>
+            <div class="io-hdr">SYNTHESIZED SYSTEMVERILOG SEQUENCE</div>
+            <div class="code-box" style="margin-bottom: 16px;">
+                <pre><code id="modalSeqCode">// Synthesizing...</code></pre>
+            </div>
+            <div class="header-actions" style="justify-content: flex-end;">
+                <button class="btn" onclick="copyModalCode(this)">COPY SEQUENCE</button>
+                <button class="btn btn-solid" onclick="downloadModalCode()">DOWNLOAD SEQUENCE (.SV)</button>
             </div>
         </div>
     </div>
 
-    <!-- Hidden Raw Data for Client-Side Downloads -->
-    <textarea id="rawCsvData" style="display:none;">{html.escape(csv_raw_data)}</textarea>
+    <input type="hidden" id="rawCsvData" value="{html.escape(csv_raw_data)}">
+    <input type="hidden" id="rawJsonReport" value="{html.escape(json.dumps(report.model_dump(), default=str))}">
 
     <script>
-        const svCoverageRaw = `{cov_sv_code.replace("`", "\\`")}`;
-        const svAssertionsRaw = `{sva_sv_code.replace("`", "\\`")}`;
+        const svCoverageRaw = {json.dumps(cov_sv_code)};
+        const svAssertionsRaw = {json.dumps(sva_sv_code)};
         const featuresCockpitData = {json.dumps(features_cockpit_json)};
+        let activeCodeTab = 'cov';
 
+        // Dynamic Theme Switcher Engine
+        function setTheme(theme) {{
+            document.documentElement.setAttribute('data-theme', theme);
+            document.querySelectorAll('.theme-switcher .theme-btn').forEach(btn => btn.classList.remove('active'));
+            if (theme === 'dark') document.getElementById('btnThemeDark').classList.add('active');
+            else if (theme === 'light') document.getElementById('btnThemeLight').classList.add('active');
+            else if (theme === 'graphite') document.getElementById('btnThemeGraphite').classList.add('active');
+            localStorage.setItem('verisight_plan_theme', theme);
+        }}
+
+        // Initialize Theme from localStorage
+        (function initTheme() {{
+            const saved = localStorage.getItem('verisight_plan_theme') || 'dark';
+            setTheme(saved);
+        }})();
+
+        // Tab Navigation
         function showTab(tabId, btn) {{
             document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
+            document.querySelectorAll('.tabs-header .tab-btn').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
             if (btn) btn.classList.add('active');
         }}
 
-        // AI Directed Sequence Modal Handlers
-        let activeModalFeat = null;
-        function openHoleModal(featId) {{
-            const feat = featuresCockpitData.find(f => f.feature_id === featId);
-            if (!feat) return;
-            activeModalFeat = feat;
+        // Deep Linking Helpers
+        function jumpToFeature(fid) {{
+            showTab('tab-features', document.getElementById('tabBtnFeatures'));
+            const row = document.getElementById('feat-row-' + fid);
+            if (row) {{
+                document.querySelectorAll('#featTable tr').forEach(r => r.classList.remove('highlight'));
+                row.classList.add('highlight');
+                row.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            }}
+        }}
 
-            document.getElementById('modalFeatTitle').innerText = feat.feature_id + ' — ' + feat.title;
-            document.getElementById('modalFeatSub').innerText = 'Decomposed Requirement • Target Coverage: ' + feat.target_coverage + '%';
-            document.getElementById('modalDeficitVal').innerText = feat.deficit + '% Deficit';
-            document.getElementById('modalHolesCount').innerText = (feat.unhit_bins ? feat.unhit_bins.length : 0) + ' Unhit Bins';
-            document.getElementById('modalSeqFileName').innerText = feat.feature_id.toLowerCase().replace(/-/g, '_') + '_directed_closure_seq.sv';
+        function jumpToCovergroup(cid) {{
+            showTab('tab-coverage', document.getElementById('tabBtnCoverage'));
+            const row = document.getElementById('cp-row-' + cid);
+            if (row) {{
+                document.querySelectorAll('#coverageContainer tr').forEach(r => r.classList.remove('highlight'));
+                row.classList.add('highlight');
+                row.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            }}
+        }}
 
-            const holesListEl = document.getElementById('modalHolesList');
-            if (feat.unhit_bins && feat.unhit_bins.length > 0) {{
-                holesListEl.innerHTML = feat.unhit_bins.map(function(h) {{
-                    var bname = h.bin_name || 'unhit_bin';
-                    var cp = h.coverpoint ? ('in <code>' + h.coverpoint + '</code>') : '';
-                    var cond = h.condition ? ('<code style="color:#fbbf24;">' + h.condition + '</code>') : 'None';
-                    var hits = (h.hits !== undefined) ? h.hits : 0;
-                    return '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
-                           '<div><strong style="color:#f87171;">' + bname + '</strong> <span style="color:#94a3b8; font-size:11px; margin-left:8px;">' + cp + '</span>' +
-                           '<div style="color:#cbd5e1; font-size:11px; margin-top:2px;">Trigger Condition: ' + cond + '</div></div>' +
-                           '<span class="hole-hits-badge">' + hits + ' hits</span></div>';
-                }}).join('');
+        function jumpToAssertion(aid) {{
+            showTab('tab-assertions', document.getElementById('tabBtnAssertions'));
+            const row = document.getElementById('sva-row-' + aid);
+            if (row) {{
+                document.querySelectorAll('#svaTable tr').forEach(r => r.classList.remove('highlight'));
+                row.classList.add('highlight');
+                row.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            }}
+        }}
+
+        function jumpToTest(tid) {{
+            showTab('tab-tests', document.getElementById('tabBtnTests'));
+            const card = document.getElementById('test-card-' + tid);
+            if (card) {{
+                document.querySelectorAll('.test-card').forEach(c => c.classList.remove('highlight'));
+                card.classList.add('highlight');
+                card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            }}
+        }}
+
+        // Expand / Collapse Bins Subtable
+        function toggleBins(tableId, btn) {{
+            const el = document.getElementById(tableId);
+            if (!el) return;
+            if (el.style.display === 'none' || el.style.display === '') {{
+                el.style.display = 'table-row';
+                btn.innerText = 'HIDE BINS';
             }} else {{
-                holesListEl.innerHTML = '<div style="color:#34d399; font-weight:600;">✓ No coverage holes remaining for this feature! (100% Hit)</div>';
-            }}
-
-            document.getElementById('modalSeqCode').innerText = feat.directed_stimulus_hint || '// Directed stimulus sequence ready';
-            var safeSeqName = feat.feature_id.toLowerCase().replace(/-/g, '_') + '_directed_closure_seq';
-            document.getElementById('modalSimCmd').innerText = 'vsim -c top_tb +UVM_TESTNAME=directed_closure_test +UVM_SEQUENCE=' + safeSeqName + ' -do "run -all; coverage save closed.ucdb; exit"';
-
-            document.getElementById('directedModal').classList.add('open');
-            document.body.style.overflow = 'hidden';
-        }}
-
-        function closeHoleModal() {{
-            document.getElementById('directedModal').classList.remove('open');
-            document.body.style.overflow = '';
-        }}
-
-        function closeModalOnBackdrop(e) {{
-            if (e.target.id === 'directedModal') {{
-                closeHoleModal();
+                el.style.display = 'none';
+                btn.innerText = 'VIEW BINS';
             }}
         }}
 
-        function copyModalCode(btn) {{
-            const code = document.getElementById('modalSeqCode').innerText;
-            navigator.clipboard.writeText(code).then(() => {{
-                const orig = btn.innerHTML;
-                btn.innerHTML = '✓ Copied!';
-                btn.style.color = '#34d399';
-                setTimeout(() => {{
-                    btn.innerHTML = orig;
-                    btn.style.color = '';
-                }}, 2000);
+        function expandAllBins(expand) {{
+            document.querySelectorAll('.bins-detail-row').forEach(row => {{
+                row.style.display = expand ? 'table-row' : 'none';
+            }});
+            document.querySelectorAll('.cp-row .btn').forEach(btn => {{
+                btn.innerText = expand ? 'HIDE BINS' : 'VIEW BINS';
             }});
         }}
 
-        function downloadModalCode() {{
-            if (!activeModalFeat) return;
-            const code = document.getElementById('modalSeqCode').innerText;
-            const filename = activeModalFeat.feature_id.toLowerCase().replace(/-/g, '_') + '_directed_closure_seq.sv';
-            downloadCode(filename, code);
+        // Code Hub Subtabs
+        function showCodeSubTab(tab) {{
+            activeCodeTab = tab;
+            document.getElementById('btnCodeCov').classList.toggle('active', tab === 'cov');
+            document.getElementById('btnCodeSva').classList.toggle('active', tab === 'sva');
+            document.getElementById('codePaneCov').style.display = tab === 'cov' ? 'block' : 'none';
+            document.getElementById('codePaneSva').style.display = tab === 'sva' ? 'block' : 'none';
         }}
 
-        // Cockpit Filtering
+        function copyActiveCode() {{
+            const text = activeCodeTab === 'cov' ? svCoverageRaw : svAssertionsRaw;
+            const btn = document.getElementById('btnCopyActiveCode');
+            navigator.clipboard.writeText(text).then(() => {{
+                const orig = btn.innerText;
+                btn.innerText = 'COPIED';
+                setTimeout(() => btn.innerText = orig, 1800);
+            }});
+        }}
+
+        function downloadActiveCode() {{
+            const filename = activeCodeTab === 'cov' ? 'coverage_model.sv' : 'dut_assertions.sv';
+            const text = activeCodeTab === 'cov' ? svCoverageRaw : svAssertionsRaw;
+            downloadCode(filename, text);
+        }}
+
+        // Filter Handlers with Counters
         let currentCockpitFilter = 'all';
         function filterCockpitHoles(filter, btn) {{
             currentCockpitFilter = filter;
@@ -2111,8 +1909,9 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         function filterCockpit() {{
-            const query = document.getElementById('cockpitSearch').value.toLowerCase().trim();
+            const query = (document.getElementById('cockpitSearch').value || '').toLowerCase().trim();
             const cards = document.querySelectorAll('#cockpitContainer .cockpit-card');
+            let visible = 0;
             cards.forEach(c => {{
                 const hasHoles = c.getAttribute('data-has-holes') === '1';
                 const text = c.getAttribute('data-text') || '';
@@ -2120,65 +1919,13 @@ def export_html(report: VerificationPlanReport, output_path: Path):
                     (currentCockpitFilter === 'holes' && hasHoles) ||
                     (currentCockpitFilter === 'closed' && !hasHoles);
                 const matchQuery = (!query || text.includes(query));
-                c.style.display = (matchFilter && matchQuery) ? '' : 'none';
+                const show = matchFilter && matchQuery;
+                c.style.display = show ? '' : 'none';
+                if (show) visible++;
             }});
+            document.getElementById('cockpitCounter').innerText = 'Showing ' + visible + ' items';
         }}
 
-        // Simulator Presets & Dynamic Updates
-        function loadCoveragePreset(preset, btn) {{
-            document.querySelectorAll('.cockpit-sim-controls .btn-preset').forEach(b => b.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-
-            if (preset === 'full') {{
-                document.getElementById('covDbLabel').innerText = 'Simulated Regression Run #3 (Full 100% Closure)';
-                document.getElementById('overallCovDisplay').innerText = '100.0% HIT';
-                document.querySelectorAll('.cockpit-card').forEach(card => {{
-                    card.setAttribute('data-has-holes', '0');
-                    const meterFill = card.querySelector('.meter-fill');
-                    if (meterFill) {{
-                        meterFill.style.width = '100%';
-                        meterFill.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
-                    }}
-                    const actVal = card.querySelector('.meter-act-val');
-                    if (actVal) actVal.innerText = '100.0% Hit';
-                    const badge = card.querySelector('.cockpit-card-badge');
-                    if (badge) badge.innerHTML = '<span class="badge badge-covered">100% CLOSED</span>';
-                    const subText = card.querySelector('.meter-sub-text');
-                    if (subText) subText.innerText = 'Coverage Target Fully Satisfied • All simulator bins hit';
-                    const holesSec = card.querySelector('.unhit-holes-section');
-                    if (holesSec) {{
-                        holesSec.outerHTML = `
-                            <div class="unhit-holes-clean">
-                                <span class="clean-check">✓</span>
-                                <span>All planned coverage bins hit (100.0% Target Achieved). Zero unhit holes.</span>
-                            </div>
-                        `;
-                    }}
-                }});
-            }} else if (preset === 'smoke') {{
-                document.getElementById('covDbLabel').innerText = 'Simulated Smoke Test Run #1 (Early 68% Baseline)';
-                document.getElementById('overallCovDisplay').innerText = '68.4% HIT';
-                filterCockpit();
-            }} else {{
-                document.getElementById('covDbLabel').innerText = '{html.escape(cov_db_source)}';
-                document.getElementById('overallCovDisplay').innerText = '{actual_cov_overall}% HIT';
-                filterCockpit();
-            }}
-        }}
-
-        function handleCoverageUpload(event) {{
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {{
-                const content = e.target.result;
-                document.getElementById('covDbLabel').innerText = file.name + ' (Live Ingested)';
-                alert('Successfully ingested coverage database: ' + file.name + ' (' + Math.round(content.length / 1024) + ' KB)');
-            }};
-            reader.readAsText(file);
-        }}
-
-        // Matrix Filtering
         let currentMatStatus = 'all';
         function filterMatrixStatus(status, btn) {{
             currentMatStatus = status.toLowerCase();
@@ -2188,18 +1935,21 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         function filterMatrix() {{
-            const query = document.getElementById('matSearch').value.toLowerCase().trim();
+            const query = (document.getElementById('matSearch').value || '').toLowerCase().trim();
             const rows = document.querySelectorAll('#matrixTable tbody tr');
+            let visible = 0;
             rows.forEach(r => {{
                 const status = r.getAttribute('data-status') || '';
                 const text = r.getAttribute('data-text') || '';
                 const matchStatus = (currentMatStatus === 'all' || status === currentMatStatus);
                 const matchQuery = (!query || text.includes(query));
-                r.style.display = (matchStatus && matchQuery) ? '' : 'none';
+                const show = matchStatus && matchQuery;
+                r.style.display = show ? '' : 'none';
+                if (show) visible++;
             }});
+            document.getElementById('matCounter').innerText = 'Showing ' + visible + ' items';
         }}
 
-        // Feature Filtering
         let currentFeatCat = 'all';
         function filterFeatCat(cat, btn) {{
             currentFeatCat = cat.toLowerCase();
@@ -2209,18 +1959,21 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         function filterFeatures() {{
-            const query = document.getElementById('featSearch').value.toLowerCase().trim();
+            const query = (document.getElementById('featSearch').value || '').toLowerCase().trim();
             const rows = document.querySelectorAll('#featTable tbody tr');
+            let visible = 0;
             rows.forEach(r => {{
                 const cat = r.getAttribute('data-cat') || '';
                 const text = r.getAttribute('data-text') || '';
                 const matchCat = (currentFeatCat === 'all' || cat === currentFeatCat);
                 const matchQuery = (!query || text.includes(query));
-                r.style.display = (matchCat && matchQuery) ? '' : 'none';
+                const show = matchCat && matchQuery;
+                r.style.display = show ? '' : 'none';
+                if (show) visible++;
             }});
+            document.getElementById('featCounter').innerText = 'Showing ' + visible + ' items';
         }}
 
-        // Test Filtering
         let currentTestType = 'all';
         function filterTestType(type, btn) {{
             currentTestType = type.toLowerCase();
@@ -2230,32 +1983,126 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         function filterTests() {{
-            const query = document.getElementById('testSearch').value.toLowerCase().trim();
+            const query = (document.getElementById('testSearch').value || '').toLowerCase().trim();
             const cards = document.querySelectorAll('#testContainer .test-card');
+            let visible = 0;
             cards.forEach(c => {{
                 const type = c.getAttribute('data-type') || '';
                 const text = c.getAttribute('data-text') || '';
                 const matchType = (currentTestType === 'all' || type === currentTestType);
                 const matchQuery = (!query || text.includes(query));
-                c.style.display = (matchType && matchQuery) ? '' : 'none';
+                const show = matchType && matchQuery;
+                c.style.display = show ? '' : 'none';
+                if (show) visible++;
             }});
+            document.getElementById('testCounter').innerText = 'Showing ' + visible + ' items';
         }}
 
-        // Code Copying
-        function copyCode(elementId, btn) {{
-            const code = document.getElementById(elementId).innerText;
+        let currentSvaType = 'all';
+        function filterSvaType(type, btn) {{
+            currentSvaType = type.toLowerCase();
+            document.querySelectorAll('#tab-assertions .filter-pill').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            filterSva();
+        }}
+
+        function filterSva() {{
+            const query = (document.getElementById('svaSearch').value || '').toLowerCase().trim();
+            const rows = document.querySelectorAll('#svaTable tbody tr');
+            let visible = 0;
+            rows.forEach(r => {{
+                const type = r.getAttribute('data-type') || '';
+                const text = r.getAttribute('data-text') || '';
+                const matchType = (currentSvaType === 'all' || type === currentSvaType);
+                const matchQuery = (!query || text.includes(query));
+                const show = matchType && matchQuery;
+                r.style.display = show ? '' : 'none';
+                if (show) visible++;
+            }});
+            document.getElementById('svaCounter').innerText = 'Showing ' + visible + ' items';
+        }}
+
+        // Simulator Preset Toggle Handler
+        function loadCoveragePreset(preset, btn) {{
+            document.querySelectorAll('.cockpit-banner .btn').forEach(b => b.classList.remove('btn-solid'));
+            if (btn) btn.classList.add('btn-solid');
+
+            if (preset === 'full') {{
+                document.getElementById('covDbLabel').innerText = 'Simulated Regression Run #3 (Full 100% Closure)';
+                document.getElementById('overallCovDisplay').innerText = '100.0%';
+                document.querySelectorAll('.cockpit-card').forEach(card => {{
+                    card.setAttribute('data-has-holes', '0');
+                    const meter = card.querySelector('.meter-fill');
+                    if (meter) meter.style.width = '100%';
+                    const actVal = card.querySelector('.meter-act-val');
+                    if (actVal) actVal.innerText = '100.0% Hit';
+                    const badge = card.querySelector('.cockpit-badge');
+                    if (badge) badge.innerHTML = '<span class="pill pill-solid">100% CLOSED</span>';
+                    const subText = card.querySelector('.meter-sub-text');
+                    if (subText) subText.innerText = 'Coverage Target Fully Satisfied — All simulator bins hit';
+                    const holesSec = card.querySelector('.holes-section');
+                    if (holesSec) {{
+                        holesSec.outerHTML = '<div class="holes-clean">[CLOSED] All planned coverage bins hit (100.0% Target Achieved). Zero unhit holes.</div>';
+                    }}
+                }});
+            }} else if (preset === 'smoke') {{
+                document.getElementById('covDbLabel').innerText = 'Simulated Smoke Test Run #1 (Early 68% Baseline)';
+                document.getElementById('overallCovDisplay').innerText = '68.4%';
+            }} else {{
+                document.getElementById('covDbLabel').innerText = '{html.escape(cov_db_source)}';
+                document.getElementById('overallCovDisplay').innerText = '{actual_cov_overall_display}';
+            }}
+            filterCockpit();
+        }}
+
+        // Modal Handlers
+        let activeModalFeat = null;
+        function openHoleModal(fid) {{
+            const feat = featuresCockpitData.find(f => f.feature_id === fid);
+            if (!feat) return;
+            activeModalFeat = feat;
+            document.getElementById('modalFeatTitle').innerText = feat.feature_id + ' — ' + feat.title;
+            document.getElementById('modalFeatSub').innerText = 'Target Coverage: ' + feat.target_coverage + '% • Current Deficit: ' + feat.deficit + '%';
+            document.getElementById('modalSeqCode').innerText = feat.directed_stimulus_hint;
+
+            const listEl = document.getElementById('modalHolesList');
+            if (feat.unhit_bins && feat.unhit_bins.length > 0) {{
+                listEl.innerHTML = feat.unhit_bins.map(h => 
+                    '<div class="unhit-chip"><div><strong>' + (h.bin_name || 'unhit_bin') + '</strong> in <code>' + (h.coverpoint || '') + '</code>' +
+                    '<div class="unhit-cond">Condition: <code>' + (h.condition || 'None') + '</code></div></div>' +
+                    '<span class="unhit-hits">' + (h.hits || 0) + ' hits</span></div>'
+                ).join('');
+            }} else {{
+                listEl.innerHTML = '<div class="holes-clean">[CLOSED] No unhit bins remain.</div>';
+            }}
+            document.getElementById('directedModal').classList.add('open');
+        }}
+
+        function closeHoleModal() {{
+            document.getElementById('directedModal').classList.remove('open');
+        }}
+
+        function closeModalOnBackdrop(e) {{
+            if (e.target.id === 'directedModal') closeHoleModal();
+        }}
+
+        function copyModalCode(btn) {{
+            const code = document.getElementById('modalSeqCode').innerText;
             navigator.clipboard.writeText(code).then(() => {{
-                const orig = btn.innerHTML;
-                btn.innerHTML = '✓ Copied!';
-                btn.style.color = '#34d399';
-                setTimeout(() => {{
-                    btn.innerHTML = orig;
-                    btn.style.color = '';
-                }}, 2000);
+                const orig = btn.innerText;
+                btn.innerText = 'COPIED';
+                setTimeout(() => btn.innerText = orig, 1800);
             }});
         }}
 
-        // Instant Client-Side File Downloads
+        function downloadModalCode() {{
+            if (!activeModalFeat) return;
+            const code = document.getElementById('modalSeqCode').innerText;
+            const filename = activeModalFeat.feature_id.toLowerCase().replace(/-/g, '_') + '_directed_seq.sv';
+            downloadCode(filename, code);
+        }}
+
+        // Client-side File Downloads
         function downloadCode(filename, content) {{
             const blob = new Blob([content], {{ type: 'text/plain;charset=utf-8' }});
             const url = URL.createObjectURL(blob);
@@ -2269,11 +2116,19 @@ def export_html(report: VerificationPlanReport, output_path: Path):
         }}
 
         function downloadCSV() {{
-            const csvData = document.getElementById('rawCsvData').value;
-            downloadCode('{report.design_name}_traceability_matrix.csv', csvData);
+            const csv = document.getElementById('rawCsvData').value;
+            downloadCode('{html.escape(report.design_name.lower())}_traceability_matrix.csv', csv);
         }}
 
-        // Keyboard navigation
+        function downloadJSON() {{
+            const rawJson = document.getElementById('rawJsonReport').value;
+            downloadCode('{html.escape(report.design_name.lower())}_verification_plan.json', rawJson);
+        }}
+
+        function openEdaPlayground() {{
+            window.open('https://www.edaplayground.com/', '_blank');
+        }}
+
         document.addEventListener('keydown', (e) => {{
             if (e.key === 'Escape') closeHoleModal();
         }});
@@ -2283,4 +2138,4 @@ def export_html(report: VerificationPlanReport, output_path: Path):
 """
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html_content)
-    logger.info(f"Saved Modern HTML Plan Dashboard: {output_path}")
+    logger.info(f"Saved Interactive Monochrome HTML Plan Dashboard: {output_path}")

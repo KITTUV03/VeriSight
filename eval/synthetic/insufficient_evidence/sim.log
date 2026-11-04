@@ -1,0 +1,12 @@
+UVM_INFO @ 0 ns: reporter [RNTST] Running test smoke_test...
+UVM_INFO @ 10 ns: uvm_test_top.env.agt.mon [MON] Observed transaction
+UVM_ERROR widget_scoreboard.sv(88) @ 130 ns: uvm_test_top.env.scb [SCB] MISMATCH: expected result=4 actual result=5
+UVM_INFO @ 240 ns: uvm_test_top [TEST] sequence done
+--- UVM Report Summary ---
+** Report counts by severity
+UVM_INFO :     3
+UVM_WARNING :    0
+UVM_ERROR :    1
+UVM_FATAL :    0
+Simulation time: 240 ns
+** TEST FAILED **

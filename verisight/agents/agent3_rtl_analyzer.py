@@ -30,6 +30,16 @@ from verisight.schemas.rtl_analysis import (
 )
 from verisight.tools import yosys_runner, xtracer_runner
 from verisight.tools.xtracer_runner import XTracerNotFoundError
+from verisight.tools.traceweave import correlate_failure_evidence
+from verisight.tools.fault_localization import localize_faults
+from verisight.analysis.power_analysis import analyze_power_intent
+from verisight.analysis.extended_checks import (
+    run_extended_cdc_checks,
+    run_extended_lint_checks,
+    run_extended_structural_checks,
+    run_extended_protocol_checks,
+    run_extended_security_misc_checks,
+)
 from verisight.utils.logger import get_logger
 
 logger = get_logger("agent3_rtl_analyzer")
@@ -117,6 +127,49 @@ class RTLRootCauseAnalyzer(BaseAgent):
         self.logger.info("Module 7: Miscellaneous Analysis")
         analysis.misc = self._analyze_misc(knowledge)
 
+        # Advanced Engine 1: TraceWeave Multi-Source Evidence Correlation
+        try:
+            tw_report = correlate_failure_evidence(knowledge.log, knowledge.vcd, knowledge.rtl)
+            analysis.traceweave = tw_report.model_dump()
+            self.logger.info(f"  → TraceWeave: {tw_report.summary}")
+        except Exception as e:
+            self.logger.debug(f"TraceWeave correlation skipped: {e}")
+
+        # Advanced Engine 2: Spectrum-Based Fault Localization (CirFix SBFL)
+        try:
+            sbfl_report = localize_faults(knowledge.log, knowledge.rtl)
+            analysis.fault_localization = sbfl_report.model_dump()
+            if sbfl_report.top_suspect:
+                self.logger.info(
+                    f"  → Fault Localization (CirFix/SBFL): Top suspect '{sbfl_report.top_suspect.signal_name}' "
+                    f"in {sbfl_report.top_suspect.module_name} (score={sbfl_report.top_suspect.suspiciousness})"
+                )
+                # If functional issues empty, augment with top SBFL suspect
+                if not analysis.functional.issues and sbfl_report.top_suspect.suspiciousness >= 0.4:
+                    top = sbfl_report.top_suspect
+                    analysis.functional.issues.append(FunctionalIssue(
+                        issue_type="logic_error",
+                        description=f"SBFL localized defect to {top.module_name}.{top.signal_name} (Ochiai suspiciousness: {top.suspiciousness})",
+                        module=top.module_name,
+                        signal=top.signal_name,
+                        file=top.file_path,
+                        line_number=top.line_number,
+                        severity="high",
+                    ))
+                    analysis.functional.summary = f"SBFL located {len(sbfl_report.ranked_suspects)} suspect(s); top: {top.signal_name}"
+        except Exception as e:
+            self.logger.debug(f"Fault localization skipped: {e}")
+
+        # Module 8: UPF Power Intent & Low-Power Verification (Optional)
+        if getattr(knowledge, "upf", None) is not None:
+            self.logger.info("Module 8: UPF Power Intent & Low-Power Verification")
+            try:
+                analysis.power = analyze_power_intent(knowledge)
+                if analysis.power:
+                    self.logger.info(f"  → Power Intent: {analysis.power.summary}")
+            except Exception as e:
+                self.logger.warning(f"Power analysis failed: {e}")
+
         # Determine primary root cause
         analysis = self._determine_primary_root_cause(analysis, classification)
 
@@ -133,6 +186,32 @@ class RTLRootCauseAnalyzer(BaseAgent):
     def _analyze_x_propagation(self, knowledge: UnifiedKnowledge) -> XTraceResult:
         """Analyze X value origins and propagation paths."""
         result = XTraceResult()
+
+        # Surface how the RTL was parsed so downstream consumers never mistake
+        # degraded/partial parsing for a complete AST.
+        pstatus = getattr(knowledge.rtl, "parser_status", None)
+        if pstatus is not None:
+            result.parser_backend = pstatus.backend
+            result.parser_degraded = pstatus.degraded
+            if pstatus.degraded:
+                result.limitations.append(
+                    f"RTL parse was degraded (backend={pstatus.backend}): "
+                    + "; ".join(pstatus.notes[:2]) if pstatus.notes
+                    else f"RTL parse was degraded (backend={pstatus.backend})."
+                )
+        # This module is STATIC analysis of the source AST. It flags registers
+        # that lack a reset assignment — a necessary but not sufficient
+        # condition for a runtime X. Establishing the actual runtime
+        # propagation path of an unknown value requires simulation (a VCD +
+        # the real x-tracer, see _augment_with_real_xtracer), because it
+        # depends on dynamic scheduling, conditional execution and stimulus
+        # that a source-only AST cannot resolve.
+        result.limitations.append(
+            "Static source analysis: identifies potential X origins "
+            "(registers/memories without reset). It does NOT establish the "
+            "runtime propagation path of an unknown value — that requires "
+            "simulation-based tracing (VCD + x-tracer)."
+        )
 
         for module in knowledge.rtl.modules:
             # Find registers without reset (X origins)
@@ -275,22 +354,18 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.tool_message = str(e)
             return result
 
-        # Step 4: build queries (explicit override, or auto-derived from
-        # sim-log scoreboard mismatches).
-        if config.signal and config.time_ps is not None:
-            queries = [xtracer_runner.XTraceQuery(
-                field_name=config.signal,
-                signal_candidates=[config.signal],
-                time_ps=config.time_ps,
-            )]
-        else:
-            queries = xtracer_runner.derive_queries(knowledge, top_module)
+        # Step 4: build queries (explicit override, or auto-derived with
+        # control signals prioritized before data bus bits).
+        explicit_sigs = getattr(config, "signals", None) or ([config.signal] if config.signal else None)
+        queries = xtracer_runner.derive_queries(
+            knowledge, top_module, explicit_signals=explicit_sigs, explicit_time_ps=config.time_ps
+        )
 
         if not queries:
             result.tool_status = "skipped_no_query"
             result.tool_message = (
                 "Could not derive an X-valued signal/time to trace from the "
-                "sim log. Pass --xtrace-signal and --xtrace-time explicitly."
+                "sim log. Pass --xtrace-signal explicitly."
             )
             return result
 
@@ -456,6 +531,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                 if block.reset_signal and "negedge" in block.sensitivity_list:
                     result.async_resets.append(block.reset_signal)
 
+            # Extended CDC checks (multi-bit crossing, raw clock gating, glitch before sync)
+            try:
+                ext_cdc = run_extended_cdc_checks(module, knowledge.rtl.modules)
+                result.crossings.extend(ext_cdc)
+            except Exception as e:
+                self.logger.debug(f"Extended CDC checks skipped for {module.name}: {e}")
+
         result.summary = (
             f"Found {len(result.crossings)} CDC issue(s), "
             f"{len(result.async_resets)} async reset(s)"
@@ -507,6 +589,15 @@ class RTLRootCauseAnalyzer(BaseAgent):
                         ))
                         counts["unused_variable"] = counts.get("unused_variable", 0) + 1
 
+            # Extended Lint checks (casex, arithmetic shift, signed/unsigned, logical/bitwise, clock edge, implicit net)
+            try:
+                ext_lint = run_extended_lint_checks(module)
+                for iss in ext_lint:
+                    result.issues.append(iss)
+                    counts[iss.issue_type] = counts.get(iss.issue_type, 0) + 1
+            except Exception as e:
+                self.logger.debug(f"Extended lint checks skipped for {module.name}: {e}")
+
         result.issue_counts = counts
         result.summary = f"Found {len(result.issues)} lint issue(s)"
         self.logger.info(f"  → Lint: {len(result.issues)} issues")
@@ -556,6 +647,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                     "has_default": fsm.has_default,
                 })
 
+            # Extended Structural checks (FSM deadlock, counter terminal check, dual-port collision, port swaps)
+            try:
+                ext_struct = run_extended_structural_checks(module, knowledge.rtl.modules)
+                result.issues.extend(ext_struct)
+            except Exception as e:
+                self.logger.debug(f"Extended structural checks skipped for {module.name}: {e}")
+
         result.summary = f"Found {len(result.issues)} structural issue(s)"
         self.logger.info(f"  → Structural: {len(result.issues)} issues")
         return result
@@ -587,8 +685,17 @@ class RTLRootCauseAnalyzer(BaseAgent):
             result.detected_protocols.append(rule.protocol)
 
         result.detected_protocols = list(set(result.detected_protocols))
-        result.summary = f"Detected protocols: {', '.join(result.detected_protocols) or 'none'}"
-        self.logger.info(f"  → Protocol: {len(result.detected_protocols)} detected")
+
+        # Extended Protocol checks (AXI4 valid stability, AHB HREADY wait-state, APB setup phase)
+        for module in knowledge.rtl.modules:
+            try:
+                ext_proto = run_extended_protocol_checks(module, result.detected_protocols)
+                result.issues.extend(ext_proto)
+            except Exception as e:
+                self.logger.debug(f"Extended protocol checks skipped for {module.name}: {e}")
+
+        result.summary = f"Detected protocols: {', '.join(result.detected_protocols) or 'none'} ({len(result.issues)} protocol issue(s) identified)"
+        self.logger.info(f"  → Protocol: {len(result.detected_protocols)} detected, {len(result.issues)} issues")
         return result
 
     # ─── Module 7: Misc Analyzer ───────────────────────────────────
@@ -620,6 +727,13 @@ class RTLRootCauseAnalyzer(BaseAgent):
                     severity="medium",
                 ))
 
+            # Extended Security & Misc checks (key zeroization, sync reset + clock gating deadlock)
+            try:
+                ext_misc = run_extended_security_misc_checks(module)
+                result.issues.extend(ext_misc)
+            except Exception as e:
+                self.logger.debug(f"Extended misc checks skipped for {module.name}: {e}")
+
         result.summary = f"Found {len(result.issues)} miscellaneous issue(s)"
         self.logger.info(f"  → Misc: {len(result.issues)} issues")
         return result
@@ -631,11 +745,18 @@ class RTLRootCauseAnalyzer(BaseAgent):
     ) -> RTLAnalysis:
         """Determine the primary root cause across all sub-modules."""
 
-        # Priority order: X-Trace > Functional > CDC > Lint > Structural > Protocol > Misc
+        # Priority order: X-Trace > Power Intent > Functional > CDC > Lint > Structural > Protocol > Misc
+        power_crit = [i for i in (analysis.power.all_issues if analysis.power else []) if i.severity in ("critical", "error")]
+        power_high = [i for i in (analysis.power.all_issues if analysis.power else []) if i.severity == "high"]
+
         if analysis.xtrace.severity in ("critical", "high"):
             analysis.primary_root_cause = analysis.xtrace.summary
             analysis.primary_category = "X Propagation"
             analysis.confidence = 95 if analysis.xtrace.severity == "critical" else 85
+        elif power_crit:
+            analysis.primary_root_cause = power_crit[0].description
+            analysis.primary_category = f"Power Intent ({power_crit[0].category.title()})"
+            analysis.confidence = 92
         elif analysis.functional.issues:
             critical = [i for i in analysis.functional.issues if i.severity == "critical"]
             if critical:
@@ -646,6 +767,10 @@ class RTLRootCauseAnalyzer(BaseAgent):
                 analysis.primary_root_cause = analysis.functional.issues[0].description
                 analysis.primary_category = "Functional"
                 analysis.confidence = 75
+        elif power_high:
+            analysis.primary_root_cause = power_high[0].description
+            analysis.primary_category = f"Power Intent ({power_high[0].category.title()})"
+            analysis.confidence = 80
         elif analysis.cdc.crossings:
             analysis.primary_root_cause = analysis.cdc.crossings[0].description
             analysis.primary_category = "CDC"

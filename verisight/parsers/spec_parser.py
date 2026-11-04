@@ -68,24 +68,34 @@ def parse_spec(filepath: str) -> SpecKnowledge:
 
 
 def _extract_title(content: str) -> str:
-    """Extract title from first H1 heading."""
+    """Extract title from first H1 heading or first non-empty line."""
     match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
-    return match.group(1).strip() if match else ""
+    if match:
+        return match.group(1).strip()
+    for line in content.splitlines():
+        line = line.strip()
+        if line and not line.startswith("```"):
+            return line
+    return ""
 
 
 def _split_sections(content: str) -> Dict[str, str]:
     """
     Split Markdown content into sections by heading hierarchy.
+    Supports both markdown '#' headings and numbered headings (e.g. '1. Overview').
 
     Returns dict mapping heading text to section body.
     """
     sections: Dict[str, str] = {}
-    # Match headings at any level
-    heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+    # Match markdown headings (# ...) or numbered section headings (1. Overview, 4.1 Reset)
+    heading_pattern = re.compile(
+        r"^(?:(#{1,6})\s+(.+)|(\d+(?:\.\d+)*\.?\s+[A-Za-z][\w\s/-]+))$",
+        re.MULTILINE
+    )
 
     matches = list(heading_pattern.finditer(content))
     for i, match in enumerate(matches):
-        heading = match.group(2).strip()
+        heading = (match.group(2) or match.group(3) or "").strip()
         start = match.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
         sections[heading] = content[start:end].strip()

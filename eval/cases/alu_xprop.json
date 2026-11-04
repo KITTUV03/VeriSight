@@ -1,0 +1,27 @@
+{
+  "id": "alu_xprop",
+  "title": "ALU result register never reset -> X propagation to scoreboard",
+  "category_tag": "x_propagation",
+  "source": "VeriSight examples/ (intentional-bug testbed). Ground truth from alu.sv:39-52 comments + alu_spec.md reset requirement.",
+  "ground_truth_confidence": "high",
+  "inputs": {
+    "spec": "examples/specs/alu_spec.md",
+    "rtl": "examples/rtl/",
+    "tb": "examples/tb/",
+    "log": "examples/logs/sim.log",
+    "vcd": "examples/waveforms/alu_failure_trace.vcd"
+  },
+  "ground_truth": {
+    "classification": "RTL Bug",
+    "category_keywords": ["x", "propagation", "uninitialized", "reset"],
+    "root_cause_keywords_all": ["result", "reset"],
+    "responsible_files": ["alu.sv"],
+    "responsible_lines": {"alu.sv": [42, 52]},
+    "first_causal_error_substring": "result=xx",
+    "expect_insufficient_evidence": false,
+    "notes": "always_ff reset clause resets carry/zero but omits `result` (alu.sv:43-46), so `result` is X from time 0. Spec requires result=8'h00 on reset."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["apb_slave", "Protocol Violation"]
+  }
+}

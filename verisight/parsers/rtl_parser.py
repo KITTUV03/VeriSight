@@ -5,42 +5,400 @@ Parses SystemVerilog RTL source files and extracts structured knowledge
 including module declarations, ports, parameters, always blocks, FSMs,
 clock domains, reset logic, and inline assertions.
 
-This is a deterministic, regex+heuristic parser — no LLM calls.
+Primary backend: pyslang (the Slang SystemVerilog frontend) via
+``verisight.parsers.sv_frontend`` + ``pyslang_rtl``. This gives real
+IEEE-1800 parsing with accurate types, signal dependencies, and source
+locations.
+
+Fallback: a deterministic regex+heuristic parser (the original
+implementation, preserved below). It is only used when pyslang is
+unavailable or produced no usable modules, and when it runs the result is
+explicitly labelled ``degraded`` with the pyslang diagnostics preserved —
+never a silent switch.
 """
 
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Sequence, Tuple, Union, Set
 
 from verisight.schemas.rtl_schema import (
     RTLKnowledge, RTLModule, Port, Parameter, AlwaysBlock,
     FSM, FSMState, FSMTransition, ClockDomain, RTLAssertion,
 )
+from verisight.schemas.parser_schema import (
+    ParserStatus, ParserDiagnostic, CATEGORY_TOOL,
+    CATEGORY_MISSING_DEPENDENCY, SEVERITY_ERROR, SEVERITY_WARNING,
+)
 from verisight.utils.file_utils import read_file, discover_files, RTL_EXTENSIONS
 from verisight.utils.sv_lexer import strip_comments
 from verisight.utils.logger import get_logger
+from verisight.parsers import sv_frontend
+from verisight.parsers.pyslang_rtl import build_rtl_knowledge
 
 logger = get_logger("rtl_parser")
 
 
-def parse_rtl(path: str) -> RTLKnowledge:
+def resolve_rtl_files(path: Union[str, Path, Sequence[Union[str, Path]]]) -> List[Path]:
+    """Resolve single path, directory, or sequence of paths into existing file paths."""
+    resolved_files: List[Path] = []
+    seen = set()
+
+    def _add_p(p_in: Path):
+        try:
+            r = p_in.resolve()
+            if r not in seen and p_in.is_file() and p_in.suffix.lower() in RTL_EXTENSIONS:
+                seen.add(r)
+                resolved_files.append(p_in)
+        except Exception:
+            pass
+
+    if isinstance(path, (str, Path)):
+        p = Path(path)
+        if p.is_file():
+            _add_p(p)
+        elif p.is_dir():
+            for f in discover_files(p, RTL_EXTENSIONS):
+                _add_p(f)
+        else:
+            # Check if multiple paths separated by commas or spaces
+            parts = str(path).replace(",", " ").split()
+            if len(parts) > 1:
+                for part in parts:
+                    sub_p = Path(part)
+                    if sub_p.is_file():
+                        _add_p(sub_p)
+                    elif sub_p.is_dir():
+                        for f in discover_files(sub_p, RTL_EXTENSIONS):
+                            _add_p(f)
+    elif isinstance(path, Sequence):
+        for item in path:
+            p = Path(item)
+            if p.is_file():
+                _add_p(p)
+            elif p.is_dir():
+                for f in discover_files(p, RTL_EXTENSIONS):
+                    _add_p(f)
+
+    return resolved_files
+
+
+def order_rtl_sources(files: Sequence[Path]) -> Tuple[List[Path], List[str], List[str], List[str]]:
     """
-    Parse RTL source files from a file or directory.
+    Analyzes multiple RTL files and determines compilation order:
+    1. Header/include files (.svh, .vh)
+    2. Packages (package ...; endpackage)
+    3. Interfaces (interface ...; endinterface)
+    4. Leaf submodules (modules instantiated by others)
+    5. Top-level modules
+
+    Also extracts defined packages, interfaces, and auto-include directories.
+    """
+    headers: List[Path] = []
+    packages_files: List[Path] = []
+    interfaces_files: List[Path] = []
+    modules_files: List[Path] = []
+
+    defined_packages: List[str] = []
+    defined_interfaces: List[str] = []
+    auto_incdirs: Set[str] = set()
+
+    pkg_pattern = re.compile(r"\bpackage\s+(\w+)\s*;", re.MULTILINE)
+    iface_pattern = re.compile(r"\binterface\s+(\w+)\s*(?:#|\()?", re.MULTILINE)
+    mod_pattern = re.compile(r"\bmodule\s+(\w+)\s*(?:#|\()?", re.MULTILINE)
+    inst_pattern = re.compile(r"\b(\w+)\s+(?:#\s*\([^)]*\)\s+)?(\w+)\s*\(", re.MULTILINE)
+
+    file_meta: Dict[Path, Dict[str, Any]] = {}
+
+    for f in files:
+        auto_incdirs.add(str(f.parent.resolve()))
+        suffix = f.suffix.lower()
+        content = ""
+        try:
+            content = f.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+        clean = strip_comments(content) if content else ""
+        pkgs = pkg_pattern.findall(clean)
+        ifaces = iface_pattern.findall(clean)
+        mods = mod_pattern.findall(clean)
+
+        defined_packages.extend(pkgs)
+        defined_interfaces.extend(ifaces)
+
+        if suffix in (".svh", ".vh"):
+            headers.append(f)
+        elif pkgs:
+            packages_files.append(f)
+        elif ifaces and not mods:
+            interfaces_files.append(f)
+        else:
+            modules_files.append(f)
+
+        file_meta[f] = {
+            "pkgs": pkgs,
+            "ifaces": ifaces,
+            "mods": mods,
+            "insts": [inst.get("module") for inst in _extract_instantiations(clean, str(f))],
+        }
+
+    # Dependency sort modules: submodules before instantiators
+    ordered_mods: List[Path] = []
+    visited = set()
+
+    def _visit_mod(p: Path, stack: set):
+        if p in visited:
+            return
+        stack.add(p)
+        p_insts = set(file_meta.get(p, {}).get("insts", []))
+        for other_p in modules_files:
+            if other_p != p and other_p not in visited and other_p not in stack:
+                other_mods = set(file_meta.get(other_p, {}).get("mods", []))
+                if p_insts.intersection(other_mods):
+                    _visit_mod(other_p, stack)
+        stack.remove(p)
+        visited.add(p)
+        ordered_mods.append(p)
+
+    for mf in modules_files:
+        if mf not in visited:
+            _visit_mod(mf, set())
+
+    # Prioritize leaf modules (modules with 0 instantiations) before parent/top modules
+    leaf_mods = [f for f in ordered_mods if not file_meta.get(f, {}).get("insts")]
+    parent_mods = [f for f in ordered_mods if f not in leaf_mods]
+
+    ordered_files = headers + packages_files + interfaces_files + leaf_mods + parent_mods
+    return ordered_files, defined_packages, defined_interfaces, sorted(auto_incdirs)
+
+
+def check_missing_dependencies(
+    modules: List[RTLModule],
+    defined_packages: Sequence[str],
+    file_list: Optional[Sequence[Union[str, Path]]] = None,
+) -> Tuple[List[str], List[ParserDiagnostic]]:
+    """Detect instantiated modules that are missing from uploaded RTL."""
+    missing: List[str] = []
+    diags: List[ParserDiagnostic] = []
+    defined_mods = {m.name for m in modules}
+    verilog_primitives = {
+        "and", "nand", "or", "nor", "xor", "xnor", "buf", "not",
+        "bufif0", "bufif1", "notif0", "notif1", "pulldown", "pullup",
+        "nmos", "pmos", "cmos", "rnmos", "rpmos", "rcmos", "tran",
+        "rtran", "tranif0", "rtranif0", "tranif1", "rtranif1",
+        "interface", "modport", "package", "typedef", "struct", "enum",
+        "initial", "always", "assign", "begin", "end", "task", "function",
+    }
+    for m in modules:
+        for inst in m.instantiations:
+            inst_mod = inst.get("module", "")
+            if (
+                inst_mod
+                and inst_mod not in defined_mods
+                and inst_mod not in verilog_primitives
+                and not inst_mod.startswith("$")
+                and inst_mod not in missing
+            ):
+                missing.append(inst_mod)
+                diags.append(ParserDiagnostic(
+                    severity=SEVERITY_ERROR,
+                    category=CATEGORY_MISSING_DEPENDENCY,
+                    message=(
+                        f"Module '{inst_mod}' instantiated in module '{m.name}' "
+                        f"({m.file}) is not defined in any uploaded RTL source file."
+                    ),
+                    file=m.file,
+                    code="MissingModuleDependency",
+                ))
+
+    # Also inspect raw source files for instantiations that could not be elaborated by AST
+    if file_list:
+        for f in file_list:
+            content = read_file(f)
+            clean = strip_comments(content) if content else ""
+            file_insts = _extract_instantiations(clean, str(f))
+            for inst in file_insts:
+                inst_mod = inst.get("module", "")
+                if (
+                    inst_mod
+                    and inst_mod not in defined_mods
+                    and inst_mod not in verilog_primitives
+                    and not inst_mod.startswith("$")
+                    and inst_mod not in missing
+                ):
+                    missing.append(inst_mod)
+                    diags.append(ParserDiagnostic(
+                        severity=SEVERITY_ERROR,
+                        category=CATEGORY_MISSING_DEPENDENCY,
+                        message=(
+                            f"Module '{inst_mod}' instantiated in file '{Path(f).name}' "
+                            f"is not defined in any uploaded RTL source file."
+                        ),
+                        file=str(f),
+                        code="MissingModuleDependency",
+                    ))
+
+    return sorted(set(missing)), diags
+
+
+def parse_rtl(
+    path: Union[str, Path, Sequence[Union[str, Path]]],
+    include_dirs: Optional[Sequence[str]] = None,
+    defines: Optional[Sequence[str]] = None,
+    allow_fallback: bool = True,
+    top_module: Optional[str] = None,
+) -> RTLKnowledge:
+    """
+    Parse RTL source files from a file, directory, or sequence of files.
+
+    Uses the pyslang frontend first; falls back to the legacy regex parser
+    only when pyslang is unavailable or yields no modules.
 
     Args:
-        path: Path to a single .sv/.v file or directory containing RTL files.
+        path: Single file, directory, or sequence of .sv/.v/.vhd files.
+        include_dirs: Optional `include search directories.
+        defines: Optional macro defines ("NAME" or "NAME=value").
+        allow_fallback: If True, fall back to the regex parser when pyslang
+            is unavailable or finds no modules.
+        top_module: Optional explicit top-level module selection.
 
     Returns:
-        RTLKnowledge Pydantic model.
+        RTLKnowledge Pydantic model with dependency ordering and diagnostics.
     """
     logger.info(f"Parsing RTL: {path}")
-    p = Path(path)
+    files = resolve_rtl_files(path)
 
-    if p.is_file():
-        files = [p]
-    else:
-        files = discover_files(p, RTL_EXTENSIONS)
+    if not files:
+        logger.warning(f"No RTL files resolved from path: {path}")
+        pstatus = ParserStatus(
+            backend="none",
+            syntax_ok=False,
+            degraded=True,
+            diagnostics=[
+                ParserDiagnostic(
+                    severity=SEVERITY_ERROR,
+                    category=CATEGORY_TOOL,
+                    message=f"No RTL source files found at: {path}",
+                    code="NoFilesFound",
+                )
+            ]
+        )
+        return RTLKnowledge(parser_status=pstatus)
 
+    ordered_files, def_pkgs, def_ifaces, auto_incdirs = order_rtl_sources(files)
+    file_strs = [str(f) for f in ordered_files]
+
+    all_include_dirs = list(include_dirs or [])
+    for d in auto_incdirs:
+        if d not in all_include_dirs:
+            all_include_dirs.append(d)
+
+    defines = list(defines or [])
+
+    # ─── Primary path: pyslang frontend ───────────────────────────────
+    if sv_frontend.is_available() and file_strs:
+        try:
+            result = sv_frontend.compile_files(file_strs, all_include_dirs, defines)
+            if result.compilation is not None:
+                knowledge = build_rtl_knowledge(result, file_strs)
+                knowledge.parser_status = result.status
+                knowledge.packages = def_pkgs
+                knowledge.interfaces = def_ifaces
+
+                # Missing dependencies check
+                missing_deps, dep_diags = check_missing_dependencies(knowledge.modules, def_pkgs, file_list=ordered_files)
+                knowledge.missing_dependencies = missing_deps
+                knowledge.parser_status.diagnostics.extend(dep_diags)
+
+                # Top module resolution
+                if top_module:
+                    knowledge.top_module = top_module
+                elif knowledge.top_candidates:
+                    knowledge.top_module = knowledge.top_candidates[0]
+                    if len(knowledge.top_candidates) > 1:
+                        knowledge.parser_status.notes.append(
+                            f"Multiple candidate top modules: {', '.join(knowledge.top_candidates)}. "
+                            f"Selected '{knowledge.top_module}' as top."
+                        )
+
+                if knowledge.modules or not allow_fallback:
+                    logger.info(
+                        f"RTL parsed (pyslang): {len(knowledge.modules)} modules, "
+                        f"top={knowledge.top_module}, "
+                        f"syntax_ok={result.status.syntax_ok}, "
+                        f"degraded={result.status.degraded}"
+                    )
+                    return knowledge
+
+                logger.warning(
+                    "pyslang parsed no modules — falling back to regex parser (degraded)."
+                )
+                fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
+                _mark_degraded(fallback, result.status, reason="pyslang found no modules")
+                return fallback
+            elif not allow_fallback:
+                knowledge = RTLKnowledge(file_list=file_strs)
+                knowledge.parser_status = result.status
+                return knowledge
+            else:
+                logger.warning(
+                    "pyslang frontend failed to compile — falling back to regex parser (degraded)."
+                )
+                fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
+                _mark_degraded(fallback, result.status, reason="pyslang compilation failed")
+                return fallback
+        except Exception as exc:  # defensive: never let the frontend crash parsing
+            logger.warning(f"pyslang RTL parse raised {exc!r} — regex fallback (degraded).")
+            if not allow_fallback:
+                raise
+            fallback = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
+            _mark_degraded(fallback, None, reason=f"pyslang exception: {exc!r}")
+            return fallback
+
+    # ─── pyslang unavailable ──────────────────────────────────────────
+    if not sv_frontend.is_available():
+        logger.warning(
+            f"pyslang unavailable ({sv_frontend.unavailable_reason()}) — "
+            "using regex fallback (degraded)."
+        )
+    knowledge = _parse_rtl_regex(ordered_files, top_module=top_module, def_pkgs=def_pkgs, def_ifaces=def_ifaces)
+    _mark_degraded(
+        knowledge, None,
+        reason=f"pyslang unavailable: {sv_frontend.unavailable_reason()}",
+    )
+    return knowledge
+
+
+def _mark_degraded(
+    knowledge: RTLKnowledge,
+    pyslang_status: Optional[ParserStatus],
+    reason: str,
+) -> None:
+    """Label a regex-fallback result as degraded, preserving pyslang diagnostics."""
+    status = ParserStatus(
+        backend="regex-fallback",
+        degraded=True,
+        elaborated=False,
+        syntax_ok=True,  # regex parser does not validate syntax
+        notes=[
+            f"Regex fallback used: {reason}.",
+            "Results are approximate: no type/scope resolution, SVA/UVM/"
+            "generate constructs may be mis-parsed. Do not treat as a full AST.",
+        ],
+    )
+    if pyslang_status is not None:
+        status.diagnostics = list(pyslang_status.diagnostics)
+        status.notes = pyslang_status.notes + status.notes
+    knowledge.parser_status = status
+
+
+def _parse_rtl_regex(
+    files: Sequence[Path],
+    top_module: Optional[str] = None,
+    def_pkgs: Optional[Sequence[str]] = None,
+    def_ifaces: Optional[Sequence[str]] = None,
+) -> RTLKnowledge:
+    """Legacy regex/heuristic RTL parser (fallback only)."""
     modules = []
     file_list = []
     total_lines = 0
@@ -60,7 +418,8 @@ def parse_rtl(path: str) -> RTLKnowledge:
         for inst in m.instantiations:
             instantiated.add(inst.get("module", ""))
     top_candidates = [m.name for m in modules if m.name not in instantiated]
-    top_module = top_candidates[0] if top_candidates else ""
+
+    resolved_top = top_module if top_module else (top_candidates[0] if top_candidates else "")
 
     # Collect global issues
     global_issues = []
@@ -68,12 +427,18 @@ def parse_rtl(path: str) -> RTLKnowledge:
         for ab in m.always_blocks:
             global_issues.extend(ab.issues)
 
+    missing_deps, dep_diags = check_missing_dependencies(modules, def_pkgs or [], file_list=files)
+
     knowledge = RTLKnowledge(
         modules=modules,
-        top_module=top_module,
+        top_module=resolved_top,
         file_list=file_list,
         total_lines=total_lines,
         global_issues=global_issues,
+        packages=list(def_pkgs or []),
+        interfaces=list(def_ifaces or []),
+        missing_dependencies=missing_deps,
+        top_candidates=top_candidates,
     )
 
     logger.info(
@@ -140,7 +505,7 @@ def _extract_ports(content: str) -> List[Port]:
     port_pattern = re.compile(
         r"(input|output|inout)\s+"
         r"(?:(wire|reg|logic)\s+)?"
-        r"(?:(\[[\d:]+\])\s+)?"
+        r"(?:(\[[^\]]+\])\s+)?"
         r"(\w+)",
         re.MULTILINE
     )
@@ -493,6 +858,9 @@ def _extract_instantiations(content: str, filepath: str) -> List[Dict[str, str]]
         "input", "output", "inout", "wire", "reg", "logic",
         "parameter", "localparam", "generate", "integer",
         "always_ff", "always_comb", "always_latch",
+        "interface", "modport", "package", "endmodule", "endinterface",
+        "endpackage", "import", "export", "typedef", "struct", "enum",
+        "assert", "assume", "cover", "property", "sequence", "return",
     }
 
     for match in inst_pattern.finditer(content):

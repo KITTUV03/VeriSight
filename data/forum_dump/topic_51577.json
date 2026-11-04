@@ -1,0 +1,12 @@
+{
+  "id": 51577,
+  "title": "Bug (?) in uvm_pool",
+  "slug": "bug-in-uvm-pool",
+  "created_at": "2026-03-13T17:28:51.782Z",
+  "bumped_at": "2026-03-13T17:28:51.895Z",
+  "posts_count": 1,
+  "question_raw": "<p>Currently using the event_pool, and in one my environments I do this:</p>\n<p><code>e_some_event = uvm_event_pool::get_global(“some_event_name”);</code><br>\n<code>if (e_some_event == null) `uvm_fatal(“my_env“,  “could not find some_event_name”)</code></p>\n<p>With the expectation that if the event did not exist, it would return null. But after some digging, the get_global() method also calls the get() method in uvm_pool such that it will automatically create this event anyway - so it’ll always create a uvm_event object when I don’t want it to.</p>\n<p>The documentation for get() explicitly says it will create a new object for you, but not get_global() so this was a surprise.</p>\n<p>I know I can just do a uvm_event_pool::exists() call first and check there - but I would have to do that call and then the get() / get_global() anyway and I wanted to avoid that.</p>\n<p>Is there a reason for this functionality? What is the goal of having get_global() vs get() ?</p>",
+  "question_text": "Currently using the event_pool, and in one my environments I do this:\ne_some_event = uvm_event_pool::get_global(“some_event_name”);\nif (e_some_event == null) `uvm_fatal(“my_env“,  “could not find some_event_name”)\nWith the expectation that if the event did not exist, it would return null. But after some digging, the get_global() method also calls the get() method in uvm_pool such that it will automatically create this event anyway - so it’ll always create a uvm_event object when I don’t want it to.\nThe documentation for get() explicitly says it will create a new object for you, but not get_global() so this was a surprise.\nI know I can just do a uvm_event_pool::exists() call first and check there - but I would have to do that call and then the get() / get_global() anyway and I wanted to avoid that.\nIs there a reason for this functionality? What is the goal of having get_global() vs get() ?",
+  "author": "spud_engineer",
+  "replies": []
+}

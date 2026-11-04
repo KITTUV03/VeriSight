@@ -1,124 +1,72 @@
 {
-  "classification": "RTL Bug",
-  "confidence": 78,
-  "component": "sync_fifo (status flag / count generation logic)",
-  "reason": "The dominant failure signature is that the FIFO's status flags do not track the occupancy count as required by the specification: full stays 0 when the FIFO is full (@85 ns), empty stays 1 when data is present (@125 ns), and almost_full stays 0 when the AF_LEVEL threshold is crossed (@210 ns). These stale/late flags then cause the downstream protocol violations (write when full @355 ns, read when empty @420 ns) and the simultaneous read/write data mismatch @350 ns. Structural RTL analysis confirms a reset-coverage defect: 'fifo_count' is written in the sequential block at projects/fifo/rtl/sync_fifo.sv:63 but is not assigned in the reset clause, so occupancy (and hence every flag derived from it) starts from an indeterminate/uninitialized value and remains permanently skewed relative to the actual pointer difference (rd_ptr/wr_ptr are reset at line 43). This is a violation of REQ-007, REQ-008, REQ-009, REQ-011 and REQ-012 by the design → Decision Rule Case 6/7/8 (RTL violates spec, uninitialized state, protocol protection not implemented correctly).",
-  "category": "Functional / Reset Initialization → Status-Flag & Protocol Violation",
-  "spec_reference": "REQ-007 (full), REQ-008 (empty), REQ-009 (almost_full/AF_LEVEL), REQ-011 (overflow), REQ-012 (underflow), REQ-013 (wr_count); Reset Behavior section: 'reset (low, asynchronous) resets ...'",
-  "log_reference": "@85 ns Full flag mismatch (exp 1, got 0); @125 ns Empty flag mismatch (exp 0, got 1); @210 ns Almost full flag mismatch (exp 1, got 0); @350 ns data mismatch on simultaneous rd/wr; @355 ns write while full; @420 ns read while empty",
-  "rtl_reference": "projects/fifo/rtl/sync_fifo.sv:63 (always block writing almost_empty, almost_full, empty, fifo_count, full, overflow, underflow — fifo_count missing from reset clause); also sv:43 (pointer reset), sv:54 (memory block, no reset)",
-  "tb_reference": "Scoreboard source not provided; one anomalous check message '@85 ns FIFO count mismatch: Expected 15, Got 15' suggests a possible comparison/reporting defect in the count checker that should be reviewed separately",
-  "recommended_fix": "1) In the reset branch of the always block at sync_fifo.sv:63, initialize fifo_count <= '0 (along with full, empty, almost_full, almost_empty, overflow, underflow) so occupancy is deterministic after the asynchronous active-low reset. 2) Derive full/empty/almost_full/almost_empty from the next-state count (fifo_count_next computed from wr_en & ~full and rd_en & ~empty in the same cycle) or make them combinational functions of fifo_count so they assert on the cycle the threshold is reached rather than one cycle late. 3) Ensure the simultaneous read/write case keeps fifo_count unchanged while still forwarding/advancing both pointers, which fixes the @350 ns data mismatch. 4) Gate the write/read strobes with the corrected full/empty flags and pulse overflow/underflow for exactly one cycle per REQ-011/REQ-012. 5) Separately, audit the scoreboard count-compare that reported 'Expected 15, Got 15' (likely wrong field printed or wrong operator) — this is a TB reporting issue layered on top of the RTL defect.",
+  "classification": "TB Bug",
+  "confidence": 95,
+  "component": "Scoreboard",
+  "reason": "The testbench scoreboard does not account for the 1-clock-cycle synchronous read latency specified in REQ-012. The scoreboard immediately compares the current read address against the current rdata in the same cycle, sampling the stale rdata from the previous operation rather than pipelining the check to the following cycle.",
+  "category": "Timing / Latency",
+  "spec_reference": "REQ-011, REQ-012",
+  "log_reference": "@175 ns: Mismatch @addr 1 EXP=201 ACT=110",
+  "rtl_reference": "projects/ram/rtl/ram_rtl.sv:17",
+  "tb_reference": "projects/ram/tb/ram_scoreboard.sv",
+  "recommended_fix": "Modify the scoreboard or monitor to model the 1-cycle read latency. In the scoreboard, buffer or pipeline the expected read transaction (address and expected data) so that it is compared against rdata one clock cycle later when the RTL read data becomes valid.",
   "evidence": [
     {
-      "source": "rtl",
-      "reference": "projects/fifo/rtl/sync_fifo.sv:63",
-      "description": "Sequential block drives fifo_count and all status flags but fifo_count is absent from the reset clause, leaving occupancy uninitialized after reset (Case 7 style X/indeterminate state).",
-      "snippet": "always_ff @(posedge clk or negedge rst_n) begin if (!rst_n) begin full<=0; empty<=1; ... /* fifo_count NOT reset */ end else ... end"
-    },
-    {
-      "source": "rtl",
-      "reference": "projects/fifo/rtl/sync_fifo.sv:43",
-      "description": "wr_ptr/rd_ptr ARE reset, so pointer-based occupancy and the separately maintained fifo_count can diverge immediately after reset, producing permanently wrong flags.",
-      "snippet": ""
-    },
-    {
-      "source": "log",
-      "reference": "@85 ns, @125 ns, @210 ns",
-      "description": "Three independent flag checks (full, empty, almost_full) all fail in the same direction: the flag lags/does not reflect actual occupancy — a systematic count/threshold defect, not a random data corruption.",
-      "snippet": ""
-    },
-    {
-      "source": "log",
-      "reference": "@355 ns, @420 ns",
-      "description": "Overflow (write when full) and underflow (read when empty) protection failed, i.e. REQ-011/REQ-012 protection mechanisms are ineffective because they depend on the broken full/empty flags → Case 8 protocol implemented incorrectly in RTL.",
-      "snippet": ""
-    },
-    {
       "source": "spec",
-      "reference": "REQ-007/008/009/011/012/013",
-      "description": "Spec unambiguously requires full when no space remains, empty when no data available, almost_full at AF_LEVEL, and one-cycle overflow/underflow pulses. No self-contradiction exists in the requirement set, so Case 9 (Spec Bug) is excluded.",
-      "snippet": ""
+      "reference": "REQ-012",
+      "description": "Specification defines synchronous read latency of exactly one clock cycle",
+      "snippet": "Read data is available on rdata with a latency of exactly one clock cycle following the assertion of addr with we = 0."
     },
     {
-      "source": "log",
-      "reference": "@350 ns 'Data mismatch at simultaneous read/write'",
-      "description": "Concurrent read/write handling corrupts dout/count bookkeeping — a classic symptom of incorrect count update for the simultaneous case in the same block at line 63.",
-      "snippet": ""
+      "source": "rtl",
+      "reference": "projects/ram/rtl/ram_rtl.sv:17",
+      "description": "RTL implements synchronous registered read data conforming to specification",
+      "snippet": "sequential block @ line 17: writes ['rdata'], HAS RESET"
     },
     {
       "source": "tb",
-      "reference": "Scoreboard: 'No scoreboard found' in collected artifacts",
-      "description": "TB predictor source unavailable, so a scoreboard off-by-one cannot be fully excluded; the '@85 ns Expected 15, Got 15' message is the only TB-side anomaly and affects a single check, not the flag failures.",
-      "snippet": ""
+      "reference": "projects/ram/tb/ram_scoreboard.sv",
+      "description": "Scoreboard checks read data combinationally/immediately against memory[tr.addr] without 1-cycle delay",
+      "snippet": "if (tr.rdata !== memory[tr.addr]) `uvm_error(\"RAM_SB\", $sformatf(\"Mismatch @addr %0d EXP=%0d ACT=%0d\", tr.addr, memory[tr.addr], tr.rdata))"
+    },
+    {
+      "source": "log",
+      "reference": "@175 ns, @235 ns",
+      "description": "ACT data corresponds to data from previous read transaction (addr 2 data 110 seen during addr 1 read)",
+      "snippet": "[UVM_ERROR] @175 ns: Mismatch @addr 1 EXP=201 ACT=110\n[UVM_ERROR] @235 ns: Mismatch @addr 1 EXP=201 ACT=110"
     }
   ],
   "reasoning_chain": [
     {
       "step": 1,
-      "observation": "Seven errors: three status-flag mismatches, one data mismatch on simultaneous rd/wr, and two protocol-protection violations (write-when-full, read-when-empty).",
-      "inference": "Failures cluster around occupancy tracking and flag generation rather than data path storage.",
-      "source": "simulation log"
+      "observation": "UVM error logs report mismatches during read operations where ACT matches data from a different/earlier transaction (e.g. ACT=110 at addr 1 read, where 110 is the content of addr 2).",
+      "inference": "The read data observed by the scoreboard is offset by one cycle from the expected address.",
+      "source": "log"
     },
     {
       "step": 2,
-      "observation": "Spec REQ-007..REQ-013 define full/empty/almost_full/almost_empty/overflow/underflow/count behavior consistently; no contradictory statements.",
-      "inference": "Spec Bug (Case 9) ruled out.",
-      "source": "specification"
+      "observation": "REQ-011 and REQ-012 state that the RAM uses synchronous read architecture with exactly 1 clock cycle latency before rdata is valid.",
+      "inference": "A read initiated at cycle N will present valid data on rdata at cycle N+1.",
+      "source": "spec"
     },
     {
       "step": 3,
-      "observation": "RTL structural analysis: fifo_count is written in the always block at line 63 but is missing from that block's reset clause; pointers at line 43 are reset.",
-      "inference": "Post-reset occupancy is indeterminate; all flags derived from fifo_count are wrong from time 0 — an RTL initialization defect (Case 7) and a spec violation (Case 6).",
-      "source": "projects/fifo/rtl/sync_fifo.sv:43,63"
+      "observation": "RTL analysis shows a sequential block at line 17 driving rdata, confirming registered output behavior adhering to REQ-011 and REQ-012.",
+      "inference": "RTL correctly implements synchronous read with registered output.",
+      "source": "rtl"
     },
     {
       "step": 4,
-      "observation": "full=0 at the moment the scoreboard expects full=1, and empty=1 when data should be readable; almost_full never asserts at threshold.",
-      "inference": "Flags are computed from a stale/registered count instead of the next-state count, so threshold crossings are missed or delayed — consistent with the reset/count defect.",
-      "source": "log @85/125/210 ns"
-    },
-    {
-      "step": 5,
-      "observation": "Overflow/underflow guard errors occur AFTER the flag errors (355 ns, 420 ns).",
-      "inference": "Protocol violations are downstream consequences of the broken flags, confirming a single RTL root cause (Case 8) rather than bad stimulus; a driver bug would not also corrupt full/empty flag values reported by the DUT.",
-      "source": "log timeline"
-    },
-    {
-      "step": 6,
-      "observation": "One log line reports 'FIFO count mismatch: Expected 15, Got 15' where expected == actual, and scoreboard source was not collected.",
-      "inference": "There is a secondary TB reporting/compare defect worth fixing, but it does not explain the DUT flag values; it lowers confidence modestly rather than changing the classification.",
-      "source": "log @85 ns / missing scoreboard artifact"
-    },
-    {
-      "step": 7,
-      "observation": "Driver and monitor artifacts show no reported protocol/sampling anomalies, and deterministic pre-analysis independently suggests RTL Bug with a reset-coverage finding.",
-      "inference": "Cases 1–5 (TB Bug paths) are not supported by evidence; final classification is RTL Bug.",
-      "source": "deterministic pre-analysis"
+      "observation": "Scoreboard logic in ram_scoreboard.sv evaluates tr.rdata !== memory[tr.addr] synchronously within the same transaction without pipelining or delaying the check.",
+      "inference": "The testbench scoreboard incorrectly assumes zero-cycle latency read, causing comparison of current address with previous cycle's rdata output (Case 3: Scoreboard prediction incorrect).",
+      "source": "tb"
     }
   ],
-  "missing_artifacts": [
-    "Full RTL source of sync_fifo.sv (lines 30–110) to confirm exact flag equations and the reset clause contents",
-    "Scoreboard/predictor source (reference FIFO model) to validate expected full/almost_full thresholds and to explain the 'Expected 15, Got 15' message",
-    "DUT parameter values used in this test (DATA_WIDTH, DEPTH/ADDR_WIDTH, AF_LEVEL, AE_LEVEL, FWFT vs standard mode)",
-    "Waveform (VCD/FSDB) around 80–130 ns showing rst_n, wr_en, rd_en, fifo_count, full, empty",
-    "Monitor sampling code / clocking block to confirm flags are sampled on the correct clock edge"
-  ],
+  "missing_artifacts": [],
   "alternative_hypotheses": [
     {
-      "classification": "TB Bug",
-      "confidence": 15,
-      "reason": "The '@85 ns FIFO count mismatch: Expected 15, Got 15' check fails with identical expected and actual values, and an off-by-one in the reference model (asserting full at count 15 for a depth-16 FIFO) could also explain the full/almost_full mismatches. Scoreboard source was not available to disprove this; if the reference model is wrong, this becomes Case 3."
-    },
-    {
-      "classification": "TB Bug (monitor sampling)",
+      "classification": "RTL Bug",
       "confidence": 5,
-      "reason": "Flags sampled one cycle early (wrong clocking-block skew) would produce exactly this 'flag is late' pattern for full/empty/almost_full. However it would not explain the write-when-full and read-when-empty protocol violations, which imply the DUT itself did not block the transfers."
-    },
-    {
-      "classification": "Unknown",
-      "confidence": 2,
-      "reason": "If neither the full RTL flag equations nor the scoreboard model can be obtained, evidence would be limited to structural hints; current reset-coverage finding plus consistent multi-flag failure pattern is sufficient to avoid this outcome."
+      "reason": "RTL could potentially have an incorrect read enable condition or register latching bug, but the presence of registered rdata in RTL aligns with the 1-cycle latency specification."
     }
   ]
 }

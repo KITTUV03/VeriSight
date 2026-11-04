@@ -1,0 +1,27 @@
+{
+  "id": 51575,
+  "title": "UVM Verification of I2C Slave IP with APB Registers",
+  "slug": "uvm-verification-of-i2c-slave-ip-with-apb-registers",
+  "created_at": "2026-03-09T13:38:36.982Z",
+  "bumped_at": "2026-03-10T08:14:53.863Z",
+  "posts_count": 3,
+  "question_raw": "<p>Hello everyone,</p>\n<p>I am currently working on a verification project of an I2C Slave IP using UVM. The IP has an APB interface for registers access, and I am building the testbench from scratch to understand the full UVM flow.</p>\n<p>I want to ask for advice on how to structure a testplan and testbench architecture for this project.</p>",
+  "question_text": "Hello everyone,\nI am currently working on a verification project of an I2C Slave IP using UVM. The IP has an APB interface for registers access, and I am building the testbench from scratch to understand the full UVM flow.\nI want to ask for advice on how to structure a testplan and testbench architecture for this project.",
+  "author": "youssef3",
+  "replies": [
+    {
+      "id": 156599,
+      "author": "cgales",
+      "raw": "<p>The Verification Academy provides a lot of information to help you get started. Have you gone through all of the training and examples?</p>",
+      "text": "The Verification Academy provides a lot of information to help you get started. Have you gone through all of the training and examples?",
+      "created_at": "2026-03-09T14:55:20.393Z"
+    },
+    {
+      "id": 156602,
+      "author": "youssef3",
+      "raw": "<p>No, there is  an example with internal registers ?</p>",
+      "text": "No, there is  an example with internal registers ?",
+      "created_at": "2026-03-10T08:14:53.863Z"
+    }
+  ]
+}

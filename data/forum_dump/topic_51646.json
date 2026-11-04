@@ -1,0 +1,20 @@
+{
+  "id": 51646,
+  "title": "Use case of uvm_void",
+  "slug": "use-case-of-uvm-void",
+  "created_at": "2026-05-25T12:27:38.394Z",
+  "bumped_at": "2026-05-26T19:15:41.496Z",
+  "posts_count": 2,
+  "question_raw": "<p>I was reading about the use of <code>uvm_void</code> from the Accellera forum,<a href=\"https://forums.accellera.org/topic/597-use-of-uvm_void-class/\" rel=\"noopener nofollow ugc\">LINK</a> where it is mentioned that it “destroys type safety” by acting like a universal base class, similar to <code>void*</code> in C++. However, I am not able to fully understand what this means.</p>\n<p>What exactly is “type safety” in this context, and how does <code>uvm_void</code> affect it? Why is having a universal base class considered unsafe?</p>\n<p>Also, in UVM, components exist for the entire simulation, while transactions (objects) exist only temporarily. So what is the purpose of using something like <code>uvm_void</code>? Is it related to destroying objects, or does it serve some other purpose entirely?</p>\n<p>Could someone explain the practical use case of <code>uvm_void</code> and why it is needed?</p>",
+  "question_text": "I was reading about the use of uvm_void from the Accellera forum,LINK where it is mentioned that it “destroys type safety” by acting like a universal base class, similar to void* in C++. However, I am not able to fully understand what this means.\nWhat exactly is “type safety” in this context, and how does uvm_void affect it? Why is having a universal base class considered unsafe?\nAlso, in UVM, components exist for the entire simulation, while transactions (objects) exist only temporarily. So what is the purpose of using something like uvm_void? Is it related to destroying objects, or does it serve some other purpose entirely?\nCould someone explain the practical use case of uvm_void and why it is needed?",
+  "author": "trushali",
+  "replies": [
+    {
+      "id": 156785,
+      "author": "dave_59",
+      "raw": "<p>In C++, the <code>void*</code> pointer is highly unsafe because it enables access to memory that may not be permitted. <code>uvm_void</code> behaves similarly to the <code>*root object</code> class in Java or Python. This weakens type safety by shifting checks from the compiler to the runtime, which can result in crashes.</p>\n<p>The primary purpose of a root class, and likely the reason behind its inclusion in the UVM, was to facilitate the merging of various frameworks. However, this functionality would have been more intuitive if it had been a language feature. There are alternative approaches to achieving this, such as using constructs like an <code>interface class</code> to indicate that a class is required to <strong>implement</strong> a <code>copy()</code> method.</p>",
+      "text": "In C++, the void* pointer is highly unsafe because it enables access to memory that may not be permitted. uvm_void behaves similarly to the *root object class in Java or Python. This weakens type safety by shifting checks from the compiler to the runtime, which can result in crashes.\nThe primary purpose of a root class, and likely the reason behind its inclusion in the UVM, was to facilitate the merging of various frameworks. However, this functionality would have been more intuitive if it had been a language feature. There are alternative approaches to achieving this, such as using constructs like an interface class to indicate that a class is required to implement a copy() method.",
+      "created_at": "2026-05-26T19:15:41.496Z"
+    }
+  ]
+}

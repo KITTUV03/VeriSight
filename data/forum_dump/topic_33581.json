@@ -1,0 +1,48 @@
+{
+  "id": 33581,
+  "title": "UVM macro",
+  "slug": "uvm-macro",
+  "created_at": "2017-10-08T05:27:37.000Z",
+  "bumped_at": "2026-09-23T08:03:52.529Z",
+  "posts_count": 6,
+  "question_raw": "<p>How can I implement factory registration without using macros.</p>",
+  "question_text": "How can I implement factory registration without using macros.",
+  "author": "verificationstud",
+  "replies": [
+    {
+      "id": 106437,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-macro/33581\">harinathdigital@gmail.com</a>:</font></em></p>\n<aside class=\"onebox allowlistedgeneric\" data-onebox-src=\"https://blogs.sw.siemens.com/verificationhorizons/2011/02/13/parameterized-classes-static-members-and-the-factory-macros/\">\n  <header class=\"source\">\n\n      <a href=\"https://blogs.sw.siemens.com/verificationhorizons/2011/02/13/parameterized-classes-static-members-and-the-factory-macros/\" target=\"_blank\" rel=\"noopener\" title=\"05:05PM - 13 February 2011\">Verification Horizons – 13 Feb 11</a>\n  </header>\n\n  <article class=\"onebox-body\">\n    \n\n<h3><a href=\"https://blogs.sw.siemens.com/verificationhorizons/2011/02/13/parameterized-classes-static-members-and-the-factory-macros/\" target=\"_blank\" rel=\"noopener\">Parameterized Classes, Static Members and the Factory Macros - Verification...</a></h3>\n\n  <p>Somebody asked me a simple question: Why do need two different macros (`ovm_object_utils and `ovm_object_param_utils) to register classes with the factory,</p>\n\n\n  </article>\n\n  <div class=\"onebox-metadata\">\n    \n    \n  </div>\n\n  <div style=\"clear: both\"></div>\n</aside>\n",
+      "text": "In reply to harinathdigital@gmail.com:\n\n  \n\n      Verification Horizons – 13 Feb 11\n  \n\n  \n    \n\nParameterized Classes, Static Members and the Factory Macros - Verification...\n\n  Somebody asked me a simple question: Why do need two different macros (`ovm_object_utils and `ovm_object_param_utils) to register classes with the factory,",
+      "created_at": "2017-10-08T05:55:49.000Z"
+    },
+    {
+      "id": 106438,
+      "author": "lalithjithan",
+      "raw": "<p>class component extends uvm_component;<br>\ntypedef uvm_component_registry #(component,“component”) type_id;</p>\n<p>static function type_id get_type();<br>\nreturn type_id::get();<br>\nendfunction</p>\n<p>function string get_type_name();<br>\nreturn “component”;<br>\nendfunction</p>\n<p>endclass : component</p>",
+      "text": "class component extends uvm_component;\ntypedef uvm_component_registry #(component,“component”) type_id;\nstatic function type_id get_type();\nreturn type_id::get();\nendfunction\nfunction string get_type_name();\nreturn “component”;\nendfunction\nendclass : component",
+      "created_at": "2017-10-08T06:01:11.000Z"
+    },
+    {
+      "id": 157063,
+      "author": "tan_27",
+      "raw": "<p>Could you please explain why do we use type_id?<br>\nWhat are the static methods inside uvm_component_registry and why is it parameterized with 2 arguments?</p>",
+      "text": "Could you please explain why do we use type_id?\nWhat are the static methods inside uvm_component_registry and why is it parameterized with 2 arguments?",
+      "created_at": "2026-09-22T06:36:44.026Z"
+    },
+    {
+      "id": 157067,
+      "author": "dave_59",
+      "raw": "<p>The UVM factory has two basic override mechanisms: a type-based override, which undergoes static compilation checks, and a string-based lookup, which can only be checked at runtime. The registry class accepts two arguments, linking the string to a specific class type.</p>\n<p>The factory plays a crucial role in the overall functioning of the UVM, and I can’t provide a comprehensive explanation here. For a detailed understanding, I recommend reading the verification horizon article mentioned above, as well as the DVCon paper it references.</p>",
+      "text": "The UVM factory has two basic override mechanisms: a type-based override, which undergoes static compilation checks, and a string-based lookup, which can only be checked at runtime. The registry class accepts two arguments, linking the string to a specific class type.\nThe factory plays a crucial role in the overall functioning of the UVM, and I can’t provide a comprehensive explanation here. For a detailed understanding, I recommend reading the verification horizon article mentioned above, as well as the DVCon paper it references.",
+      "created_at": "2026-09-23T07:06:52.411Z"
+    },
+    {
+      "id": 157068,
+      "author": "tan_27",
+      "raw": "<p>Thank you !</p>",
+      "text": "Thank you !",
+      "created_at": "2026-09-23T08:03:52.529Z"
+    }
+  ]
+}

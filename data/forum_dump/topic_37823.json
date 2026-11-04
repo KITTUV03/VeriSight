@@ -1,0 +1,48 @@
+{
+  "id": 37823,
+  "title": "Preparing test plan for SPI protocol in UVM",
+  "slug": "preparing-test-plan-for-spi-protocol-in-uvm",
+  "created_at": "2020-07-09T09:20:11.000Z",
+  "bumped_at": "2026-08-13T19:08:54.829Z",
+  "posts_count": 6,
+  "question_raw": "<p>HI,<br>\nI am doing the verification of SPI protocol using UVM.<br>\nSo how can i make a test plan for the same?</p>",
+  "question_text": "HI,\nI am doing the verification of SPI protocol using UVM.\nSo how can i make a test plan for the same?",
+  "author": "BachanShyamP",
+  "replies": [
+    {
+      "id": 124108,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/preparing-test-plan-for-spi-protocol-in-uvm/37823\">east_wind</a>:</font></em><br>\nA testplan is always based on the verification requirements you have to specify for verifying.<br>\nAnd it is tool-dependent. Because you have to read in to your simulator. The main simulator provider using different formats for this.<br>\nYou can download a testplan for I2C from my webpage</p><aside class=\"onebox allowlistedgeneric\" data-onebox-src=\"https://www.christoph-suehnel.de/services/verification-planning-management/\">\n  <header class=\"source\">\n      <img src=\"https://verificationacademy.com/forums/uploads/default/original/1X/fbdcfe0bb81eaebb065312377a0ced014fa2f4df.png\" class=\"site-icon\" data-dominant-color=\"000000\" width=\"16\" height=\"16\">\n\n      <a href=\"https://www.christoph-suehnel.de/services/verification-planning-management/\" target=\"_blank\" rel=\"noopener nofollow ugc\">christoph-suehnel.de</a>\n  </header>\n\n  <article class=\"onebox-body\">\n    <div class=\"aspect-image\" style=\"--aspect-ratio:690/121;\"><img src=\"https://verificationacademy.com/forums/uploads/default/optimized/1X/9e959cd9e148d0fbe63c32c0648e8858a12ce011_2_690x121.png\" class=\"thumbnail\" data-dominant-color=\"EDD6AB\" width=\"690\" height=\"121\"></div>\n\n<h3><a href=\"https://www.christoph-suehnel.de/services/verification-planning-management/\" target=\"_blank\" rel=\"noopener nofollow ugc\">Dr. Christoph Suehnel - Verification Planning &amp; Management</a></h3>\n\n  <p>Neue Seite</p>\n\n\n  </article>\n\n  <div class=\"onebox-metadata\">\n    \n    \n  </div>\n\n  <div style=\"clear: both\"></div>\n</aside>\n<p>\nThis gives you a flavor how it should lokk like for the SPI. I2C is a lot more complicated.</p>",
+      "text": "In reply to east_wind:\nA testplan is always based on the verification requirements you have to specify for verifying.\nAnd it is tool-dependent. Because you have to read in to your simulator. The main simulator provider using different formats for this.\nYou can download a testplan for I2C from my webpage\n  \n      \n\n      christoph-suehnel.de\n  \n\n  \n    \n\nDr. Christoph Suehnel - Verification Planning & Management\n\n  Neue Seite\n\n\n  \n\n  \n    \n    \n  \n\n  \n\n\nThis gives you a flavor how it should lokk like for the SPI. I2C is a lot more complicated.",
+      "created_at": "2020-07-09T14:19:56.000Z"
+    },
+    {
+      "id": 156986,
+      "author": "atamle",
+      "raw": "<p>Hi Dr. Suehnel, The link to your Verification Planning &amp; Management is broken. Would you please send us a new link or send me a copy? Thank you.</p>",
+      "text": "Hi Dr. Suehnel, The link to your Verification Planning & Management is broken. Would you please send us a new link or send me a copy? Thank you.",
+      "created_at": "2026-08-11T16:45:43.627Z"
+    },
+    {
+      "id": 156987,
+      "author": "pa1_narala",
+      "raw": "<p>Unable to open</p>",
+      "text": "Unable to open",
+      "created_at": "2026-08-11T17:32:24.310Z"
+    },
+    {
+      "id": 156988,
+      "author": "chr_sue",
+      "raw": "<p>My website is again available now.</p>",
+      "text": "My website is again available now.",
+      "created_at": "2026-08-13T12:25:54.153Z"
+    },
+    {
+      "id": 156989,
+      "author": "atamle",
+      "raw": "<p>Thank you! Very helpful and useful info. Much appreciated.</p>",
+      "text": "Thank you! Very helpful and useful info. Much appreciated.",
+      "created_at": "2026-08-13T19:08:54.829Z"
+    }
+  ]
+}

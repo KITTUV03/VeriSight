@@ -1,0 +1,26 @@
+{
+  "id": "apb_multi_defect",
+  "title": "APB slave: data0 upper-16b truncation + RO-register PSLVERR omission",
+  "category_tag": "protocol_and_data_rtl_bug",
+  "source": "VeriSight projects/apb. Ground truth from apb_slave.sv:79-92 intentional defects + apb_spec.md.",
+  "ground_truth_confidence": "high",
+  "inputs": {
+    "spec": "projects/apb/specs/apb_spec.md",
+    "rtl": "projects/apb/rtl/",
+    "tb": "projects/apb/tb/",
+    "log": "projects/apb/logs/sim.log"
+  },
+  "ground_truth": {
+    "classification": "RTL Bug",
+    "category_keywords": ["protocol", "data", "truncat", "pslverr", "functional", "register"],
+    "root_cause_keywords_any": ["truncat", "upper 16", "pwdata[15:0]", "reg_data0", "pslverr", "read-only", "read only", "status register", "16-bit", "16 bit"],
+    "responsible_files": ["apb_slave.sv"],
+    "responsible_lines": {"apb_slave.sv": [77, 115]},
+    "first_causal_error_substring": "Expected=0xdeadbeef Actual=0x0000beef",
+    "expect_insufficient_evidence": false,
+    "notes": "Two independent RTL defects. (1) apb_slave.sv:92 writes reg_data0 <= {16'h0, pwdata[15:0]}, dropping pwdata[31:16] -> read of 0x08 returns 0x0000beef instead of 0xdeadbeef. (2) apb_slave.sv:83 write to RO STATUS reg keeps pslverr<=0 instead of asserting it. Either is an acceptable primary root cause; the first-causal log error is the data0 truncation at 650000 ns."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["alu.sv"]
+  }
+}

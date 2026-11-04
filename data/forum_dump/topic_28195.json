@@ -1,0 +1,146 @@
+{
+  "id": 28195,
+  "title": "UVM Test is not comming out",
+  "slug": "uvm-test-is-not-comming-out",
+  "created_at": "2012-10-22T10:13:04.000Z",
+  "bumped_at": "2026-09-30T10:17:04.487Z",
+  "posts_count": 21,
+  "question_raw": "<p>Hi,</p>\n<p>I am running a UVM testcase having AXI Driver(as one of the interface) to the Memory Control and on the other side is the Memory Block. But when i am running a simple WRITE sequence, the testcase got hanged (means its not coming out).<br>\nThe last message what i am getting in the log file (I enabled UVM_OBJECTION_TRACE)::</p>\n<p>UVM_INFO @ 0: run [OBJTN_TRC] Object uvm_test_top subtracted 1 objection(s)its total(dropped from source object uvm_test_top.tb.v_seqr.simple_vseq): count=0 total=0.<br>\nUVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase</p>\n<p>My basic code is something like this::</p>\n<p>class simple_vtest extends uvm_test<br>\n…<br>\nfunction build_phase(uvm_phase phase)<br>\nuvm_config_wrapper::set(this,“env.v_seqr.run_phase”,“default_sequence”,simple_vseq::type_id::get());<br>\nsuper.build_phase(phase);<br>\nendfunction</p>\n<p>class simple_vseq extends uvm_sequence;<br>\n…<br>\nwrite_seq seq_a;<br>\ntask pre_body();<br>\nuvm_test_done.raise_objection(this);<br>\nendtask<br>\ntask bosy();<br>\n`uvm_do_on(seq_a,p_sequncer.axi_seqr)<br>\nendtask<br>\ntask post_body();<br>\nuvm_test_done.drop_objection(this);<br>\nendtask<br>\nendclass</p>\n<p>I am also getting the display after “uvm_test_done.drop_objection(this)” i.e., inside task post_body.</p>\n<p>And i also tried to finish the test by using $finish from the top after putting some delay.</p>\n<p>module top();<br>\n…<br>\ninitial begin<br>\nrun_test();<br>\nend</p>\n<p>initial begin<br>\n<span class=\"hashtag-raw\">#1000</span><br>\n$finish;<br>\nend<br>\n…<br>\nendmodule</p>\n<p>But this is also not working as its seems like testcase got hang in <span class=\"hashtag-raw\">#0</span> time only.<br>\nCan anyone please help me in this. Its urgent. Please HELP</p>\n<p>Thanks</p>",
+  "question_text": "Hi,\nI am running a UVM testcase having AXI Driver(as one of the interface) to the Memory Control and on the other side is the Memory Block. But when i am running a simple WRITE sequence, the testcase got hanged (means its not coming out).\nThe last message what i am getting in the log file (I enabled UVM_OBJECTION_TRACE)::\nUVM_INFO @ 0: run [OBJTN_TRC] Object uvm_test_top subtracted 1 objection(s)its total(dropped from source object uvm_test_top.tb.v_seqr.simple_vseq): count=0 total=0.\nUVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase\nMy basic code is something like this::\nclass simple_vtest extends uvm_test\n…\nfunction build_phase(uvm_phase phase)\nuvm_config_wrapper::set(this,“env.v_seqr.run_phase”,“default_sequence”,simple_vseq::type_id::get());\nsuper.build_phase(phase);\nendfunction\nclass simple_vseq extends uvm_sequence;\n…\nwrite_seq seq_a;\ntask pre_body();\nuvm_test_done.raise_objection(this);\nendtask\ntask bosy();\n`uvm_do_on(seq_a,p_sequncer.axi_seqr)\nendtask\ntask post_body();\nuvm_test_done.drop_objection(this);\nendtask\nendclass\nI am also getting the display after “uvm_test_done.drop_objection(this)” i.e., inside task post_body.\nAnd i also tried to finish the test by using $finish from the top after putting some delay.\nmodule top();\n…\ninitial begin\nrun_test();\nend\ninitial begin\n#1000\n$finish;\nend\n…\nendmodule\nBut this is also not working as its seems like testcase got hang in #0 time only.\nCan anyone please help me in this. Its urgent. Please HELP\nThanks",
+  "author": "Raj2004",
+  "replies": [
+    {
+      "id": 84069,
+      "author": "Raj2004",
+      "raw": "<p>Hi ,<br>\nPlease anyone can help me in this?</p>\n<p>Thanks</p>",
+      "text": "Hi ,\nPlease anyone can help me in this?\nThanks",
+      "created_at": "2012-10-23T05:50:33.000Z"
+    },
+    {
+      "id": 84070,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/2\">Raj2004</a>:</font></em></p>\n<p>Are you aware in which conditions pre/post_body are called or not called? We generally do not recommend using them because are not aware of the different situations.</p>\n<p>Do you have a typo in your source code, or is it just in your post - bosy() should be body().</p>",
+      "text": "In reply to Raj2004:\nAre you aware in which conditions pre/post_body are called or not called? We generally do not recommend using them because are not aware of the different situations.\nDo you have a typo in your source code, or is it just in your post - bosy() should be body().",
+      "created_at": "2012-10-23T05:56:38.000Z"
+    },
+    {
+      "id": 84071,
+      "author": "Raj2004",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/3\">dave_59</a>:</font></em></p>\n<p>Hi Dave,<br>\nThanks for the reply. bosy() its just a typing mistake.<br>\nSo if i don’t want to use pre/post_body for objection raise and drop then what i suppose to use?</p>",
+      "text": "In reply to dave_59:\nHi Dave,\nThanks for the reply. bosy() its just a typing mistake.\nSo if i don’t want to use pre/post_body for objection raise and drop then what i suppose to use?",
+      "created_at": "2012-10-23T06:00:54.000Z"
+    },
+    {
+      "id": 84072,
+      "author": "Raj2004",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/4\">Raj2004</a>:</font></em></p>\n<p>Hi Dave,</p>\n<p>The Last message what i am getting is ::</p>\n<p>UVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase</p>\n<p>After this its Not completing , just hanged there?<br>\nDo you need any details so please ask?</p>\n<p>Thanks</p>",
+      "text": "In reply to Raj2004:\nHi Dave,\nThe Last message what i am getting is ::\nUVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase\nAfter this its Not completing , just hanged there?\nDo you need any details so please ask?\nThanks",
+      "created_at": "2012-10-23T06:16:10.000Z"
+    },
+    {
+      "id": 84073,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/5\">Raj2004</a>:</font></em></p>\n<p>You can put what was in pre/post_body() as the first/last statements of your body().</p>\n<p>This does not explain your hang. You will have to interrupt it and see what is executing while hanging using the debugger.</p>",
+      "text": "In reply to Raj2004:\nYou can put what was in pre/post_body() as the first/last statements of your body().\nThis does not explain your hang. You will have to interrupt it and see what is executing while hanging using the debugger.",
+      "created_at": "2012-10-23T07:54:35.000Z"
+    },
+    {
+      "id": 84074,
+      "author": "Raj2004",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/6\">dave_59</a>:</font></em></p>\n<p>Hi,</p>\n<p>I also tried fork join_any to come out from the sequence but still getting the same result.</p>\n<p>…<br>\nvirtual task body();<br>\nstarting_phase.raise_objection(this,get_type_name());<br>\nfork<br>\nbegin<br>\n`uvm_do_on(veq_b,p_sequencer.axi_seqr)<br>\nend<br>\nbegin<br>\n<span class=\"hashtag-raw\">#1000</span>;<br>\nend<br>\njoin_any<br>\ndisable fork;<br>\nstarting_phase.drop_objection(this,get_type_name());<br>\nendtask<br>\n…</p>\n<p>Can you please tell me how to use the debugger or please share any link for this.</p>\n<p>Thanks</p>",
+      "text": "In reply to dave_59:\nHi,\nI also tried fork join_any to come out from the sequence but still getting the same result.\n…\nvirtual task body();\nstarting_phase.raise_objection(this,get_type_name());\nfork\nbegin\n`uvm_do_on(veq_b,p_sequencer.axi_seqr)\nend\nbegin\n#1000;\nend\njoin_any\ndisable fork;\nstarting_phase.drop_objection(this,get_type_name());\nendtask\n…\nCan you please tell me how to use the debugger or please share any link for this.\nThanks",
+      "created_at": "2012-10-23T08:17:11.000Z"
+    },
+    {
+      "id": 84075,
+      "author": "Raj2004",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/7\">Raj2004</a>:</font></em></p>\n<p>I am using Cadence NcSim.</p>\n<p>Thanks</p>",
+      "text": "In reply to Raj2004:\nI am using Cadence NcSim.\nThanks",
+      "created_at": "2012-10-23T08:21:42.000Z"
+    },
+    {
+      "id": 84076,
+      "author": "mperyer",
+      "raw": "<p>What the trace is telling you is that for some reason the body() task is completing in zero time and the post_body() task is dropping the objection leading to the end of the run_phase(). The UVM simulation then terminates.</p>\n<p>Therefore you need to look at what is going on in the write_seq and/or the driver. Is there something happening that causes the body() method in write_seq to return in 0 time? Is it something like the driver doing a get(), and the write_seq only sending a single write sequence_item? If this is the case you would get this type of behaviour.</p>\n<p>Something you could try is raising an objection in the run_phase of the test, or another component, to extend the run_phase, this will allow you to see whether your driver is actually doing anything. (Your initial block is outside the UVM and will have no effect).</p>\n<code>\ntask run_phase(uvm_phase phase);\n  phase.raise_objection(this);\n  #1000us;\n  phase.drop_objection(this);\nendtask: run_phase\n</code>",
+      "text": "What the trace is telling you is that for some reason the body() task is completing in zero time and the post_body() task is dropping the objection leading to the end of the run_phase(). The UVM simulation then terminates.\nTherefore you need to look at what is going on in the write_seq and/or the driver. Is there something happening that causes the body() method in write_seq to return in 0 time? Is it something like the driver doing a get(), and the write_seq only sending a single write sequence_item? If this is the case you would get this type of behaviour.\nSomething you could try is raising an objection in the run_phase of the test, or another component, to extend the run_phase, this will allow you to see whether your driver is actually doing anything. (Your initial block is outside the UVM and will have no effect).\n\ntask run_phase(uvm_phase phase);\n  phase.raise_objection(this);\n  #1000us;\n  phase.drop_objection(this);\nendtask: run_phase",
+      "created_at": "2012-10-23T09:35:02.000Z"
+    },
+    {
+      "id": 84077,
+      "author": "nash123",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/9\">mperyer</a>:</font></em></p>\n<p>Hi Raj2004,</p>\n<p>I am seeing a similar issue…my build and connect phases are done…simulation enters run phase and hangs at time 0…Could you figure out what caused your simulation to hang?</p>\n<p>Thanks</p>",
+      "text": "In reply to mperyer:\nHi Raj2004,\nI am seeing a similar issue…my build and connect phases are done…simulation enters run phase and hangs at time 0…Could you figure out what caused your simulation to hang?\nThanks",
+      "created_at": "2012-12-21T03:43:37.000Z"
+    },
+    {
+      "id": 84078,
+      "author": "Raj2004",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/10\">nash123</a>:</font></em></p>\n<p>Hi Nash,</p>\n<p>There may be few possibilities but the important one is may be some thing (process) is running in background, That the same with me.Please check the loops in your code as may be some loops are going in infinite condition or its waiting for some signals or values.</p>\n<p>Thanks<br>\nAnubhaw</p>",
+      "text": "In reply to nash123:\nHi Nash,\nThere may be few possibilities but the important one is may be some thing (process) is running in background, That the same with me.Please check the loops in your code as may be some loops are going in infinite condition or its waiting for some signals or values.\nThanks\nAnubhaw",
+      "created_at": "2012-12-21T11:06:19.000Z"
+    },
+    {
+      "id": 84079,
+      "author": "Ajeetha_Kumari_CVC",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/11\">Raj2004</a>:</font></em></p>\n<p>A wild guess, perhaps one of your raised-objections are not dropped yet? See a way to debug that kind of scenario @ <a href=\"http://www.uvmworld.org/forums/showthread.php?853-How-can-all-opposing-objections-be-printed&amp;p=3543#post3543\" class=\"inline-onebox\" rel=\"noopener nofollow ugc\">404</a></p>\n<p>HTH<br>\nAjeetha, CVC</p><aside class=\"onebox allowlistedgeneric\" data-onebox-src=\"https://www.cvcblr.com/blog/\">\n  <header class=\"source\">\n      <img src=\"https://verificationacademy.com/forums/uploads/default/original/1X/38ed702898cb71507fdc14c334a83db10b85a346.png\" class=\"site-icon\" data-dominant-color=\"333526\" width=\"120\" height=\"120\">\n\n      <a href=\"https://www.cvcblr.com/blog/\" target=\"_blank\" rel=\"noopener nofollow ugc\">My cvcblr</a>\n  </header>\n\n  <article class=\"onebox-body\">\n    \n\n<h3><a href=\"https://www.cvcblr.com/blog/\" target=\"_blank\" rel=\"noopener nofollow ugc\">Verification Course Blog | VeriLog Courses | CVC</a></h3>\n\n  <p>Read our verification course blog to find out more about what CVC can offer, if you are looking for online courses contact us today.</p>\n\n  <p>\n    <span class=\"label1\">Est. reading time: 1 minute</span>\n  </p>\n\n  </article>\n\n  <div class=\"onebox-metadata\">\n    \n    \n  </div>\n\n  <div style=\"clear: both\"></div>\n</aside>\n",
+      "text": "In reply to Raj2004:\nA wild guess, perhaps one of your raised-objections are not dropped yet? See a way to debug that kind of scenario @ 404\nHTH\nAjeetha, CVC\n  \n      \n\n      My cvcblr\n  \n\n  \n    \n\nVerification Course Blog | VeriLog Courses | CVC\n\n  Read our verification course blog to find out more about what CVC can offer, if you are looking for online courses contact us today.\n\n  \n    Est. reading time: 1 minute",
+      "created_at": "2013-01-04T18:38:53.000Z"
+    },
+    {
+      "id": 84080,
+      "author": "nash123",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/12\">ajeetha</a>:</font></em></p>\n<p>Thanks All for the help…I actually had an infinite loop in one of the components</p>",
+      "text": "In reply to ajeetha:\nThanks All for the help…I actually had an infinite loop in one of the components",
+      "created_at": "2013-01-14T07:47:46.000Z"
+    },
+    {
+      "id": 84081,
+      "author": "Bhanu_Prakash",
+      "raw": "<p>Hi all,</p>\n<p>I’m facing the similar issue, forever loops in the monitor are running even after dropping all the objections (enabled objection trace). How to end the testcase, in this case? Can’t we control this using objection mechanism only ?</p>\n<p>Thanks in advance,<br>\nBhanu</p>",
+      "text": "Hi all,\nI’m facing the similar issue, forever loops in the monitor are running even after dropping all the objections (enabled objection trace). How to end the testcase, in this case? Can’t we control this using objection mechanism only ?\nThanks in advance,\nBhanu",
+      "created_at": "2013-08-13T06:21:17.000Z"
+    },
+    {
+      "id": 84082,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/14\">Bhanu Prakash</a>:</font></em></p>\n<p>For debugging, try changing your monitor’s forever loop to break out after some timeout, or by checking some variable that you interactively set when you notice the simulation not ending. Then see what the remaining activity in the testbench is doing.</p>",
+      "text": "In reply to Bhanu Prakash:\nFor debugging, try changing your monitor’s forever loop to break out after some timeout, or by checking some variable that you interactively set when you notice the simulation not ending. Then see what the remaining activity in the testbench is doing.",
+      "created_at": "2013-08-13T23:21:10.000Z"
+    },
+    {
+      "id": 84083,
+      "author": "Bhanu_Prakash",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/15\">dave_59</a>:</font></em></p>\n<p>Thanks Dave,<br>\nI found that objection is raised in main_phase of driver, but in run_phase all the objections are dropped. So the main_phase in env is not completed.</p>\n<p>Is this the reason why this happened?</p>\n<p>Regards,<br>\nBhanu</p>",
+      "text": "In reply to dave_59:\nThanks Dave,\nI found that objection is raised in main_phase of driver, but in run_phase all the objections are dropped. So the main_phase in env is not completed.\nIs this the reason why this happened?\nRegards,\nBhanu",
+      "created_at": "2013-08-14T04:36:00.000Z"
+    },
+    {
+      "id": 84084,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/uvm-test-is-not-comming-out/28195/16\">Bhanu Prakash</a>:</font></em></p>\n<p>Hard to know without seeing your code. But this is why we recommend sticking with the run_phase, especially in your driver. Also, you driver should not be raising and dropping objections.</p>",
+      "text": "In reply to Bhanu Prakash:\nHard to know without seeing your code. But this is why we recommend sticking with the run_phase, especially in your driver. Also, you driver should not be raising and dropping objections.",
+      "created_at": "2013-08-14T05:17:22.000Z"
+    },
+    {
+      "id": 84085,
+      "author": "Mr_Verification",
+      "raw": "<p>In my case, all phases were ending and reporting was run, but the sim never stopped.  What?  Why?</p>\n<p>So I finally looked at uvm_root:</p>\n<p>class uvm_root extends uvm_component;<br>\n// Task: run_test<br>\n//<br>\n// Phases all components through all registered phases. If the optional<br>\n// test_name argument is provided, or if a command-line plusarg,<br>\n// +UVM_TESTNAME=TEST_NAME, is found, then the specified component is created<br>\n// just prior to phasing. The test may contain new verification components or<br>\n// the entire testbench, in which case the test and testbench can be chosen from<br>\n// the command line without forcing recompilation. <strong>If the global (package)<br>\n// variable, finish_on_completion, is set, then $finish is called after<br>\n// phasing completes.<br>\n. . .<br>\n// Variable: finish_on_completion<br>\n//<br>\n// If set, then run_test will call $finish after all phases are executed.</strong><br>\nbit  finish_on_completion = 1;<br>\n. . .<br>\ntask uvm_root::run_test(string test_name=“”);<br>\n. . .<br>\n// if test now defined, create it using common factory<br>\nif (test_name != “”) begin<br>\n$cast(uvm_test_top, factory.create_component_by_name(test_name,<br>\n“”, “uvm_test_top”, null));<br>\n. . .<br>\n// phase runner, isolated from calling process<br>\nfork begin<br>\n// spawn the phase runner task<br>\nphase_runner_proc = process::self();<br>\nuvm_phase::m_run_phases();<br>\nend<br>\njoin_none<br>\n<span class=\"hashtag-raw\">#0</span>; // let the phase runner start<br>\n. . .<br>\nwait (m_phase_all_done == 1);</p>\n<p>// clean up after ourselves<br>\nphase_runner_proc.kill();</p>\n<p>l_rs = uvm_report_server::get_server();<br>\nl_rs.report_summarize();</p>\n<p><strong>if (finish_on_completion)<br>\n$finish;</strong></p>\n<p>endtask</p>\n<p>I was trying to bring up a BFM only full chip TB (CPUs stubbed out).  The Top TB had this code, so UVM wouldn’t finish before the C tests:</p>\n<p>uvm_top.finish_on_completion=0;</p>\n<p>Solution: In full chip tests (non-BFM), C tests now write to a GPIO pin when they are finished.  A UVM monitor waits for write and drops an objection, allowing UVM to finish.  C tests no longer need a cycle count arg and finish_on_completion gets axed!!!</p>",
+      "text": "In my case, all phases were ending and reporting was run, but the sim never stopped.  What?  Why?\nSo I finally looked at uvm_root:\nclass uvm_root extends uvm_component;\n// Task: run_test\n//\n// Phases all components through all registered phases. If the optional\n// test_name argument is provided, or if a command-line plusarg,\n// +UVM_TESTNAME=TEST_NAME, is found, then the specified component is created\n// just prior to phasing. The test may contain new verification components or\n// the entire testbench, in which case the test and testbench can be chosen from\n// the command line without forcing recompilation. If the global (package)\n// variable, finish_on_completion, is set, then $finish is called after\n// phasing completes.\n. . .\n// Variable: finish_on_completion\n//\n// If set, then run_test will call $finish after all phases are executed.\nbit  finish_on_completion = 1;\n. . .\ntask uvm_root::run_test(string test_name=“”);\n. . .\n// if test now defined, create it using common factory\nif (test_name != “”) begin\n$cast(uvm_test_top, factory.create_component_by_name(test_name,\n“”, “uvm_test_top”, null));\n. . .\n// phase runner, isolated from calling process\nfork begin\n// spawn the phase runner task\nphase_runner_proc = process::self();\nuvm_phase::m_run_phases();\nend\njoin_none\n#0; // let the phase runner start\n. . .\nwait (m_phase_all_done == 1);\n// clean up after ourselves\nphase_runner_proc.kill();\nl_rs = uvm_report_server::get_server();\nl_rs.report_summarize();\nif (finish_on_completion)\n$finish;\nendtask\nI was trying to bring up a BFM only full chip TB (CPUs stubbed out).  The Top TB had this code, so UVM wouldn’t finish before the C tests:\nuvm_top.finish_on_completion=0;\nSolution: In full chip tests (non-BFM), C tests now write to a GPIO pin when they are finished.  A UVM monitor waits for write and drops an objection, allowing UVM to finish.  C tests no longer need a cycle count arg and finish_on_completion gets axed!!!",
+      "created_at": "2016-07-09T16:36:14.000Z"
+    },
+    {
+      "id": 157092,
+      "author": "tan_27",
+      "raw": "<p>Could you please explain the usage of UVM_OBJECTION_TRACE and provide a simple code example for better understanding?</p>",
+      "text": "Could you please explain the usage of UVM_OBJECTION_TRACE and provide a simple code example for better understanding?",
+      "created_at": "2026-09-30T04:07:42.196Z"
+    },
+    {
+      "id": 157094,
+      "author": "MichaelP",
+      "raw": "<aside class=\"quote no-group\" data-username=\"tan_27\" data-post=\"19\" data-topic=\"28195\">\n<div class=\"title\">\n<div class=\"quote-controls\"></div>\n<img alt=\"\" width=\"24\" height=\"24\" src=\"https://verificationacademy.com/forums/letter_avatar_proxy/v4/letter/t/df788c/48.png\" class=\"avatar\"> tan_27:</div>\n<blockquote>\n<p>UVM_OBJECTION_TRACE</p>\n</blockquote>\n</aside>\n<p>+UVM_OBJECTION_TRACE<br>\nis a command-line plusarg used in the UVM to trace objection activity and debug simulation hangs or premature terminations.<br>\nAdd it to your test command-line, and run the test, finally open the test log: you would see many prints to the test log, which are tracking the rise and drop of each objection in a UVM test.<br>\nIn SoC/Full-Chip environments those prints could be quite overwhelming…</p>\n<p>Please first try to read on UVM objection mechanism:</p><aside class=\"onebox allowlistedgeneric\" data-onebox-src=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_objection-svh.html\">\n  <header class=\"source\">\n\n      <a href=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_objection-svh.html\" target=\"_blank\" rel=\"noopener\">verificationacademy.com</a>\n  </header>\n\n  <article class=\"onebox-body\">\n    \n\n<h3><a href=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_objection-svh.html\" target=\"_blank\" rel=\"noopener\">Objection Mechanism</a></h3>\n\n\n\n  </article>\n\n  <div class=\"onebox-metadata\">\n    \n    \n  </div>\n\n  <div style=\"clear: both\"></div>\n</aside>\n\n<p>And on UVM command line processor which receives this TRACE plusarg:</p><aside class=\"onebox allowlistedgeneric\" data-onebox-src=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_cmdline_processor-svh.html\">\n  <header class=\"source\">\n\n      <a href=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_cmdline_processor-svh.html\" target=\"_blank\" rel=\"noopener\">verificationacademy.com</a>\n  </header>\n\n  <article class=\"onebox-body\">\n    \n\n<h3><a href=\"https://verificationacademy.com/verification-methodology-reference/uvm/docs_1.2/html/files/base/uvm_cmdline_processor-svh.html\" target=\"_blank\" rel=\"noopener\">uvm_cmdline_processor</a></h3>\n\n\n\n  </article>\n\n  <div class=\"onebox-metadata\">\n    \n    \n  </div>\n\n  <div style=\"clear: both\"></div>\n</aside>\n\n<p>I don’t have a simple code example, but sure you could find one on the Internet or ask one of the chatbots to generate one.</p>",
+      "text": "tan_27:\n\nUVM_OBJECTION_TRACE\n\n\n+UVM_OBJECTION_TRACE\nis a command-line plusarg used in the UVM to trace objection activity and debug simulation hangs or premature terminations.\nAdd it to your test command-line, and run the test, finally open the test log: you would see many prints to the test log, which are tracking the rise and drop of each objection in a UVM test.\nIn SoC/Full-Chip environments those prints could be quite overwhelming…\nPlease first try to read on UVM objection mechanism:\n  \n\n      verificationacademy.com\n  \n\n  \n    \n\nObjection Mechanism\n\n\n\n  \n\n  \n    \n    \n  \n\n  \n\n\nAnd on UVM command line processor which receives this TRACE plusarg:\n  \n\n      verificationacademy.com\n  \n\n  \n    \n\nuvm_cmdline_processor\n\n\n\n  \n\n  \n    \n    \n  \n\n  \n\n\nI don’t have a simple code example, but sure you could find one on the Internet or ask one of the chatbots to generate one.",
+      "created_at": "2026-09-30T06:42:43.299Z"
+    }
+  ]
+}

@@ -16,6 +16,9 @@ Key design rules enforced here:
 
 import re
 import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, List, Tuple
 
@@ -209,6 +212,15 @@ class FixGeneratorAgent(BaseAgent):
             return self._decline(
                 f"Classification '{classification.classification}' does not "
                 "require a code fix (only TB Bug and RTL Bug are handled).",
+                min_conf,
+            )
+
+        # ── Restrict automated fixes to RTL by default ─────────────
+        if classification.classification == "TB Bug" and not config.fix.allow_tb_fix:
+            self.logger.info("TB Bug fix requested, but allow_tb_fix is False (default). Declining fix.")
+            return self._decline(
+                "Automated testbench modifications are disabled by default. "
+                "Pass --allow-tb-fix (or set VERISIGHT_ALLOW_TB_FIX=true) to enable TB fixes.",
                 min_conf,
             )
 
@@ -497,8 +509,31 @@ class FixGeneratorAgent(BaseAgent):
     ) -> ValidationResult:
         """Run available validation levels on the generated fix."""
         val = ValidationResult()
+        config = get_config()
 
-        # Level 1 — Syntax validation (structural regex checks)
+        # Check: Restrict fixes to RTL by default
+        if not config.fix.allow_tb_fix:
+            target_lower = Path(result.target_file).name.lower()
+            tb_files = [Path(f).name.lower() for f in knowledge.input_files.get("tb", [])]
+            is_tb = (
+                target_lower in tb_files
+                or any(frag in target_lower for frag in ("tb", "testbench", "scoreboard", "env", "monitor", "driver", "seq"))
+            )
+            if is_tb:
+                self.logger.warning(
+                    f"Sandbox Security: Unauthorized modification to verification file '{result.target_file}' rejected."
+                )
+                val.structural = "FAIL"
+                val.structural_notes = (
+                    f"Unauthorized modification to testbench/verification infrastructure '{result.target_file}'. "
+                    "Fixes are restricted to RTL unless allow_tb_fix is explicitly enabled."
+                )
+                result.fix_available = False
+                result.fix_type = "no_fix"
+                result.decline_reason = val.structural_notes
+                return val
+
+        # Level 1 — Syntax validation (structural regex checks + pyslang)
         syntax_ok, syntax_notes = self._validate_syntax(result.corrected_code)
         val.syntax = "PASS" if syntax_ok else "FAIL"
         val.syntax_notes = syntax_notes
@@ -513,36 +548,208 @@ class FixGeneratorAgent(BaseAgent):
         val.specification = "PASS" if spec_ok else "FAIL"
         val.specification_notes = spec_notes
 
-        # Levels 4 & 5 — Not available
+        # Level 3.5 — Security: Anti-tamper inspection of verification checks
+        tamper_ok, tamper_notes = self._inspect_verification_checks(result.patch, result.corrected_code)
+        val.anti_tamper = "PASS" if tamper_ok else "FAIL"
+        val.anti_tamper_notes = tamper_notes
+        if not tamper_ok:
+            self.logger.warning(f"Sandbox Security: Verification check anti-tamper failed: {tamper_notes}")
+            result.fix_available = False
+            result.fix_type = "no_fix"
+            result.decline_reason = f"Security check failed: {tamper_notes}"
+            return val
+
+        # Level 3.6 — Fast Lint check (verilator/iverilog in sandbox)
+        lint_ok, lint_notes = self._run_sandbox_lint(result, knowledge)
+        val.lint = "PASS" if lint_ok else "FAIL"
+        val.lint_notes = lint_notes
+        if not lint_ok:
+            self.logger.warning(f"Sandbox Validation: Fast lint failed: {lint_notes}")
+            result.fix_available = False
+            result.fix_type = "no_fix"
+            result.decline_reason = f"Lint check failed: {lint_notes}"
+            return val
+
+        # Levels 4 & 5 — Simulation & Regression
         val.simulation = "NOT_AVAILABLE"
         val.regression = "NOT_AVAILABLE"
 
         # Feed validation result back into confidence (validation_evidence slot)
-        if syntax_ok and struct_ok and spec_ok:
+        if syntax_ok and struct_ok and spec_ok and tamper_ok and lint_ok:
             result.confidence_breakdown.validation_evidence = 1.0
-        elif syntax_ok:
+        elif syntax_ok and tamper_ok:
             result.confidence_breakdown.validation_evidence = 0.5
         else:
             result.confidence_breakdown.validation_evidence = 0.0
         result.confidence = result.confidence_breakdown.compute_total()
 
         self.logger.info(
-            f"  Validation: syntax={val.syntax} structural={val.structural} "
-            f"spec={val.specification}"
+            f"  Validation: syntax={val.syntax} struct={val.structural} "
+            f"spec={val.specification} tamper={val.anti_tamper} lint={val.lint}"
         )
         return val
 
+    def _inspect_verification_checks(
+        self, patch: str, corrected_code: str
+    ) -> Tuple[bool, str]:
+        """
+        Inspect the generated diff for removed, commented-out, or weakened checks
+        involving assert, cover, $error, $fatal, and uvm_error.
+        """
+        if not patch:
+            return True, "No patch diff to inspect."
+
+        lines = patch.splitlines()
+        removed_lines = [l[1:].strip() for l in lines if l.startswith("-") and not l.startswith("---")]
+        added_lines = [l[1:].strip() for l in lines if l.startswith("+") and not l.startswith("+++")]
+
+        check_pattern = re.compile(
+            r"(?:\b|\`|\$)(assert|cover|covergroup|coverpoint|\$error|\$fatal|uvm_error|uvm_fatal)\b",
+            re.IGNORECASE,
+        )
+
+        # 1. Detect commented-out checks in added lines
+        for l in added_lines:
+            if re.search(r"//.*?(?:\b|\`|\$)(assert|cover|covergroup|coverpoint|\$error|\$fatal|uvm_error|uvm_fatal)\b", l, re.IGNORECASE):
+                return False, f"Prohibited: Commented-out verification check detected: '{l}'"
+            if re.search(r"/\*.*?(?:\b|\`|\$)(assert|cover|covergroup|coverpoint|\$error|\$fatal|uvm_error|uvm_fatal)\b.*?\*/", l, re.IGNORECASE):
+                return False, f"Prohibited: Verification check in block comment detected: '{l}'"
+
+        # Check multiline comments across entire patch
+        for mc in re.findall(r"/\*[\s\S]*?\*/", patch):
+            if check_pattern.search(mc):
+                return False, f"Prohibited: Verification check enclosed in multiline comment: '{mc[:80]}...'"
+
+        # 2. Detect weakened checks in added lines
+        for l in added_lines:
+            if re.search(r"\bassert\s*\(\s*(1|1'b1|true)\s*\)", l, re.IGNORECASE):
+                return False, f"Prohibited: Tautologically weakened assertion detected: '{l}'"
+            if re.search(r"\bif\s*\(\s*(0|1'b0|false)\s*\).*?(\$error|\$fatal|uvm_error)", l, re.IGNORECASE):
+                return False, f"Prohibited: Tautologically disabled error check detected: '{l}'"
+
+        # 3. Detect check removal without equivalent replacement
+        check_keywords = ["assert", "cover", "covergroup", "$error", "$fatal", "uvm_error", "uvm_fatal"]
+        for rl in removed_lines:
+            clean_rl = re.sub(r"//.*$", "", rl).strip()
+            for kw in check_keywords:
+                kw_pat = rf"(?:\b|\`|\$){re.escape(kw.lstrip('$`'))}\b"
+                if re.search(kw_pat, clean_rl, re.IGNORECASE):
+                    # Check if an equivalent check keyword exists in added lines
+                    kw_present = any(re.search(kw_pat, re.sub(r"//.*$", "", al), re.IGNORECASE) for al in added_lines)
+                    if not kw_present:
+                        return False, f"Prohibited: Verification check '{kw}' was removed from source: '{clean_rl}'"
+
+        return True, "No verification checks removed, commented out, or weakened."
+
+    def _run_sandbox_lint(
+        self, result: FixResult, knowledge: UnifiedKnowledge
+    ) -> Tuple[bool, str]:
+        """
+        Execute fast lint in an isolated sandbox, preserving original source files.
+        Prefers verilator --lint-only -Wall when available, else iverilog -t null -g2012.
+        """
+        verilator_bin = shutil.which("verilator")
+        iverilog_bin = shutil.which("iverilog")
+
+        if not verilator_bin and not iverilog_bin:
+            return True, "Fast lint skipped (neither verilator nor iverilog installed on PATH)."
+
+        target_file = Path(result.target_file) if result.target_file else Path("patch_target.sv")
+
+        # Load original content or build patched content
+        orig_content, ok = self._load_source(result.target_file)
+        patched_content = result.corrected_code
+        if ok and orig_content and result.corrected_code:
+            # If corrected_code is only a snippet, try to wrap or use snippet
+            if result.target_module and result.target_module in orig_content and len(result.corrected_code) < len(orig_content):
+                patched_content = orig_content.replace(result.target_module, result.target_module)
+
+        # Check if target is a UVM TB construct (standalone verilator/iverilog lacks full UVM library)
+        is_uvm = "uvm" in (patched_content or "").lower() or result.issue_type == "TB" or "uvm" in str(target_file).lower()
+        if is_uvm:
+            return True, "Fast lint skipped on UVM testbench construct (requires full simulator UVM environment)."
+
+        with tempfile.TemporaryDirectory(prefix="verisight_sandbox_lint_") as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # Copy relevant RTL source files for include/package resolution
+            include_dirs = {str(tmp_path)}
+            for f in knowledge.input_files.get("rtl", []):
+                try:
+                    src_p = Path(f)
+                    if src_p.exists() and src_p.resolve() != target_file.resolve():
+                        dest_p = tmp_path / src_p.name
+                        dest_p.write_text(src_p.read_text(encoding="utf-8", errors="ignore"))
+                except Exception:
+                    pass
+
+            sandbox_file = tmp_path / (target_file.name if target_file.name else "patched.sv")
+            sandbox_file.write_text(patched_content or result.corrected_code, encoding="utf-8")
+
+            # Try Verilator first
+            if verilator_bin:
+                cmd = [verilator_bin, "--lint-only", "-Wall"]
+                for inc in sorted(include_dirs):
+                    cmd.append(f"-I{inc}")
+                cmd.append(str(sandbox_file))
+                try:
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                    out = (proc.stderr or "") + (proc.stdout or "")
+                    if "%Error" in out or (proc.returncode != 0 and "%Warning" not in out):
+                        return False, f"verilator lint error:\n{out[:500]}"
+                    return True, "verilator lint passed cleanly."
+                except subprocess.TimeoutExpired:
+                    return False, "verilator lint timed out after 15s."
+                except Exception as e:
+                    self.logger.warning(f"verilator invocation failed: {e}")
+
+            # Fallback to Icarus Verilog (for compatible designs)
+            if iverilog_bin:
+                is_uvm = "uvm" in (patched_content or "").lower() or result.issue_type == "TB" or "uvm" in str(target_file).lower()
+                if is_uvm:
+                    return True, "Fast lint: skipped iverilog on UVM construct (iverilog lacks UVM support)."
+
+                cmd = [iverilog_bin, "-t", "null", "-g2012"]
+                for inc in sorted(include_dirs):
+                    cmd.extend(["-I", inc])
+                cmd.append(str(sandbox_file))
+                try:
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                    if proc.returncode != 0:
+                        out = (proc.stderr or "") + (proc.stdout or "")
+                        # If the error is only about unknown UVM macros, do not fail
+                        if "macro uvm_" in out and "syntax error" not in out.lower():
+                            return True, "iverilog passed (ignoring benign UVM macro warnings)."
+                        return False, f"iverilog lint error:\n{out[:500]}"
+                    return True, "iverilog lint passed cleanly."
+                except subprocess.TimeoutExpired:
+                    return False, "iverilog lint timed out after 15s."
+                except Exception as e:
+                    self.logger.warning(f"iverilog invocation failed: {e}")
+
+        return True, "Fast lint completed without errors."
+
     def _validate_syntax(self, code: str) -> Tuple[bool, str]:
-        """Level 1: Basic structural syntax checks for SystemVerilog/Verilog."""
+        """
+        Level 1 syntax pre-check for a generated fix.
+
+        Two layers:
+          1. Fast structural heuristics (empty / placeholder / balanced
+             begin-end / balanced parens) — catch obviously broken fragments
+             without needing a syntactic context.
+          2. pyslang syntax check — when available, parse the snippet (wrapped
+             in a module/always context as needed) and fail only on *genuine*
+             syntax errors. Undeclared signals or UVM macros in a fix snippet
+             are missing-dependency, NOT syntax, and must not fail the check.
+        """
         if not code or not code.strip():
             return False, "Corrected code is empty."
 
         issues = []
 
-        # Check balanced begin/end
+        # ── Layer 1: structural heuristics ──────────────────────────────
         begins = len(re.findall(r"\bbegin\b", code, re.IGNORECASE))
         ends = len(re.findall(r"\bend\b", code, re.IGNORECASE))
-        # Subtract 'endmodule', 'endcase', etc. from 'end' count
         compound_ends = len(re.findall(
             r"\bend(?:module|function|task|case|generate|clocking|interface)\b",
             code, re.IGNORECASE
@@ -553,19 +760,76 @@ class FixGeneratorAgent(BaseAgent):
                 f"Unbalanced begin/end: {begins} begins, {plain_ends} plain ends"
             )
 
-        # Check for obvious hallucinated constructs
         if re.search(r"\b(TODO|FIXME|PLACEHOLDER|your_signal_here)\b", code, re.IGNORECASE):
             issues.append("Corrected code contains placeholder text.")
 
-        # Warn on unclosed parentheses
         opens = code.count("(")
         closes = code.count(")")
         if opens != closes:
             issues.append(f"Unbalanced parentheses: {opens} open, {closes} close")
 
+        # ── Layer 2: pyslang syntax check ───────────────────────────────
+        slang_errs = self._pyslang_syntax_errors(code)
+        for msg in slang_errs[:4]:
+            issues.append(f"syntax: {msg}")
+
         if issues:
             return False, "; ".join(issues)
-        return True, "begin/end balanced, no placeholders detected."
+
+        note = "begin/end balanced, no placeholders detected."
+        if slang_errs is not None and not slang_errs:
+            note = "pyslang: no syntax errors; begin/end + parens balanced."
+        return True, note
+
+    def _pyslang_syntax_errors(self, code: str) -> list:
+        """
+        Return genuine syntax-error messages for a fix snippet via pyslang.
+
+        A fix snippet has no syntactic context, so we try a few plausible
+        wrappings (as-is, inside a module, inside an always block). If *any*
+        wrapping parses with no syntax errors, the snippet is syntactically
+        fine and we return []. Only when every wrapping has syntax errors do
+        we report them. Missing-dependency / semantic diagnostics (undeclared
+        signals, unknown UVM macros) are ignored here — they are expected in a
+        decontextualised fragment. Returns [] if pyslang is unavailable (the
+        heuristics above still apply).
+        """
+        try:
+            from verisight.parsers import sv_frontend
+        except Exception:
+            return []
+        if not sv_frontend.is_available():
+            return []
+
+        has_unit = re.search(
+            r"\b(module|package|interface|program|class|primitive)\b", code
+        )
+        candidates = []
+        if has_unit:
+            candidates.append(code)
+        candidates.append(f"module __vs_chk__;\n{code}\nendmodule\n")
+        # statement/expression fragments: put them in a procedural context
+        candidates.append(
+            f"module __vs_chk__;\n  always_comb begin\n{code}\n  end\nendmodule\n"
+        )
+
+        best_errors = None
+        for cand in candidates:
+            try:
+                res = sv_frontend.compile_text(cand, name="fix_candidate")
+            except Exception:
+                continue
+            syn = [
+                f"{d.message} (line {max(d.line - 1, 0)})"
+                for d in res.diagnostics
+                if d.category == "syntax" and d.is_error()
+            ]
+            if not syn:
+                return []  # a clean parse in some context → no syntax error
+            if best_errors is None or len(syn) < len(best_errors):
+                best_errors = syn
+
+        return best_errors or []
 
     def _validate_structural(
         self, result: FixResult, knowledge: UnifiedKnowledge

@@ -9,6 +9,8 @@ overrides, config DB usage, and coverage models.
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+from verisight.schemas.parser_schema import ParserStatus
+
 
 class TransactionField(BaseModel):
     """A field in a UVM transaction/sequence_item."""
@@ -218,4 +220,8 @@ class TBKnowledge(BaseModel):
     )
     packages: List[str] = Field(
         default_factory=list, description="Package names"
+    )
+    parser_status: ParserStatus = Field(
+        default_factory=ParserStatus,
+        description="Parser backend, degraded/partial status, and structured diagnostics"
     )

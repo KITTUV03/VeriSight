@@ -1,0 +1,20 @@
+{
+  "id": 51661,
+  "title": "UVM_SEQ_ARB_WEIGHTED Arbitration: How Does It Work and When Should It Be Used?",
+  "slug": "uvm-seq-arb-weighted-arbitration-how-does-it-work-and-when-should-it-be-used",
+  "created_at": "2026-06-08T04:44:28.690Z",
+  "bumped_at": "2026-06-08T14:45:50.711Z",
+  "posts_count": 2,
+  "question_raw": "<p>I’m trying to understand the <code>UVM_SEQ_ARB_WEIGHTED</code> arbitration mode in UVM.</p>\n<ul>\n<li>\n<p>What exactly does <code>UVM_SEQ_ARB_WEIGHTED</code> do?</p>\n</li>\n<li>\n<p>How does the sequencer decide which sequence gets the grant when this mode is selected?</p>\n</li>\n<li>\n<p>How are sequence priorities used in the weighted arbitration algorithm?</p>\n</li>\n<li>\n<p>How is it different from <code>UVM_SEQ_ARB_FIFO</code> and <code>UVM_SEQ_ARB_STRICT_FIFO</code>?</p>\n</li>\n<li>\n<p>In what practical verification scenarios would you choose <code>UVM_SEQ_ARB_WEIGHTED</code> over the other arbitration modes?</p>\n</li>\n</ul>\n<p>I’m looking for a conceptual explanation of the arbitration flow rather than a source-code walkthrough.</p>",
+  "question_text": "I’m trying to understand the UVM_SEQ_ARB_WEIGHTED arbitration mode in UVM.\n\n\nWhat exactly does UVM_SEQ_ARB_WEIGHTED do?\n\n\nHow does the sequencer decide which sequence gets the grant when this mode is selected?\n\n\nHow are sequence priorities used in the weighted arbitration algorithm?\n\n\nHow is it different from UVM_SEQ_ARB_FIFO and UVM_SEQ_ARB_STRICT_FIFO?\n\n\nIn what practical verification scenarios would you choose UVM_SEQ_ARB_WEIGHTED over the other arbitration modes?\n\n\nI’m looking for a conceptual explanation of the arbitration flow rather than a source-code walkthrough.",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156825,
+      "author": "dave_59",
+      "raw": "<p>In <code>UVM_SEQ_ARB_WEIGHTED</code> mode, the sequence “<em>priorities</em>” are not really priorities anymore. They are treated as weights in a weighted random selection among the pending requests. A sequence with a larger value is more likely to be selected, but it is not guaranteed to win over a sequence with a smaller value. In that mode, insertion order also does not matter, no FIFO. You could use this mode to statistically model realistic protocol traffic.</p>\n<p>See <a href=\"https://cluelogic.com/2015/04/uvm-tutorial-for-candy-lovers-sequence-arbitration/\" class=\"inline-onebox\">UVM Tutorial for Candy Lovers – 26. Sequence Arbitration – ClueLogic</a></p>",
+      "text": "In UVM_SEQ_ARB_WEIGHTED mode, the sequence “priorities” are not really priorities anymore. They are treated as weights in a weighted random selection among the pending requests. A sequence with a larger value is more likely to be selected, but it is not guaranteed to win over a sequence with a smaller value. In that mode, insertion order also does not matter, no FIFO. You could use this mode to statistically model realistic protocol traffic.\nSee UVM Tutorial for Candy Lovers – 26. Sequence Arbitration – ClueLogic",
+      "created_at": "2026-06-08T14:45:50.711Z"
+    }
+  ]
+}

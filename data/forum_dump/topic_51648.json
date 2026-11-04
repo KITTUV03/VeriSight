@@ -1,0 +1,27 @@
+{
+  "id": 51648,
+  "title": "Why Is Scoreboard Kept Separate from Agent in UVM?",
+  "slug": "why-is-scoreboard-kept-separate-from-agent-in-uvm",
+  "created_at": "2026-05-28T10:22:54.612Z",
+  "bumped_at": "2026-06-03T05:49:04.986Z",
+  "posts_count": 3,
+  "question_raw": "<h1><a name=\"p-156789-why-is-scoreboard-kept-separate-from-agent-in-uvm-1\" class=\"anchor\" href=\"#p-156789-why-is-scoreboard-kept-separate-from-agent-in-uvm-1\" aria-label=\"Heading link\"></a>Why Is Scoreboard Kept Separate from Agent in UVM?</h1>\n<p>In traditional SystemVerilog testbenches, generator, driver, monitor, and scoreboard are usually placed directly inside the environment.</p>\n<p>In UVM:</p>\n<ul>\n<li>\n<p>sequencer, driver, and monitor are grouped into an agent</p>\n</li>\n<li>\n<p>scoreboard is kept separate inside the environment</p>\n</li>\n</ul>\n<p>I understand why protocol-related components are grouped into an agent, but I am confused specifically about the scoreboard.</p>\n<p>Because scoreboards are also often protocol/DUT-specific, for example:</p>\n<ul>\n<li>\n<p>FIFO scoreboard</p>\n</li>\n<li>\n<p>RAM scoreboard</p>\n</li>\n<li>\n<p>AES scoreboard</p>\n</li>\n<li>\n<p>HMAC scoreboard</p>\n</li>\n<li>\n<p>AXI scoreboard</p>\n</li>\n<li>\n<p>APB scoreboard</p>\n</li>\n</ul>\n<p>So my question is:</p>\n<p>Why did UVM inventors keep the scoreboard separate from the agent instead of placing it inside the agent too?</p>\n<p>What exact architectural or reusability problem does this separation solve?</p>",
+  "question_text": "Why Is Scoreboard Kept Separate from Agent in UVM?\nIn traditional SystemVerilog testbenches, generator, driver, monitor, and scoreboard are usually placed directly inside the environment.\nIn UVM:\n\n\nsequencer, driver, and monitor are grouped into an agent\n\n\nscoreboard is kept separate inside the environment\n\n\nI understand why protocol-related components are grouped into an agent, but I am confused specifically about the scoreboard.\nBecause scoreboards are also often protocol/DUT-specific, for example:\n\n\nFIFO scoreboard\n\n\nRAM scoreboard\n\n\nAES scoreboard\n\n\nHMAC scoreboard\n\n\nAXI scoreboard\n\n\nAPB scoreboard\n\n\nSo my question is:\nWhy did UVM inventors keep the scoreboard separate from the agent instead of placing it inside the agent too?\nWhat exact architectural or reusability problem does this separation solve?",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156790,
+      "author": "dave_59",
+      "raw": "<p>This might just be a difference in terminology.</p>\n<p><em>Scoreboards</em> are typically connected to multiple agents to ensure the end-to-end correctness of the system. These agents analyze the flow of data through transactions.</p>\n<p>Protocol <em>checkers</em> can be embedded within agents or integrated into the SystemVerilog interfaces they connect to. These checks can be implemented using assertions.</p>",
+      "text": "This might just be a difference in terminology.\nScoreboards are typically connected to multiple agents to ensure the end-to-end correctness of the system. These agents analyze the flow of data through transactions.\nProtocol checkers can be embedded within agents or integrated into the SystemVerilog interfaces they connect to. These checks can be implemented using assertions.",
+      "created_at": "2026-05-28T16:50:59.805Z"
+    },
+    {
+      "id": 156799,
+      "author": "Hey_Verif26",
+      "raw": "<p>can you please, elaborate how i can integrate scoreboard and system verilog interface for multiple protocols ?</p>",
+      "text": "can you please, elaborate how i can integrate scoreboard and system verilog interface for multiple protocols ?",
+      "created_at": "2026-06-03T05:49:04.986Z"
+    }
+  ]
+}

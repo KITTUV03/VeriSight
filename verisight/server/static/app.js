@@ -14,6 +14,8 @@
     systemStatus: null,
     currentPatch: null,
     targetRtlFile: 'examples/rtl/alu.sv',
+    uploadedRtlFiles: [],
+    uploadedUpfFile: null,
   };
 
   // DOM Elements Cache
@@ -37,6 +39,17 @@
     btnLaunchSim: document.getElementById('btnLaunchSim'),
     simSpinner: document.getElementById('simSpinner'),
     btnSimText: document.getElementById('btnSimText'),
+    // Multi-File & UPF Elements
+    analysisModeBadge: document.getElementById('analysisModeBadge'),
+    fileCountBadge: document.getElementById('fileCountBadge'),
+    rtlDropzone: document.getElementById('rtlDropzone'),
+    rtlFileInput: document.getElementById('rtlFileInput'),
+    rtlChipsContainer: document.getElementById('rtlChipsContainer'),
+    topModuleInput: document.getElementById('topModuleInput'),
+    upfDropzone: document.getElementById('upfDropzone'),
+    upfFileInput: document.getElementById('upfFileInput'),
+    upfChipsContainer: document.getElementById('upfChipsContainer'),
+    upfPathInput: document.getElementById('upfPathInput'),
     // Terminal
     terminal: document.getElementById('terminalOutput'),
     btnClearTerm: document.getElementById('btnClearTerm'),
@@ -82,8 +95,8 @@
   function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚡';
-    toast.innerHTML = `<span style="color:var(--cyan-bright);">${icon}</span> <span>${message}</span>`;
+    const icon = type === 'success' ? '[OK]' : type === 'error' ? '[ERR]' : '[INFO]';
+    toast.innerHTML = `<span style="color:var(--cyan-bright);font-weight:700;margin-right:6px;">${icon}</span> <span>${message}</span>`;
     els.toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -162,46 +175,180 @@
     }
   }
 
+  function updateModeBadge() {
+    const hasUpf = state.uploadedUpfFile !== null || (els.upfPathInput && els.upfPathInput.value.trim() !== '');
+    if (els.analysisModeBadge) {
+      if (hasUpf) {
+        els.analysisModeBadge.textContent = '⚡ RTL + UPF Power-Aware';
+        els.analysisModeBadge.className = 'card-badge mode-badge-power';
+      } else {
+        els.analysisModeBadge.textContent = 'RTL-Only Analysis';
+        els.analysisModeBadge.className = 'card-badge mode-badge-rtl';
+      }
+    }
+    const rtlCount = state.uploadedRtlFiles.length > 0 ? state.uploadedRtlFiles.length : (els.rtlInput.value.trim() ? 1 : 0);
+    if (els.fileCountBadge) {
+      els.fileCountBadge.textContent = `${rtlCount} RTL File${rtlCount === 1 ? '' : 's'}`;
+    }
+  }
+
+  function renderRtlChips() {
+    if (!els.rtlChipsContainer) return;
+    els.rtlChipsContainer.innerHTML = '';
+    state.uploadedRtlFiles.forEach((file, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip';
+      const sizeKb = (file.size / 1024).toFixed(1);
+      chip.innerHTML = `
+        <span class="file-chip-name">${file.name}</span>
+        <span class="file-chip-size text-muted">(${sizeKb} KB)</span>
+        <span class="file-chip-remove" title="Remove file" data-idx="${idx}">&times;</span>
+      `;
+      chip.querySelector('.file-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.uploadedRtlFiles.splice(idx, 1);
+        renderRtlChips();
+        updateModeBadge();
+      });
+      els.rtlChipsContainer.appendChild(chip);
+    });
+    updateModeBadge();
+  }
+
+  function renderUpfChip() {
+    if (!els.upfChipsContainer) return;
+    els.upfChipsContainer.innerHTML = '';
+    if (state.uploadedUpfFile) {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip chip-upf';
+      const sizeKb = (state.uploadedUpfFile.size / 1024).toFixed(1);
+      chip.innerHTML = `
+        <span class="file-chip-name">⚡ ${state.uploadedUpfFile.name}</span>
+        <span class="file-chip-size text-muted">(${sizeKb} KB)</span>
+        <span class="file-chip-remove" title="Remove UPF">&times;</span>
+      `;
+      chip.querySelector('.file-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.uploadedUpfFile = null;
+        if (els.upfFileInput) els.upfFileInput.value = '';
+        renderUpfChip();
+        updateModeBadge();
+      });
+      els.upfChipsContainer.appendChild(chip);
+    }
+    updateModeBadge();
+  }
+
   // Launch Simulation
   async function launchSimulation() {
-    const rtl = els.rtlInput.value.trim();
+    let rtl = els.rtlInput.value.trim();
     const tb = els.tbInput.value.trim();
     const spec = els.specInput.value.trim();
+    let upf = els.upfPathInput ? els.upfPathInput.value.trim() : '';
+    const topMod = els.topModuleInput ? els.topModuleInput.value.trim() : '';
     const simulator = els.simSelect.value;
     const sec = els.secSelect.value;
     const outDir = els.outDirInput.value.trim();
 
-    if (!rtl || !tb) {
-      showToast('Please specify both RTL and Testbench paths', 'error');
+    if (!tb) {
+      showToast('Please specify a Testbench path (.sv)', 'error');
       return;
     }
 
-    state.targetRtlFile = rtl;
+    if (state.uploadedRtlFiles.length === 0 && !rtl) {
+      showToast('Please select or specify at least one RTL source file', 'error');
+      return;
+    }
 
     // UI Loading state
     els.btnLaunchSim.disabled = true;
     els.simSpinner.style.display = 'inline-block';
     els.btnSimText.textContent = 'Simulating & Diagnosing...';
 
-    logTerminal(`\n[${new Date().toLocaleTimeString()}] 🚀 Launching Closed-Loop Simulation...`, 'prompt');
-    logTerminal(`[INFO] RTL Source: ${rtl}`);
-    logTerminal(`[INFO] Testbench:  ${tb}`);
-    logTerminal(`[INFO] Simulator:  ${simulator.toUpperCase()}`);
-    logTerminal(`[INFO] Security:   ${sec === 'airgap' ? '🛡️ Sovereign Air-Gap (Local)' : 'Cloud API'}`);
+    // Step A: If user selected files via file picker / drag-and-drop, upload them first
+    let stagedRtlFiles = null;
+    if (state.uploadedRtlFiles.length > 0) {
+      logTerminal(`\n[${new Date().toLocaleTimeString()}] [UPLOAD] Ingesting ${state.uploadedRtlFiles.length} project RTL file(s)...`, 'prompt');
+      
+      try {
+        const rtlFilePayloads = await Promise.all(
+          state.uploadedRtlFiles.map(async f => ({
+            name: f.name,
+            content: await f.text(),
+          }))
+        );
+        let upfPayload = null;
+        if (state.uploadedUpfFile) {
+          upfPayload = {
+            name: state.uploadedUpfFile.name,
+            content: await state.uploadedUpfFile.text(),
+          };
+        }
+
+        const upRes = await fetch('/api/project/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rtl_files: rtlFilePayloads,
+            upf_file: upfPayload,
+            top_module: topMod || null,
+          }),
+        });
+        if (!upRes.ok) {
+          const upErr = await upRes.json();
+          throw new Error(upErr.detail || 'Project upload failed');
+        }
+        const upData = await upRes.json();
+        rtl = upData.suggested_rtl_path;
+        if (upData.suggested_upf_path) {
+          upf = upData.suggested_upf_path;
+        }
+        stagedRtlFiles = upData.rtl_files.map(f => f.path);
+        logTerminal(`[INFO] RTL Ingestion Complete: ${upData.file_count} files, top module: ${upData.top_module || 'auto'}`);
+        if (upData.upf_info) {
+          logTerminal(`[INFO] UPF Power Intent Parsed: ${upData.upf_info.domains.length} power domain(s), valid=${upData.upf_info.is_valid}`);
+        }
+        if (upData.missing_dependencies && upData.missing_dependencies.length > 0) {
+          logTerminal(`[WARN] Missing dependencies: ${upData.missing_dependencies.join(', ')}`, 'warning');
+        }
+      } catch (uploadErr) {
+        els.btnLaunchSim.disabled = false;
+        els.simSpinner.style.display = 'none';
+        els.btnSimText.textContent = 'Launch Closed-Loop Simulation';
+        showToast(uploadErr.message, 'error');
+        logTerminal(`[ERROR] Project upload failed: ${uploadErr.message}`, 'error');
+        return;
+      }
+    }
+
+    state.targetRtlFile = rtl;
+
+    logTerminal(`\n[${new Date().toLocaleTimeString()}] [RUN] Launching Closed-Loop Simulation...`, 'prompt');
+    logTerminal(`[INFO] Mode:        ${upf ? '[POWER-AWARE] RTL + UPF Verified' : '[RTL-ONLY] RTL Functional Triage'}`);
+    logTerminal(`[INFO] RTL Source:  ${rtl}`);
+    if (upf) logTerminal(`[INFO] UPF Intent:  ${upf}`);
+    logTerminal(`[INFO] Testbench:   ${tb}`);
+    logTerminal(`[INFO] Simulator:   ${simulator.toUpperCase()}`);
+    logTerminal(`[INFO] Security:    ${sec === 'airgap' ? '[AIR-GAP] Sovereign Air-Gap (Local)' : 'Cloud API'}`);
 
     try {
+      const simPayload = {
+        rtl_path: rtl,
+        rtl_files: stagedRtlFiles,
+        tb_path: tb,
+        spec_path: spec || null,
+        upf_path: upf || null,
+        top_module: topMod || null,
+        simulator: simulator,
+        output_dir: outDir,
+        airgap: sec === 'airgap',
+        provider: sec === 'claude' ? 'anthropic' : 'gemini',
+      };
+
       const res = await fetch('/api/sim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rtl_path: rtl,
-          tb_path: tb,
-          spec_path: spec || null,
-          simulator: simulator,
-          output_dir: outDir,
-          airgap: sec === 'airgap',
-          provider: sec === 'claude' ? 'anthropic' : 'gemini',
-        }),
+        body: JSON.stringify(simPayload),
       });
 
       if (!res.ok) {
@@ -220,6 +367,9 @@
       logTerminal(`\n[SUCCESS] Closed-Loop Run Complete in ${result.duration_s}s!`, 'success');
       logTerminal(`[RCA] Diagnosis: ${result.classification} (${result.confidence}% confidence)`);
       logTerminal(`[RCA] Root Cause: ${result.root_cause}`);
+      if (result.mode === 'power_aware') {
+        logTerminal(`[POWER] UPF Power Intent Verified & Correlated with Design Hierarchy!`, 'success');
+      }
 
       // Update HUD Results
       els.hudResults.style.display = 'block';
@@ -274,7 +424,7 @@
     } finally {
       els.btnLaunchSim.disabled = false;
       els.simSpinner.style.display = 'none';
-      els.btnSimText.textContent = '🚀 Launch Closed-Loop Simulation';
+      els.btnSimText.textContent = 'Launch Closed-Loop Simulation';
     }
   }
 
@@ -358,7 +508,7 @@
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', x + 4);
       text.setAttribute('y', 24);
-      text.setAttribute('fill', '#8b9bb4');
+      text.setAttribute('fill', '#93a395');
       text.setAttribute('font-size', '10');
       text.setAttribute('font-family', 'var(--font-mono)');
       text.textContent = `${Math.round(tPs / 1000)}ns`;
@@ -378,7 +528,7 @@
       rowLine.setAttribute('y1', yBase + rowHeight);
       rowLine.setAttribute('x2', width);
       rowLine.setAttribute('y2', yBase + rowHeight);
-      rowLine.setAttribute('stroke', 'rgba(255, 255, 255, 0.03)');
+      rowLine.setAttribute('stroke', 'rgba(244, 239, 230, 0.04)');
       svg.appendChild(rowLine);
 
       if (sig.is_bus) {
@@ -394,7 +544,7 @@
           const valText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           valText.setAttribute('x', x + 12);
           valText.setAttribute('y', midY + 4);
-          valText.setAttribute('fill', tr.v.includes('x') ? '#ff3366' : '#00e5ff');
+          valText.setAttribute('fill', tr.v.includes('x') ? '#bf2b4c' : '#f4efe6');
           valText.setAttribute('font-size', '10');
           valText.setAttribute('font-family', 'var(--font-mono)');
           valText.textContent = tr.v;
@@ -404,7 +554,7 @@
         pathD += `L ${width} ${midY}`;
         const busPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         busPath.setAttribute('d', pathD);
-        busPath.setAttribute('stroke', sig.name.includes('result') ? '#ff3366' : '#00e5ff');
+        busPath.setAttribute('stroke', sig.name.includes('result') ? '#bf2b4c' : '#c2cfc3');
         busPath.setAttribute('stroke-width', '1.5');
         busPath.setAttribute('fill', 'none');
         svg.appendChild(busPath);
@@ -428,7 +578,7 @@
 
         const wavePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wavePath.setAttribute('d', pathD);
-        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#ff3366' : '#00f59b');
+        wavePath.setAttribute('stroke', sig.name.includes('zero') ? '#bf2b4c' : '#93a395');
         wavePath.setAttribute('stroke-width', '1.75');
         wavePath.setAttribute('fill', 'none');
         svg.appendChild(wavePath);
@@ -442,7 +592,7 @@
     failLine.setAttribute('y1', 0);
     failLine.setAttribute('x2', failX);
     failLine.setAttribute('y2', totalHeight);
-    failLine.setAttribute('stroke', '#ff3366');
+    failLine.setAttribute('stroke', '#bf2b4c');
     failLine.setAttribute('stroke-width', '2');
     failLine.setAttribute('stroke-dasharray', '4,2');
     svg.appendChild(failLine);
@@ -450,11 +600,11 @@
     const failTag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     failTag.setAttribute('x', failX + 6);
     failTag.setAttribute('y', 36);
-    failTag.setAttribute('fill', '#ff3366');
+    failTag.setAttribute('fill', '#bf2b4c');
     failTag.setAttribute('font-size', '10');
     failTag.setAttribute('font-weight', 'bold');
     failTag.setAttribute('font-family', 'var(--font-mono)');
-    failTag.textContent = '⚡ FAILURE POINT (Cycle 1 / 15ns)';
+    failTag.textContent = '[FAIL] FAILURE POINT (Cycle 1 / 15ns)';
     svg.appendChild(failTag);
   }
 
@@ -478,7 +628,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to apply patch');
 
-      els.patchStatusText.textContent = `✓ Patch applied to ${data.target}. Backup: ${data.backup}`;
+      els.patchStatusText.textContent = `[OK] Patch applied to ${data.target}. Backup: ${data.backup}`;
       els.patchStatusText.style.color = 'var(--emerald-bright)';
       els.btnRevertFix.style.display = 'inline-flex';
       showToast(data.message, 'success');
@@ -530,7 +680,7 @@
         card.style.marginBottom = '1rem';
         card.innerHTML = `
           <div class="card-header">
-            <h2 class="card-title"><span>📂</span> ${run.id}</h2>
+            <h2 class="card-title">[RUN] ${run.id}</h2>
             <span class="card-badge ${run.confidence > 0 ? '' : 'badge-tag green'}">${run.classification}</span>
           </div>
           <p class="diag-text" style="margin-bottom:0.75rem;">${run.root_cause || 'Simulation & analysis run'}</p>
@@ -539,7 +689,7 @@
             <div style="display:flex; gap:0.5rem;">
               ${run.report_url ? `<a href="${run.report_url}" target="_blank" class="btn btn-secondary btn-xs">Open Report HTML</a>` : ''}
               ${run.plan_url ? `<a href="${run.plan_url}" target="_blank" class="btn btn-secondary btn-xs">Open Plan HTML</a>` : ''}
-              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">⚡ Inspect in Cockpit</button>
+              <button class="btn btn-primary btn-xs" onclick="window.VeriSightApp.loadRunIntoCockpit('${run.id}')">Inspect in Cockpit</button>
             </div>
           </div>
         `;
@@ -590,7 +740,7 @@
     generateDirectedTest: function (reqId) {
       showToast(`Generating SystemVerilog directed sequence for ${reqId}...`, 'info');
       setTimeout(() => {
-        showToast(`✓ Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
+        showToast(`[OK] Generated SV sequence sequence_${reqId.toLowerCase().replace(/-/g, '_')}.sv!`, 'success');
       }, 1200);
     },
     loadRunIntoCockpit: loadRunIntoCockpit,
@@ -607,6 +757,78 @@
     els.btnPresetAlu.addEventListener('click', () => applyPreset('alu'));
     els.btnPresetFifo.addEventListener('click', () => applyPreset('fifo'));
     els.btnPresetCustom.addEventListener('click', () => applyPreset('custom'));
+
+    // RTL Dropzone & File Input
+    if (els.rtlDropzone && els.rtlFileInput) {
+      els.rtlDropzone.addEventListener('click', () => els.rtlFileInput.click());
+      els.rtlFileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        files.forEach(f => {
+          if (!state.uploadedRtlFiles.some(existing => existing.name === f.name)) {
+            state.uploadedRtlFiles.push(f);
+          }
+        });
+        renderRtlChips();
+      });
+      ['dragenter', 'dragover'].forEach(evt => {
+        els.rtlDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.rtlDropzone.classList.add('dropzone-hover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        els.rtlDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.rtlDropzone.classList.remove('dropzone-hover');
+        });
+      });
+      els.rtlDropzone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach(f => {
+          if (!state.uploadedRtlFiles.some(existing => existing.name === f.name)) {
+            state.uploadedRtlFiles.push(f);
+          }
+        });
+        renderRtlChips();
+      });
+    }
+
+    // UPF Dropzone & File Input
+    if (els.upfDropzone && els.upfFileInput) {
+      els.upfDropzone.addEventListener('click', () => els.upfFileInput.click());
+      els.upfFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          state.uploadedUpfFile = e.target.files[0];
+          renderUpfChip();
+        }
+      });
+      ['dragenter', 'dragover'].forEach(evt => {
+        els.upfDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.upfDropzone.classList.add('dropzone-hover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        els.upfDropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          els.upfDropzone.classList.remove('dropzone-hover');
+        });
+      });
+      els.upfDropzone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          state.uploadedUpfFile = e.dataTransfer.files[0];
+          renderUpfChip();
+        }
+      });
+    }
+
+    if (els.upfPathInput) {
+      els.upfPathInput.addEventListener('input', updateModeBadge);
+    }
+    if (els.rtlInput) {
+      els.rtlInput.addEventListener('input', updateModeBadge);
+    }
+    updateModeBadge();
 
     // Simulation
     els.btnLaunchSim.addEventListener('click', launchSimulation);

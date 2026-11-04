@@ -1,0 +1,34 @@
+{
+  "id": 51624,
+  "title": "Confusion About uvm_void in UVM Hierarchy",
+  "slug": "confusion-about-uvm-void-in-uvm-hierarchy",
+  "created_at": "2026-05-21T11:31:08.990Z",
+  "bumped_at": "2026-05-26T19:26:33.254Z",
+  "posts_count": 4,
+  "question_raw": "<p>I am a beginner in UVM and trying to understand the purpose of <code>uvm_void</code>.</p>\n<p>From the hierarchy, I see:</p>\n<pre><code class=\"lang-auto\">\n</code></pre>\n<pre><code class=\"lang-auto\">uvm_void\n   ↓\nuvm_object\n   ↓\nother UVM classes\n</code></pre>\n<p>But I am confused because <code>uvm_void</code> is an empty class with no methods or variables.</p>\n<p>So my questions are:</p>\n<ul>\n<li>\n<p>If <code>uvm_void</code> is completely empty, then why was it needed?</p>\n</li>\n<li>\n<p>Why didn’t UVM architects directly make <code>uvm_object</code> the top/base class?</p>\n</li>\n<li>\n<p>What is the actual difference between <code>uvm_void</code> and <code>uvm_object</code> apart from one being empty and the other having methods?</p>\n</li>\n<li>\n<p>What real problem does <code>uvm_void</code> solve?</p>\n</li>\n<li>\n<p>In what situation would <code>uvm_void</code> work differently from <code>uvm_object</code>?</p>\n</li>\n<li>\n<p>Is this only for framework architecture flexibility, or is there an actual practical use case?</p>\n</li>\n</ul>\n<p>As a beginner, it feels like <code>uvm_object</code> could also work everywhere, so I am unable to relate the need for <code>uvm_void</code>.</p>",
+  "question_text": "I am a beginner in UVM and trying to understand the purpose of uvm_void.\nFrom the hierarchy, I see:\n\n\nuvm_void\n   ↓\nuvm_object\n   ↓\nother UVM classes\n\nBut I am confused because uvm_void is an empty class with no methods or variables.\nSo my questions are:\n\n\nIf uvm_void is completely empty, then why was it needed?\n\n\nWhy didn’t UVM architects directly make uvm_object the top/base class?\n\n\nWhat is the actual difference between uvm_void and uvm_object apart from one being empty and the other having methods?\n\n\nWhat real problem does uvm_void solve?\n\n\nIn what situation would uvm_void work differently from uvm_object?\n\n\nIs this only for framework architecture flexibility, or is there an actual practical use case?\n\n\nAs a beginner, it feels like uvm_object could also work everywhere, so I am unable to relate the need for uvm_void.",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156754,
+      "author": "dave_59",
+      "raw": "<p>As a beginner or even average user, there’s no need to comprehend <code>uvm_void</code>. It’s worth noting that many people criticized the creation of the <code>uvm_void</code> class, considering it unnecessary overhead. This UVM class was introduced to address the limitation of SystemVerilog OOP, which originated from Java, in casting a pointer to a <code>void*</code> type, unlike in C/C++. This ensures that objects remain <em>type-safe.</em></p>\n<p>Java does have a root class <code>java.lang.Object</code> from which everything extends. <code>uvm_void</code> was designed to mimic this structure. It would primarily be used when integrating two different base class methodologies.</p>",
+      "text": "As a beginner or even average user, there’s no need to comprehend uvm_void. It’s worth noting that many people criticized the creation of the uvm_void class, considering it unnecessary overhead. This UVM class was introduced to address the limitation of SystemVerilog OOP, which originated from Java, in casting a pointer to a void* type, unlike in C/C++. This ensures that objects remain type-safe.\nJava does have a root class java.lang.Object from which everything extends. uvm_void was designed to mimic this structure. It would primarily be used when integrating two different base class methodologies.",
+      "created_at": "2026-05-21T16:15:06.369Z"
+    },
+    {
+      "id": 156781,
+      "author": "Hey_Verif26",
+      "raw": "<p>I have one more doubt regarding the use of <code>uvm_void</code> in UVM.</p>\n<p>For example:</p>\n<pre><code class=\"lang-auto\">class uvm_pool #(type KEY=int, T=uvm_void) extends uvm_object;\n\nvirtual class uvm_port_base #(type IF=uvm_void) extends IF;\n</code></pre>\n<p>Why did UVM use <code>uvm_void</code> here instead of <code>uvm_object</code>?</p>\n<ul>\n<li>\n<p>What practical issue would happen if <code>uvm_object</code> was used instead?</p>\n</li>\n<li>\n<p>When should a UVM class use:</p>\n<ul>\n<li>\n<p><code>uvm_void</code></p>\n</li>\n<li>\n<p><code>uvm_object</code></p>\n</li>\n<li>\n<p>or a specific class type as a parameter?</p>\n</li>\n</ul>\n</li>\n<li>\n<p>Is <code>uvm_void</code> mainly used to allow non-<code>uvm_object</code> types/interfaces/classes as generic parameters?</p>\n</li>\n</ul>\n<p>I want to understand the architectural/design reason behind this choice.</p>",
+      "text": "I have one more doubt regarding the use of uvm_void in UVM.\nFor example:\nclass uvm_pool #(type KEY=int, T=uvm_void) extends uvm_object;\n\nvirtual class uvm_port_base #(type IF=uvm_void) extends IF;\n\nWhy did UVM use uvm_void here instead of uvm_object?\n\n\nWhat practical issue would happen if uvm_object was used instead?\n\n\nWhen should a UVM class use:\n\n\nuvm_void\n\n\nuvm_object\n\n\nor a specific class type as a parameter?\n\n\n\n\nIs uvm_void mainly used to allow non-uvm_object types/interfaces/classes as generic parameters?\n\n\nI want to understand the architectural/design reason behind this choice.",
+      "created_at": "2026-05-25T17:09:36.049Z"
+    },
+    {
+      "id": 156786,
+      "author": "dave_59",
+      "raw": "<p><code>uvm_void</code> is redundant here because it will be overridden by any type including a non-class type.  It’s unfortunate that there’s still a tool out there that doesn’t support parameters without a default assignment. This would force users to explicitly override the parameter when declaring a <code>uvm_pool</code> class</p>",
+      "text": "uvm_void is redundant here because it will be overridden by any type including a non-class type.  It’s unfortunate that there’s still a tool out there that doesn’t support parameters without a default assignment. This would force users to explicitly override the parameter when declaring a uvm_pool class",
+      "created_at": "2026-05-26T19:26:33.254Z"
+    }
+  ]
+}

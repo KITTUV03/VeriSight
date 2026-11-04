@@ -1,0 +1,20 @@
+{
+  "id": 51321,
+  "title": "Uvm_config_db set in the below example correct?",
+  "slug": "uvm-config-db-set-in-the-below-example-correct",
+  "created_at": "2025-08-21T17:58:33.829Z",
+  "bumped_at": "2026-06-15T18:38:11.025Z",
+  "posts_count": 2,
+  "question_raw": "<p>I am getting a message as below when I use +UVM_CONFIG_DB_TRACE:</p>\n<p><em>UVM_INFO @ 0: reporter [CFGDB/SET] Configuration 'uvm_test_top.top_env.sub_env.axi_system_env_h</em>.cfg’ (type class amba_axi_uvm_pkg::amba_axi_system_configuration) set by uvm_test_top.top_env.sub_env = (class amba_axi_uvm_pkg::amba_axi_system_configuration) ?*</p>\n<p><strong>My question is whether the uvm_config_db set has been done correctly? I see the question mark at the end of the above print which is causing a doubt or this question mark at the end has no significance?</strong><br>\nAlso I do get a FATAL_ERROR stating :<br>\n<em>UVM_FATAL @ 0: uvm_test_top.top_env.sub_env.axi_system_env_h [end_of_elaboration_phase] Invalid configuration passed. Please pass a valid amba_axi_system_configuration object or derived object</em></p>\n<p>In my sub_env I am declaring the vip configuration and in build_phase doing a uvm_config_db set call.</p>\n<pre><code class=\"lang-auto\">class custom_amba_axi_system_configuration extends amba_axi_system_configuration;\n//----\n//---\nendclass\n//----------------------------------\nclass sub_env extends top_env;\naxi_system_env axi_system_env_h;\ncustom_amba_axi_system_configuration cfg;\n//Build phase\ncfg = custom_amba_axi_system_configuration :: type_id:: create(\"cfg\");\nuvm_config_db#(amba_axi_system_configuration)::set(this, \"axi_system_env_h*\", \"cfg\",cfg);\naxi_system_env_h = axi_system_env :: type_id :: create(\"axi_system_env_h\", this);\n\nendclass\n</code></pre>",
+  "question_text": "I am getting a message as below when I use +UVM_CONFIG_DB_TRACE:\nUVM_INFO @ 0: reporter [CFGDB/SET] Configuration 'uvm_test_top.top_env.sub_env.axi_system_env_h.cfg’ (type class amba_axi_uvm_pkg::amba_axi_system_configuration) set by uvm_test_top.top_env.sub_env = (class amba_axi_uvm_pkg::amba_axi_system_configuration) ?*\nMy question is whether the uvm_config_db set has been done correctly? I see the question mark at the end of the above print which is causing a doubt or this question mark at the end has no significance?\nAlso I do get a FATAL_ERROR stating :\nUVM_FATAL @ 0: uvm_test_top.top_env.sub_env.axi_system_env_h [end_of_elaboration_phase] Invalid configuration passed. Please pass a valid amba_axi_system_configuration object or derived object\nIn my sub_env I am declaring the vip configuration and in build_phase doing a uvm_config_db set call.\nclass custom_amba_axi_system_configuration extends amba_axi_system_configuration;\n//----\n//---\nendclass\n//----------------------------------\nclass sub_env extends top_env;\naxi_system_env axi_system_env_h;\ncustom_amba_axi_system_configuration cfg;\n//Build phase\ncfg = custom_amba_axi_system_configuration :: type_id:: create(\"cfg\");\nuvm_config_db#(amba_axi_system_configuration)::set(this, \"axi_system_env_h*\", \"cfg\",cfg);\naxi_system_env_h = axi_system_env :: type_id :: create(\"axi_system_env_h\", this);\n\nendclass",
+  "author": "rabh",
+  "replies": [
+    {
+      "id": 156859,
+      "author": "sl_jesse",
+      "raw": "<p>The type shoud be consistent between the parameter in parenthesis and the passed object type.</p>",
+      "text": "The type shoud be consistent between the parameter in parenthesis and the passed object type.",
+      "created_at": "2026-06-15T18:38:11.025Z"
+    }
+  ]
+}

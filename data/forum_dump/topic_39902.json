@@ -1,0 +1,34 @@
+{
+  "id": 39902,
+  "title": "Merits of Overriding Sequence Items",
+  "slug": "merits-of-overriding-sequence-items",
+  "created_at": "2021-12-21T00:17:42.000Z",
+  "bumped_at": "2026-08-03T14:55:38.216Z",
+  "posts_count": 4,
+  "question_raw": "<p>I am going to strongly disagree with the statement “Therefore, from a practical point of view, sequence_items are unlikely to be overridden” (Cookbook Section UVM/Sequences/Overrides).</p>\n<p>I am going to provide two examples of how type overrides with sequence items has been very useful for me.</p>\n<p>While I do want to test the entire state-space of possible stimulus, I often want to narrow my stimulus for certain tests. By heavily constraining my stimulus I am actually able to hit certain scenarios. An example could only running maximum or minimum size packets for an extended duration. If I need to run a large number of these packets in a row to create a scenario, then this is unlikely to happen without additional constraints. I could do this by writing a new sequence that constructs these derived sequence items that have additional constraints, but that seems like it would be slightly more code and more files than extending a sequence_item and using a type_id_override().</p>\n<p>My other example is that I often find bugs and sometimes I am not responsible for fixing them. However, I still want to find other bugs while that bug is being fixed. Therefore I create a test that exhibits the bug and document it. However, I then introduce new constraints in a derived class to mask the bug and have all my other tests use type overrides to enforce these constraints. This allows me to temporarily mask known issues while I hunt for more bugs or work on adding more coverage.</p>",
+  "question_text": "I am going to strongly disagree with the statement “Therefore, from a practical point of view, sequence_items are unlikely to be overridden” (Cookbook Section UVM/Sequences/Overrides).\nI am going to provide two examples of how type overrides with sequence items has been very useful for me.\nWhile I do want to test the entire state-space of possible stimulus, I often want to narrow my stimulus for certain tests. By heavily constraining my stimulus I am actually able to hit certain scenarios. An example could only running maximum or minimum size packets for an extended duration. If I need to run a large number of these packets in a row to create a scenario, then this is unlikely to happen without additional constraints. I could do this by writing a new sequence that constructs these derived sequence items that have additional constraints, but that seems like it would be slightly more code and more files than extending a sequence_item and using a type_id_override().\nMy other example is that I often find bugs and sometimes I am not responsible for fixing them. However, I still want to find other bugs while that bug is being fixed. Therefore I create a test that exhibits the bug and document it. However, I then introduce new constraints in a derived class to mask the bug and have all my other tests use type overrides to enforce these constraints. This allows me to temporarily mask known issues while I hunt for more bugs or work on adding more coverage.",
+  "author": "James.Kolar",
+  "replies": [
+    {
+      "id": 132322,
+      "author": "dave_59",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/merits-of-overriding-sequence-items/39902\">James.Kolar</a>:</font></em></p>\n<p>I agree with your disagreement. They were probably only thinking about overrides that added new   class member variables or methods. Overriding class constraints is a very common factory override for any class with random variables.</p>",
+      "text": "In reply to James.Kolar:\nI agree with your disagreement. They were probably only thinking about overrides that added new   class member variables or methods. Overriding class constraints is a very common factory override for any class with random variables.",
+      "created_at": "2021-12-21T02:39:31.000Z"
+    },
+    {
+      "id": 156975,
+      "author": "AD",
+      "raw": "<p>Hey Dave,<br>\nI also agree with your point but I didn’t understand you line,<br>\n“They were probably only thinking about overrides that added new class member variables or methods.”<br>\nCan you elaborate more about it.<br>\nThanks</p>",
+      "text": "Hey Dave,\nI also agree with your point but I didn’t understand you line,\n“They were probably only thinking about overrides that added new class member variables or methods.”\nCan you elaborate more about it.\nThanks",
+      "created_at": "2026-07-31T08:04:08.517Z"
+    },
+    {
+      "id": 156976,
+      "author": "dave_59",
+      "raw": "<p>That section of the cookbook explains how the sequence-to-driver communication is specifically designed for a particular <code>sequence_item</code>. It wouldn’t make sense to add a new variable to a sequence_item unless the driver is also extended to read that variable. However, there are numerous cases where extending a sequence item is beneficial. Many people create base sequence items and extend them for use with a driver, while also extending them differently for use with a monitor by adding responses. Of course, the cases raised by the original poster, which involve extending the sequence item to add constraints, are a common practice. Therefore, the cookbook statement is clearly misleading.</p>",
+      "text": "That section of the cookbook explains how the sequence-to-driver communication is specifically designed for a particular sequence_item. It wouldn’t make sense to add a new variable to a sequence_item unless the driver is also extended to read that variable. However, there are numerous cases where extending a sequence item is beneficial. Many people create base sequence items and extend them for use with a driver, while also extending them differently for use with a monitor by adding responses. Of course, the cases raised by the original poster, which involve extending the sequence item to add constraints, are a common practice. Therefore, the cookbook statement is clearly misleading.",
+      "created_at": "2026-08-03T14:55:38.216Z"
+    }
+  ]
+}

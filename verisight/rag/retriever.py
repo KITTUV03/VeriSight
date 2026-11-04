@@ -35,6 +35,7 @@ class Retriever:
         problem_description: str,
         error_messages: List[str],
         n_results: int = 5,
+        min_similarity: Optional[float] = None,
     ) -> RAGContext:
         """
         Retrieve relevant context from the knowledge base.
@@ -50,8 +51,18 @@ class Retriever:
         Returns:
             RAGContext with similar failures and relevant patterns.
         """
+        # Relevance gate: drop retrieved neighbours that are too dissimilar to
+        # be evidence. Default comes from pipeline config (cosine similarity).
+        if min_similarity is None:
+            try:
+                from verisight.config import get_config
+                min_similarity = get_config().pipeline.rag_min_similarity
+            except Exception:
+                min_similarity = 0.25
+
         similar_failures = []
         relevant_patterns = []
+        dropped = 0
 
         # Search for similar failures
         if problem_description:
@@ -59,10 +70,15 @@ class Retriever:
                 problem_description, n_results
             )
             for f in failures:
+                similarity = 1.0 - f.get("distance", 1.0)
+                if similarity < min_similarity:
+                    dropped += 1
+                    continue
                 similar_failures.append({
                     "document": f.get("document", ""),
                     "metadata": f.get("metadata", {}),
-                    "similarity": 1.0 - f.get("distance", 1.0),
+                    "similarity": similarity,
+                    "verified": str(f.get("metadata", {}).get("verified", "")),
                     "source": f.get("source", ""),
                 })
 
@@ -70,12 +86,18 @@ class Retriever:
         for error_msg in error_messages[:3]:  # Limit to top 3 errors
             patterns = self.kb.search_patterns(error_msg, n_results=3)
             for p in patterns:
+                similarity = 1.0 - p.get("distance", 1.0)
+                if similarity < min_similarity:
+                    dropped += 1
+                    continue
                 relevant_patterns.append({
                     "document": p.get("document", ""),
                     "metadata": p.get("metadata", {}),
-                    "similarity": 1.0 - p.get("distance", 1.0),
+                    "similarity": similarity,
                     "query": error_msg[:200],
                 })
+        if dropped:
+            logger.info(f"RAG relevance gate dropped {dropped} low-similarity result(s) (< {min_similarity})")
 
         # Calculate overall confidence
         confidence = 0.0

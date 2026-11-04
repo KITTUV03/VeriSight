@@ -14,7 +14,7 @@ import shutil
 import sys
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -33,16 +33,30 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 OUTPUT_DIR = WORKSPACE_DIR / "output"
 
 
+class UploadedFilePayload(BaseModel):
+    name: str
+    content: str
+
+
+class ProjectUploadPayload(BaseModel):
+    rtl_files: List[UploadedFilePayload]
+    upf_file: Optional[UploadedFilePayload] = None
+    top_module: Optional[str] = None
+
+
 class SimRequest(BaseModel):
-    rtl_path: str = "examples/rtl/alu.sv"
+    rtl_path: Optional[str] = "examples/rtl/alu.sv"
+    rtl_files: Optional[List[str]] = None
     tb_path: str = "examples/tb/alu_tb.sv"
     spec_path: Optional[str] = "examples/specs/alu_spec.md"
+    upf_path: Optional[str] = None
+    top_module: Optional[str] = None
     simulator: str = "auto"
     output_dir: str = "output/closed_loop"
     airgap: bool = True
     provider: Optional[str] = "gemini"
     api_key: Optional[str] = None
-    model_name: Optional[str] = "gemini-2.0-flash"
+    model_name: Optional[str] = "gemini-3.5-flash"
 
 
 class ApplyFixRequest(BaseModel):
@@ -53,6 +67,14 @@ class ApplyFixRequest(BaseModel):
 
 class RevertFixRequest(BaseModel):
     target_file: str
+
+
+class ExportEDAPlaygroundRequest(BaseModel):
+    rtl_path: str = "examples/rtl/alu.sv"
+    tb_path: str = "examples/tb/alu_tb.sv"
+    output_dir: str = "output/edaplayground"
+    preferred_simulator: str = "questa"
+    anonymize_rtl: bool = False
 
 
 def create_app() -> FastAPI:
@@ -250,28 +272,163 @@ def create_app() -> FastAPI:
             "plan_url": f"/reports/{run_id}/plan/verification_plan.html" if (run_path / "plan" / "verification_plan.html").exists() else (f"/reports/{run_id}/verification_plan.html" if (run_path / "verification_plan.html").exists() else None),
         }
 
+    @app.post("/api/project/upload")
+    async def upload_project_files(payload: ProjectUploadPayload):
+        """
+        Multi-File RTL and Optional UPF upload endpoint.
+        Saves uploaded files separately in an isolated project workspace,
+        validates syntax, cross-references UPF against RTL, resolves dependencies,
+        and returns structured project manifest and diagnostics.
+        """
+        import uuid
+        session_id = f"proj_{uuid.uuid4().hex[:8]}"
+        project_dir = WORKSPACE_DIR / "output" / "uploads" / session_id
+        rtl_dir = project_dir / "rtl"
+        power_dir = project_dir / "power"
+        rtl_dir.mkdir(parents=True, exist_ok=True)
+        power_dir.mkdir(parents=True, exist_ok=True)
+
+        diagnostics = []
+        saved_rtl_paths = []
+        rtl_file_meta = []
+
+        allowed_rtl_exts = {".v", ".sv", ".vh", ".svh", ".vhd", ".vhdl"}
+
+        for upload in payload.rtl_files:
+            filename = Path(upload.name).name
+            suffix = Path(filename).suffix.lower()
+
+            if suffix not in allowed_rtl_exts:
+                diagnostics.append({
+                    "severity": "warning",
+                    "file": filename,
+                    "message": f"File '{filename}' has unsupported RTL extension '{suffix}'. Expected .v, .sv, .vh, .svh, .vhd.",
+                })
+
+            dest_path = rtl_dir / filename
+            content = upload.content
+
+            if len(content.strip()) == 0:
+                diagnostics.append({
+                    "severity": "error",
+                    "file": filename,
+                    "message": f"Uploaded RTL file '{filename}' is empty.",
+                })
+
+            dest_path.write_text(content, encoding="utf-8")
+            saved_rtl_paths.append(str(dest_path))
+            rtl_file_meta.append({
+                "name": filename,
+                "path": str(dest_path),
+                "relative_path": str(dest_path.relative_to(WORKSPACE_DIR)),
+                "size_bytes": len(content.encode("utf-8")),
+            })
+
+        # Parse RTL project
+        from verisight.parsers.rtl_parser import parse_rtl
+        rtl_knowledge = parse_rtl(saved_rtl_paths, top_module=payload.top_module)
+
+        # Parse UPF if provided
+        upf_info = None
+        saved_upf_path = None
+        if payload.upf_file and payload.upf_file.name:
+            upf_filename = Path(payload.upf_file.name).name
+            if not upf_filename.lower().endswith(".upf"):
+                diagnostics.append({
+                    "severity": "warning",
+                    "file": upf_filename,
+                    "message": f"Uploaded power intent file '{upf_filename}' does not have .upf extension.",
+                })
+            dest_upf = power_dir / upf_filename
+            dest_upf.write_text(payload.upf_file.content, encoding="utf-8")
+            saved_upf_path = str(dest_upf)
+
+            from verisight.parsers.upf_parser import parse_upf
+            upf_knowledge = parse_upf(saved_upf_path, rtl_knowledge=rtl_knowledge)
+            upf_info = {
+                "file": upf_filename,
+                "path": saved_upf_path,
+                "relative_path": str(dest_upf.relative_to(WORKSPACE_DIR)),
+                "domains": [pd.model_dump() for pd in upf_knowledge.power_domains],
+                "switches": [ps.model_dump() for ps in upf_knowledge.power_switches],
+                "isolation_strategies": [iso.model_dump() for iso in upf_knowledge.isolation_strategies],
+                "level_shifters": [ls.model_dump() for ls in upf_knowledge.level_shifters],
+                "retention_strategies": [ret.model_dump() for ret in upf_knowledge.retention_strategies],
+                "power_state_tables": [pst.model_dump() for pst in upf_knowledge.power_state_tables],
+                "diagnostics": [d.model_dump() for d in upf_knowledge.diagnostics],
+                "is_valid": upf_knowledge.is_valid,
+            }
+
+        # Add parser diagnostics
+        for d in rtl_knowledge.parser_status.diagnostics:
+            diagnostics.append({
+                "severity": d.severity,
+                "file": d.file,
+                "line": d.line,
+                "message": d.message,
+                "code": d.code,
+            })
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "mode": "power_aware" if upf_info else "rtl_only",
+            "file_count": len(saved_rtl_paths),
+            "rtl_files": rtl_file_meta,
+            "top_module": rtl_knowledge.top_module,
+            "top_candidates": rtl_knowledge.top_candidates,
+            "packages": rtl_knowledge.packages,
+            "interfaces": rtl_knowledge.interfaces,
+            "missing_dependencies": rtl_knowledge.missing_dependencies,
+            "upf_info": upf_info,
+            "diagnostics": diagnostics,
+            "suggested_rtl_path": str(rtl_dir.relative_to(WORKSPACE_DIR)),
+            "suggested_upf_path": str(Path(saved_upf_path).relative_to(WORKSPACE_DIR)) if saved_upf_path else None,
+        }
+
     @app.post("/api/sim")
     async def run_simulation_api(req: SimRequest):
         """Execute closed-loop simulation on demand and return real-time metrics."""
-        rtl = str(WORKSPACE_DIR / req.rtl_path) if not Path(req.rtl_path).is_absolute() else req.rtl_path
+        # Determine RTL inputs
+        if req.rtl_files:
+            rtl_in = [
+                str(WORKSPACE_DIR / f) if not Path(f).is_absolute() else f
+                for f in req.rtl_files
+            ]
+            for rf in rtl_in:
+                if not Path(rf).exists():
+                    raise HTTPException(status_code=400, detail=f"RTL path does not exist: {rf}")
+        elif req.rtl_path:
+            rtl_in = str(WORKSPACE_DIR / req.rtl_path) if not Path(req.rtl_path).is_absolute() else req.rtl_path
+            if not Path(rtl_in).exists():
+                raise HTTPException(status_code=400, detail=f"RTL path does not exist: {req.rtl_path}")
+        else:
+            rtl_in = str(WORKSPACE_DIR / "examples/rtl/alu.sv")
+
         tb = str(WORKSPACE_DIR / req.tb_path) if not Path(req.tb_path).is_absolute() else req.tb_path
         spec = None
         if req.spec_path:
             spec = str(WORKSPACE_DIR / req.spec_path) if not Path(req.spec_path).is_absolute() else req.spec_path
 
+        upf = None
+        if req.upf_path:
+            upf = str(WORKSPACE_DIR / req.upf_path) if not Path(req.upf_path).is_absolute() else req.upf_path
+            if not Path(upf).exists():
+                raise HTTPException(status_code=400, detail=f"UPF path does not exist: {req.upf_path}")
+
         out = str(WORKSPACE_DIR / req.output_dir) if not Path(req.output_dir).is_absolute() else req.output_dir
 
-        if not Path(rtl).exists():
-            raise HTTPException(status_code=400, detail=f"RTL path does not exist: {req.rtl_path}")
         if not Path(tb).exists():
             raise HTTPException(status_code=400, detail=f"Testbench path does not exist: {req.tb_path}")
 
         try:
             results = execute_closed_loop_flow(
-                rtl_path=rtl,
+                rtl_path=rtl_in,
                 tb_path=tb,
                 spec_path=spec,
+                upf_path=upf,
                 simulator=req.simulator,
+                top_module=req.top_module or "",
                 output_dir=out,
                 airgap=req.airgap,
                 provider=req.provider,
@@ -318,6 +475,8 @@ def create_app() -> FastAPI:
                 "confidence": rca_res.confidence if rca_res else 0,
                 "root_cause": rca_res.root_cause if rca_res else "None",
                 "category": rca_res.category if rca_res else "None",
+                "mode": "power_aware" if upf else "rtl_only",
+                "upf_active": bool(upf),
                 "log_preview": log_content[:20000],
                 "fix_patch": fix_patch,
                 "vcd_path": str(sim_res.vcd_path.relative_to(WORKSPACE_DIR)) if (sim_res and sim_res.vcd_path and sim_res.vcd_path.exists()) else None,
@@ -328,6 +487,33 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.exception("Simulation execution failed")
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/export/edaplayground")
+    async def export_edaplayground_api(req: ExportEDAPlaygroundRequest):
+        """Export RTL and testbench into an EDA Playground bundle."""
+        from verisight.tools.eda_playground_exporter import export_to_edaplayground
+
+        rtl = str(WORKSPACE_DIR / req.rtl_path) if not Path(req.rtl_path).is_absolute() else req.rtl_path
+        tb = str(WORKSPACE_DIR / req.tb_path) if not Path(req.tb_path).is_absolute() else req.tb_path
+        out = str(WORKSPACE_DIR / req.output_dir) if not Path(req.output_dir).is_absolute() else req.output_dir
+
+        if not Path(rtl).exists():
+            raise HTTPException(status_code=400, detail=f"RTL path does not exist: {req.rtl_path}")
+        if not Path(tb).exists():
+            raise HTTPException(status_code=400, detail=f"Testbench path does not exist: {req.tb_path}")
+
+        try:
+            res = export_to_edaplayground(
+                rtl_path=rtl,
+                tb_path=tb,
+                output_dir=out,
+                preferred_simulator=req.preferred_simulator,
+                anonymize_rtl=req.anonymize_rtl,
+            )
+            return JSONResponse(res)
+        except Exception as e:
+            logger.exception("EDA Playground export failed")
+            raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
     @app.get("/api/waveform")
     async def get_waveform_data(path: Optional[str] = None):

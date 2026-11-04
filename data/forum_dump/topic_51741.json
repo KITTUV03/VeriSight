@@ -1,0 +1,12 @@
+{
+  "id": 51741,
+  "title": "How to create, config, and use Agentic IA in a UVM-based Testbench?",
+  "slug": "how-to-create-config-and-use-agentic-ia-in-a-uvm-based-testbench",
+  "created_at": "2026-09-14T12:56:04.318Z",
+  "bumped_at": "2026-09-14T12:56:04.479Z",
+  "posts_count": 1,
+  "question_raw": "<p>I’m exploring how to integrate <strong>Agentic AI</strong> into a <strong>SystemVerilog/UVM verification environment</strong>. The goal is for the agent to assist with tasks such as:</p>\n<ul>\n<li>\n<p>Generate the Verification Plan and Test Plan from the spec and a VPlan format.</p>\n</li>\n<li>\n<p>Generate the Testbench, compilation, and Simulation scripts</p>\n</li>\n<li>\n<p>Run simulations, regressions, pass/fail and coverage reports, Debug, JIRAs, gaps</p>\n</li>\n</ul>",
+  "question_text": "I’m exploring how to integrate Agentic AI into a SystemVerilog/UVM verification environment. The goal is for the agent to assist with tasks such as:\n\n\nGenerate the Verification Plan and Test Plan from the spec and a VPlan format.\n\n\nGenerate the Testbench, compilation, and Simulation scripts\n\n\nRun simulations, regressions, pass/fail and coverage reports, Debug, JIRAs, gaps",
+  "author": "alex_moreno",
+  "replies": []
+}

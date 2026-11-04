@@ -100,6 +100,20 @@ class XTraceResult(BaseModel):
         default="",
         description="Human-readable explanation of tool_status"
     )
+    parser_backend: str = Field(
+        default="",
+        description="Frontend used to parse the RTL (pyslang / regex-fallback)"
+    )
+    parser_degraded: bool = Field(
+        default=False,
+        description="True if RTL parsing was partial/degraded (fallback or "
+                    "unresolved dependencies) — static X analysis is then approximate"
+    )
+    limitations: List[str] = Field(
+        default_factory=list,
+        description="Explicit limitations of this analysis (e.g. static vs "
+                    "simulation, degraded parse, missing source context)"
+    )
 
 
 # ─── Module 2: Functional Analyzer ─────────────────────────────────
@@ -286,11 +300,40 @@ class MiscResult(BaseModel):
     summary: str = Field(default="", description="Human-readable summary")
 
 
+# ─── Module 8: Power Intent & Low-Power Verification ──────────────
+
+class PowerIssue(BaseModel):
+    """An issue detected during low-power / UPF verification."""
+    severity: str = Field(default="high", description="Severity: critical/high/medium/low/warning")
+    category: str = Field(description="Category: isolation/level_shift/retention/sequencing/hierarchy_mismatch/power_switch")
+    domain: str = Field(default="", description="Power domain affected")
+    module: str = Field(default="", description="RTL module affected")
+    instance: str = Field(default="", description="Instance path affected")
+    signals: List[str] = Field(default_factory=list, description="Signals involved in the issue")
+    line_number: int = Field(default=0, description="Source line number if known")
+    file: str = Field(default="", description="Source file if known")
+    description: str = Field(description="Detailed explanation of the defect")
+    recommendation: str = Field(default="", description="Recommended repair or corrective action")
+
+
+class PowerAnalysisResult(BaseModel):
+    """Output of low-power and UPF intent analysis."""
+    domains_analyzed: List[str] = Field(default_factory=list, description="List of analyzed power domains")
+    isolation_issues: List[PowerIssue] = Field(default_factory=list, description="Missing or invalid isolation strategies")
+    level_shift_issues: List[PowerIssue] = Field(default_factory=list, description="Missing level shifters across voltage domains")
+    retention_issues: List[PowerIssue] = Field(default_factory=list, description="Retention register save/restore issues")
+    sequencing_issues: List[PowerIssue] = Field(default_factory=list, description="Power state sequencing or switch control issues")
+    hierarchy_mismatches: List[PowerIssue] = Field(default_factory=list, description="RTL-UPF hierarchy inconsistencies")
+    all_issues: List[PowerIssue] = Field(default_factory=list, description="All aggregated power issues")
+    summary: str = Field(default="", description="Human-readable power analysis summary")
+    power_aware_sim_checks: List[Dict[str, Any]] = Field(default_factory=list, description="Correlated simulation log checks")
+
+
 # ─── Aggregated RTL Analysis ───────────────────────────────────────
 
 class RTLAnalysis(BaseModel):
     """
-    Aggregated RTL analysis across all 7 sub-modules.
+    Aggregated RTL analysis across all sub-modules.
     Combined output from Agent 3.
     """
     xtrace: XTraceResult = Field(
@@ -320,6 +363,18 @@ class RTLAnalysis(BaseModel):
     misc: MiscResult = Field(
         default_factory=MiscResult,
         description="Miscellaneous analysis"
+    )
+    traceweave: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="TraceWeave correlated failure-waveform-RTL evidence"
+    )
+    fault_localization: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Spectrum-Based Fault Localization (CirFix SBFL) ranking"
+    )
+    power: Optional[PowerAnalysisResult] = Field(
+        default=None,
+        description="Optional UPF power intent and low-power verification analysis"
     )
     primary_root_cause: str = Field(
         default="",

@@ -1,0 +1,668 @@
+$date
+	Sat Oct 24 12:36:38 2026
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module ahb_sim_harness $end
+$var wire 1 ! HREADYOUT $end
+$var wire 1 " HRESP $end
+$var wire 32 # HRDATA [31:0] $end
+$var reg 32 $ HADDR [31:0] $end
+$var reg 3 % HBURST [2:0] $end
+$var reg 1 & HCLK $end
+$var reg 4 ' HPROT [3:0] $end
+$var reg 1 ( HREADY $end
+$var reg 1 ) HRESETn $end
+$var reg 1 * HSEL $end
+$var reg 3 + HSIZE [2:0] $end
+$var reg 2 , HTRANS [1:0] $end
+$var reg 32 - HWDATA [31:0] $end
+$var reg 1 . HWRITE $end
+$var integer 32 / match_count [31:0] $end
+$var integer 32 0 mismatch_count [31:0] $end
+$var integer 32 1 protocol_error_count [31:0] $end
+$var integer 32 2 uvm_error_count [31:0] $end
+$scope module dut $end
+$var wire 32 3 HADDR [31:0] $end
+$var wire 3 4 HBURST [2:0] $end
+$var wire 1 & HCLK $end
+$var wire 4 5 HPROT [3:0] $end
+$var wire 1 ( HREADY $end
+$var wire 1 ! HREADYOUT $end
+$var wire 1 ) HRESETn $end
+$var wire 1 * HSEL $end
+$var wire 3 6 HSIZE [2:0] $end
+$var wire 2 7 HTRANS [1:0] $end
+$var wire 32 8 HWDATA [31:0] $end
+$var wire 1 . HWRITE $end
+$var wire 1 9 transfer_sampled $end
+$var parameter 32 : ADDR_BURST_CNT $end
+$var parameter 32 ; ADDR_CTRL $end
+$var parameter 32 < ADDR_DATA0 $end
+$var parameter 32 = ADDR_DATA1 $end
+$var parameter 32 > ADDR_STATUS $end
+$var parameter 32 ? ADDR_WIDTH $end
+$var parameter 32 @ DATA_WIDTH $end
+$var parameter 2 A TR_BUSY $end
+$var parameter 2 B TR_IDLE $end
+$var parameter 2 C TR_NONSEQ $end
+$var parameter 2 D TR_SEQ $end
+$var reg 32 E HRDATA [31:0] $end
+$var reg 1 " HRESP $end
+$var reg 1 F addr_phase_active $end
+$var reg 32 G addr_phase_addr [31:0] $end
+$var reg 2 H addr_phase_trans [1:0] $end
+$var reg 1 I addr_phase_write $end
+$var reg 32 J reg_burst_cnt [31:0] $end
+$var reg 32 K reg_ctrl [31:0] $end
+$var reg 32 L reg_data0 [31:0] $end
+$var reg 32 M reg_data1 [31:0] $end
+$var reg 32 N reg_status [31:0] $end
+$upscope $end
+$scope task ahb_read $end
+$upscope $end
+$scope task ahb_write $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+b11 D
+b10 C
+b0 B
+b1 A
+b100000 @
+b100000 ?
+b100 >
+b1100 =
+b1000 <
+b0 ;
+b10000 :
+$end
+#0
+$dumpvars
+b10 N
+b0 M
+b0 L
+b0 K
+b0 J
+0I
+b0 H
+b0 G
+0F
+b0 E
+09
+b0 8
+b0 7
+b0 6
+b0 5
+b0 4
+b0 3
+b0 2
+b0 1
+b0 0
+b0 /
+0.
+b0 -
+b0 ,
+b0 +
+0*
+0)
+1(
+b0 '
+0&
+b0 %
+b0 $
+b0 #
+0"
+1!
+$end
+#10000
+1&
+#20000
+0&
+#30000
+1&
+#35000
+1)
+#40000
+0&
+#50000
+1&
+#60000
+0&
+#70000
+19
+b10 +
+b10 6
+b10 ,
+b10 7
+1*
+1&
+#80000
+0&
+#90000
+09
+b10 H
+1F
+0*
+b0 ,
+b0 7
+1&
+#100000
+0&
+#110000
+b0 H
+0F
+b1 /
+1&
+#120000
+0&
+#130000
+19
+b10 ,
+b10 7
+b100 $
+b100 3
+1*
+1&
+#140000
+0&
+#150000
+09
+b10 #
+b10 E
+b10 H
+1F
+b100 G
+0*
+b0 ,
+b0 7
+1&
+#160000
+0&
+#170000
+b0 #
+b0 E
+b0 H
+0F
+b10 /
+1&
+#180000
+0&
+#190000
+19
+b10 ,
+b10 7
+b1000 $
+b1000 3
+1*
+1&
+#200000
+0&
+#210000
+09
+b10 H
+1F
+b1000 G
+0*
+b0 ,
+b0 7
+1&
+#220000
+0&
+#230000
+b0 H
+0F
+b11 /
+1&
+#240000
+0&
+#250000
+19
+b10 ,
+b10 7
+b1100 $
+b1100 3
+1*
+1&
+#260000
+0&
+#270000
+09
+b10 H
+1F
+b1100 G
+0*
+b0 ,
+b0 7
+1&
+#280000
+0&
+#290000
+b0 H
+0F
+b100 /
+1&
+#300000
+0&
+#310000
+19
+b10 ,
+b10 7
+b10000 $
+b10000 3
+1*
+1&
+#320000
+0&
+#330000
+09
+b10 H
+1F
+b10000 G
+0*
+b0 ,
+b0 7
+1&
+#340000
+0&
+#350000
+b0 H
+0F
+b101 /
+1&
+#360000
+0&
+#370000
+19
+1.
+b10 ,
+b10 7
+b0 $
+b0 3
+1*
+1&
+#380000
+0&
+#390000
+09
+b10 H
+1F
+1I
+b0 G
+0*
+b0 ,
+b0 7
+b101 -
+b101 8
+1&
+#400000
+0&
+#410000
+b101 K
+b0 H
+0F
+0.
+1&
+#420000
+0&
+#430000
+19
+b10 ,
+b10 7
+1*
+1&
+#440000
+0&
+#450000
+09
+b101 #
+b101 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#460000
+0&
+#470000
+b0 #
+b0 E
+b0 H
+0F
+b110 /
+1&
+#480000
+0&
+#490000
+19
+1.
+b10 ,
+b10 7
+b1100 $
+b1100 3
+1*
+1&
+#500000
+0&
+#510000
+09
+b10 H
+1F
+1I
+b1100 G
+0*
+b0 ,
+b0 7
+b11001010111111101011101010111110 -
+b11001010111111101011101010111110 8
+1&
+#520000
+0&
+#530000
+b11001010111111101011101010111110 M
+b0 H
+0F
+0.
+1&
+#540000
+0&
+#550000
+19
+b10 ,
+b10 7
+1*
+1&
+#560000
+0&
+#570000
+09
+b11001010111111101011101010111110 #
+b11001010111111101011101010111110 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#580000
+0&
+#590000
+b0 #
+b0 E
+b0 H
+0F
+b111 /
+1&
+#600000
+0&
+#610000
+19
+1.
+b10 ,
+b10 7
+b1000 $
+b1000 3
+1*
+1&
+#620000
+0&
+#630000
+09
+b10 H
+1F
+1I
+b1000 G
+0*
+b0 ,
+b0 7
+b11011110101011011011111011101111 -
+b11011110101011011011111011101111 8
+1&
+#640000
+0&
+#650000
+b1011111011101111 L
+b0 H
+0F
+0.
+1&
+#660000
+0&
+#670000
+19
+b10 ,
+b10 7
+1*
+1&
+#680000
+0&
+#690000
+09
+b1011111011101111 #
+b1011111011101111 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#700000
+0&
+#710000
+b0 #
+b0 E
+b0 H
+0F
+b1 0
+b1 2
+1&
+#720000
+0&
+#730000
+19
+1.
+b10 ,
+b10 7
+1*
+1&
+#740000
+0&
+#750000
+09
+b10 H
+1F
+1I
+0*
+b0 ,
+b0 7
+b10100101101001010101101001011010 -
+b10100101101001010101101001011010 8
+1&
+#760000
+0&
+#770000
+b101101001011010 L
+b0 H
+0F
+0.
+1&
+#780000
+0&
+#790000
+19
+b10 ,
+b10 7
+1*
+1&
+#800000
+0&
+#810000
+09
+b101101001011010 #
+b101101001011010 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#820000
+0&
+#830000
+b0 #
+b0 E
+b0 H
+0F
+b10 0
+b10 2
+1&
+#840000
+0&
+#850000
+19
+1.
+b10 ,
+b10 7
+b100 $
+b100 3
+1*
+1&
+#860000
+0&
+#870000
+09
+b10 H
+1F
+1I
+b100 G
+0*
+b0 ,
+b0 7
+b11111111111111111111111111111111 -
+b11111111111111111111111111111111 8
+1&
+#880000
+0&
+#890000
+b0 H
+0F
+0.
+b1 1
+b11 2
+1&
+#900000
+0&
+#910000
+19
+b10 ,
+b10 7
+1*
+1&
+#920000
+0&
+#930000
+09
+b10 #
+b10 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#940000
+0&
+#950000
+b0 #
+b0 E
+b0 H
+0F
+b1000 /
+1&
+#960000
+0&
+#970000
+19
+1.
+b10 ,
+b10 7
+b100000 $
+b100000 3
+1*
+1&
+#980000
+0&
+#990000
+09
+b10 H
+1F
+1I
+b100000 G
+0*
+b0 ,
+b0 7
+b10010001101000101011001111000 -
+b10010001101000101011001111000 8
+1&
+#1000000
+0&
+#1010000
+1"
+b0 H
+0F
+0.
+b10 1
+b100 2
+1&
+#1020000
+0&
+#1030000
+19
+0"
+b10 ,
+b10 7
+1*
+1&
+#1040000
+0&
+#1050000
+09
+b11011110101011010000000000000000 #
+b11011110101011010000000000000000 E
+b10 H
+1F
+0I
+0*
+b0 ,
+b0 7
+1&
+#1060000
+0&
+#1070000
+b0 #
+b0 E
+b0 H
+0F
+1"
+1&
+#1080000
+0&
+#1090000
+0"
+1&
+#1100000
+0&
+#1110000
+1&

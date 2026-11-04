@@ -181,6 +181,16 @@ class ReportGeneratorAgent(BaseAgent):
                     priority=issue.severity,
                 ))
 
+            if rtl_analysis.power:
+                for p_issue in rtl_analysis.power.all_issues:
+                    fixes.append(RecommendedFix(
+                        action=p_issue.description,
+                        file=p_issue.file,
+                        module=p_issue.module,
+                        priority="critical" if p_issue.severity in ("critical", "error") else "high",
+                        code_suggestion=p_issue.recommendation,
+                    ))
+
         # Build prevention measures
         prevention = [
             PreventionMeasure(
@@ -206,6 +216,9 @@ class ReportGeneratorAgent(BaseAgent):
             for x in rtl_analysis.xtrace.x_origins:
                 affected_signals.append(x.origin_signal)
                 affected_signals.extend(x.affected_outputs)
+            if rtl_analysis.power:
+                for p_issue in rtl_analysis.power.all_issues:
+                    affected_signals.extend(p_issue.signals)
 
         # Build evidence chain
         evidence = list(classification.evidence)
@@ -225,6 +238,14 @@ class ReportGeneratorAgent(BaseAgent):
                     source="rtl",
                     reference=f"{x.file}:{x.line_number}",
                     description=f"Signal '{x.origin_signal}' never reset in module '{x.origin_module}'",
+                ))
+        if rtl_analysis and rtl_analysis.power:
+            for p_issue in rtl_analysis.power.all_issues:
+                evidence.append(EvidenceItem(
+                    source="upf_power_intent",
+                    reference=p_issue.domain or "UPF",
+                    description=p_issue.description,
+                    snippet=p_issue.recommendation,
                 ))
 
         # Determine primary RTL file and line
@@ -290,6 +311,7 @@ class ReportGeneratorAgent(BaseAgent):
             "errors": knowledge.logs.errors[:10],
             "mismatches": knowledge.logs.scoreboard_mismatches[:10],
             "fix": fix_result,
+            "upf": knowledge.upf,
         }
 
     def _generate_markdown_report(self, context: dict) -> str:
@@ -314,7 +336,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"|-------|-------|",
             f"| **Classification** | {report.classification} |",
             f"| **Module** | {report.module} |",
-            f"| **Confidence** | {report.confidence}% |",
             f"| **Category** | {report.category} |",
             f"| **Severity** | {report.severity} |",
             f"",
@@ -429,6 +450,54 @@ class ReportGeneratorAgent(BaseAgent):
                 ])
                 for issue in rtl_analysis.lint.issues:
                     lines.append(f"- [{issue.issue_type}] {issue.description}")
+                lines.append("")
+
+        # Power-Aware Intent (UPF Analysis)
+        upf = context.get("upf")
+        if upf:
+            lines.extend([
+                "## Power-Aware Intent (UPF Analysis)",
+                "",
+                f"**Power Domains:** {len(upf.power_domains)} | **Power Switches:** {len(upf.power_switches)} | **Isolation Strategies:** {len(upf.isolation_strategies)} | **Retention Strategies:** {len(upf.retention_strategies)}",
+                "",
+            ])
+            if upf.power_domains:
+                lines.extend([
+                    "### Power Domains",
+                    "",
+                    "| Domain Name | Scope | Elements | Primary Power | Primary Ground |",
+                    "|-------------|-------|----------|---------------|----------------|",
+                ])
+                for pd in upf.power_domains:
+                    elems = ", ".join(pd.elements) if pd.elements else "(top/all)"
+                    lines.append(f"| `{pd.name}` | `{pd.scope or '.'}` | `{elems}` | `{pd.primary_power_net or 'VDD'}` | `{pd.primary_ground_net or 'VSS'}` |")
+                lines.append("")
+
+            domain_crossings = getattr(upf, "domain_crossings", [])
+            if domain_crossings:
+                lines.extend([
+                    "### Cross-Domain Boundary Signals",
+                    "",
+                    "| Signal | Source Domain | Destination Domain | Isolation Strategy | Status |",
+                    "|--------|---------------|--------------------|--------------------|--------|",
+                ])
+                for dc in domain_crossings:
+                    iso_tag = f"`{dc.isolation_strategy}`" if getattr(dc, 'has_isolation', False) else "**NONE (HAZARD)**"
+                    status_str = "PASS" if not getattr(dc, 'issues', []) else "WARNING: Missing Isolation"
+                    lines.append(f"| `{getattr(dc, 'signal', '')}` | `{getattr(dc, 'source_domain', '')}` | `{getattr(dc, 'dest_domain', '')}` | {iso_tag} | {status_str} |")
+                lines.append("")
+
+            val_issues = getattr(upf, "validation_issues", []) or getattr(upf, "diagnostics", [])
+            if val_issues:
+                lines.extend([
+                    "### UPF Diagnostics & Verification Findings",
+                    "",
+                ])
+                for vi in val_issues:
+                    sev = getattr(vi, 'severity', 'warning').upper()
+                    itype = getattr(vi, 'issue_type', getattr(vi, 'code', 'UPF'))
+                    desc = getattr(vi, 'description', getattr(vi, 'message', ''))
+                    lines.append(f"- **[{sev}]** ({itype}): {desc}")
                 lines.append("")
 
         # Recommended Fixes
@@ -595,20 +664,20 @@ class ReportGeneratorAgent(BaseAgent):
         rtl_analysis = context.get("rtl_analysis")
 
         severity_colors = {
-            "critical": "#ef4444",
-            "high": "#f97316",
-            "medium": "#eab308",
-            "low": "#22c55e",
+            "critical": "#bf2b4c",
+            "high": "#d4a373",
+            "medium": "#93a395",
+            "low": "#c2cfc3",
         }
-        severity_color = severity_colors.get(report.severity.lower() if report.severity else "medium", "#38bdf8")
+        severity_color = severity_colors.get(report.severity.lower() if report.severity else "medium", "#f4efe6")
 
         classification_colors = {
-            "RTL Bug": "#ef4444",
-            "TB Bug": "#f97316",
-            "Spec Bug": "#eab308",
-            "Unknown": "#94a3b8",
+            "RTL Bug": "#bf2b4c",
+            "TB Bug": "#d4a373",
+            "Spec Bug": "#93a395",
+            "Unknown": "#cfc6b5",
         }
-        class_color = classification_colors.get(report.classification, "#38bdf8")
+        class_color = classification_colors.get(report.classification, "#f4efe6")
 
         # Sovereign Security & Air-Gap Compliance status
         from verisight.config import get_config
@@ -625,7 +694,7 @@ class ReportGeneratorAgent(BaseAgent):
             sec_guard_status = "MONITORED"
             sec_shield = "🔒"
         sec_provider = (cfg.llm.provider or "gemini").upper()
-        sec_model = cfg.llm.model_name or "gemini-2.0-flash"
+        sec_model = cfg.llm.model_name or "gemini-3.8-flash"
 
         # Determine failure timestamp for waveform studio
         failure_ts = 65.0
@@ -761,9 +830,10 @@ class ReportGeneratorAgent(BaseAgent):
                     """
 
                 fix_section_html = f"""
-                    <div class="fix-hero-card">
+                    <div class="fix-hero-card fix-recommendation">
+
                         <div class="fix-status-banner status-pass">
-                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct}
+                            <span class="status-dot"></span> AUTOMATED FIX AVAILABLE • CONFIDENCE {conf_pct} • Fix Recommendation (Agent 5)
                         </div>
                         <div class="grid-2col" style="margin-top:16px;">
                             <div>
@@ -814,6 +884,58 @@ class ReportGeneratorAgent(BaseAgent):
                     </div>
                 """
 
+        # UPF Power Intent HTML Section
+        upf_obj = context.get("upf")
+        upf_tab_btn = ""
+        upf_section_html = ""
+        if upf_obj:
+            upf_tab_btn = '<button class="nav-tab-btn" onclick="switchTab(\'tab-upf\')">⚡ Power Intent (UPF)</button>'
+            dom_rows = ""
+            for pd in upf_obj.power_domains:
+                elems = ", ".join(pd.elements) if pd.elements else "(top/all)"
+                dom_rows += f"<tr><td><code>{pd.name}</code></td><td><code>{pd.scope or '.'}</code></td><td>{elems}</td><td><code>{pd.primary_power_net or 'VDD'}</code></td><td><code>{pd.primary_ground_net or 'VSS'}</code></td></tr>"
+
+            crossing_rows = ""
+            domain_crossings_list = getattr(upf_obj, "domain_crossings", [])
+            for dc in domain_crossings_list:
+                iso_badge = f'<span class="badge badge-success">{dc.isolation_strategy}</span>' if getattr(dc, 'has_isolation', False) else '<span class="badge badge-error">UNISOLATED</span>'
+                crossing_rows += f"<tr><td><code>{getattr(dc, 'signal', '')}</code></td><td>{getattr(dc, 'source_domain', '')}</td><td>{getattr(dc, 'dest_domain', '')}</td><td>{iso_badge}</td><td>{'<span class=\"badge badge-warn\">HAZARD</span>' if getattr(dc, 'issues', []) else '<span class=\"badge badge-success\">PASS</span>'}</td></tr>"
+
+            diag_items = ""
+            val_issues_list = getattr(upf_obj, "validation_issues", []) or getattr(upf_obj, "diagnostics", [])
+            for vi in val_issues_list:
+                sev = getattr(vi, 'severity', 'warning')
+                itype = getattr(vi, 'issue_type', getattr(vi, 'code', 'UPF'))
+                desc = getattr(vi, 'description', getattr(vi, 'message', ''))
+                badge_cls = "badge-error" if sev == "error" else "badge-warn"
+                diag_items += f'<div class="evidence-card" style="margin-bottom:8px;"><span class="badge {badge_cls}">[{sev.upper()}] {itype}</span> <span style="margin-left:8px;">{desc}</span></div>'
+
+            upf_section_html = f"""
+                <div class="rca-hero-card">
+                    <div class="card-title-row">
+                        <div class="card-title"><span>⚡</span> UPF Power Intent Architecture</div>
+                        <span class="badge badge-info">{len(upf_obj.power_domains)} Power Domains</span>
+                    </div>
+                    <div class="grid-2col" style="margin-top:16px;">
+                        <div>
+                            <h4>Power Domains & Hierarchy Mapping</h4>
+                            <table class="table-styled">
+                                <thead><tr><th>Domain</th><th>Scope</th><th>RTL Elements</th><th>Power</th><th>Ground</th></tr></thead>
+                                <tbody>{dom_rows if dom_rows else '<tr><td colspan="5">No domains</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h4>Boundary Signals & Isolation Checks ({len(upf_obj.domain_crossings)})</h4>
+                            <table class="table-styled">
+                                <thead><tr><th>Signal</th><th>Source</th><th>Dest</th><th>Isolation</th><th>Status</th></tr></thead>
+                                <tbody>{crossing_rows if crossing_rows else '<tr><td colspan="5">No cross-domain boundary signals</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {f'<h4 style="margin-top:20px;">UPF Power Diagnostics & Rule Checks</h4><div style="margin-top:10px;">{diag_items}</div>' if diag_items else ''}
+                </div>
+            """
+
         # Signals Badges
         signals_html = ""
         if report.affected_signals:
@@ -832,23 +954,23 @@ class ReportGeneratorAgent(BaseAgent):
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {{
-            --bg-canvas: #080c14;
-            --card-bg: rgba(15, 23, 42, 0.75);
-            --card-border: rgba(148, 163, 184, 0.12);
-            --card-hover: rgba(30, 41, 59, 0.85);
-            --text-main: #f1f5f9;
-            --text-dim: #94a3b8;
-            --text-muted: #64748b;
+            --bg-canvas: #0c0e0d;
+            --card-bg: rgba(21, 26, 23, 0.82);
+            --card-border: rgba(147, 163, 149, 0.18);
+            --card-hover: rgba(29, 36, 32, 0.92);
+            --text-main: #f4efe6;
+            --text-dim: #cfc6b5;
+            --text-muted: #93a395;
             
-            --cyan: #38bdf8;
-            --cyan-glow: rgba(56, 189, 248, 0.25);
-            --emerald: #10b981;
-            --emerald-glow: rgba(16, 185, 129, 0.25);
-            --rose: #f43f5e;
-            --rose-glow: rgba(244, 63, 94, 0.25);
-            --amber: #f59e0b;
-            --amber-glow: rgba(245, 158, 11, 0.25);
-            --indigo: #818cf8;
+            --cyan: #f4efe6;
+            --cyan-glow: rgba(244, 239, 230, 0.22);
+            --emerald: #93a395;
+            --emerald-glow: rgba(147, 163, 149, 0.28);
+            --rose: #bf2b4c;
+            --rose-glow: rgba(191, 43, 76, 0.35);
+            --amber: #d4a373;
+            --amber-glow: rgba(212, 163, 115, 0.25);
+            --indigo: #861a33;
         }}
 
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -857,10 +979,10 @@ class ReportGeneratorAgent(BaseAgent):
             font-family: 'Inter', -apple-system, sans-serif;
             background-color: var(--bg-canvas);
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.08) 0%, transparent 40%),
-                linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+                radial-gradient(circle at 18% 12%, rgba(134, 26, 51, 0.16) 0%, transparent 48%),
+                radial-gradient(circle at 82% 82%, rgba(147, 163, 149, 0.12) 0%, transparent 48%),
+                linear-gradient(rgba(244, 239, 230, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(244, 239, 230, 0.04) 1px, transparent 1px);
             background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
             color: var(--text-main);
             line-height: 1.55;
@@ -896,27 +1018,27 @@ class ReportGeneratorAgent(BaseAgent):
         .brand-icon {{
             width: 44px;
             height: 44px;
-            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            background: linear-gradient(135deg, #861a33, #bf2b4c);
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 22px;
-            box-shadow: 0 0 20px var(--cyan-glow);
+            box-shadow: 0 0 20px rgba(134, 26, 51, 0.4);
         }}
 
         .brand-titles h1 {{
             font-size: 20px;
             font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #ffffff, #93c5fd);
+            background: linear-gradient(90deg, #ffffff, #f4efe6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }}
 
         .brand-titles .subtitle {{
             font-size: 12px;
-            color: var(--text-dim);
+            color: #93a395;
             font-weight: 500;
         }}
 
@@ -1606,11 +1728,6 @@ class ReportGeneratorAgent(BaseAgent):
                 <div class="kpi-val" style="color: {class_color}">{report.classification}</div>
                 <div class="kpi-sub">Root failure attribution</div>
             </div>
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">Diagnostic Confidence</div>
-                <div class="kpi-val" style="color: #34d399;">{report.confidence}%</div>
-                <div class="kpi-sub">Multi-agent consensus</div>
-            </div>
             <div class="kpi-card">
                 <div class="kpi-label">Primary Module</div>
                 <div class="kpi-val" style="font-size: 18px; word-break: break-all;">{report.module or 'apb_slave.sv'}</div>
@@ -1641,6 +1758,7 @@ class ReportGeneratorAgent(BaseAgent):
             <button class="nav-tab-btn" onclick="switchTab('tab-evidence')">⛓️ Evidence Chain ({len(report.evidence)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-reasoning')">🧠 Diagnostic Reasoning ({len(report.reasoning)})</button>
             <button class="nav-tab-btn" onclick="switchTab('tab-fix')">🛠️ Automated Fix & Patch</button>
+            {upf_tab_btn}
             {f'<button class="nav-tab-btn" onclick="switchTab(\'tab-xtracer\')">🔬 Gate X-Tracer</button>' if xtracer_items else ''}
         </nav>
 
@@ -1709,6 +1827,8 @@ class ReportGeneratorAgent(BaseAgent):
         <div id="tab-fix" class="tab-pane">
             {fix_section_html}
         </div>
+
+        {f'<div id="tab-upf" class="tab-pane">{upf_section_html}</div>' if upf_obj else ''}
 
         {f'<div id="tab-xtracer" class="tab-pane">{xtracer_items}</div>' if xtracer_items else ''}
 
@@ -1815,7 +1935,6 @@ class ReportGeneratorAgent(BaseAgent):
             f"Simulation:     {context['simulation_status']} ({context['simulation_time']})",
             "",
             f"Classification: {report.classification}",
-            f"Confidence:     {report.confidence}%",
             f"Module:         {report.module}",
             f"Category:       {report.category}",
             f"Severity:       {report.severity}",
@@ -1892,8 +2011,28 @@ class ReportGeneratorAgent(BaseAgent):
         knowledge: UnifiedKnowledge,
         session_id: str,
     ) -> None:
-        """Store the debugging session in ChromaDB for future RAG."""
+        """Store the debugging session in ChromaDB for future RAG.
+
+        Writeback is GATED: only confident, non-'Unknown' conclusions are stored,
+        and always as verified=False (model-generated, not expert-confirmed). This
+        prevents the self-reinforcement loop where a low-confidence or abstained —
+        possibly wrong — conclusion is written back and then retrieved as
+        "evidence" on the next run.
+        """
         try:
+            from verisight.config import get_config
+            min_conf = get_config().pipeline.rag_writeback_min_confidence
+
+            if report.classification == "Unknown":
+                self.logger.info("RAG writeback skipped: classification is 'Unknown' (not stored to avoid reinforcing an abstention).")
+                return
+            if int(getattr(report, "confidence", 0) or 0) < min_conf:
+                self.logger.info(
+                    f"RAG writeback skipped: confidence {report.confidence} < "
+                    f"{min_conf} threshold (avoids reinforcing an unverified low-confidence conclusion)."
+                )
+                return
+
             # Build problem description from log errors
             error_msgs = [e.message for e in knowledge.logs.errors[:5]]
             problem = "; ".join(error_msgs) if error_msgs else report.root_cause
@@ -1914,8 +2053,13 @@ class ReportGeneratorAgent(BaseAgent):
                     "confidence": str(report.confidence),
                     "severity": report.severity,
                 },
+                verified=False,
             )
-            self.logger.info(f"Session stored in RAG knowledge base: {session_id}")
+            if hasattr(self.kb, "store_rtl_files") and knowledge.rtl:
+                self.kb.store_rtl_files(session_id, knowledge.rtl)
+            if hasattr(self.kb, "store_power_intent") and knowledge.upf:
+                self.kb.store_power_intent(session_id, knowledge.upf)
+            self.logger.info(f"Session stored in RAG knowledge base (verified=False): {session_id}")
 
         except Exception as e:
             self.logger.warning(f"Failed to store session in RAG: {e}")

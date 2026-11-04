@@ -8,15 +8,16 @@ Builds the UnifiedKnowledge (knowledge.json) passed to Agent 2.
 """
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union, Sequence
 from datetime import datetime
 
 from verisight.agents.base_agent import BaseAgent
 from verisight.parsers.spec_parser import parse_spec
 from verisight.parsers.rtl_parser import parse_rtl
+from verisight.parsers.upf_parser import parse_upf
 from verisight.parsers.uvm_parser import parse_uvm
 from verisight.parsers.log_parser import parse_log
-from verisight.parsers.coverage_parser import parse_coverage
+from verisight.parsers.coverage_parser import parse_coverage, CoverageFormatError
 from verisight.parsers.vcd_parser import parse_vcd
 from verisight.schemas.knowledge_schema import UnifiedKnowledge, RAGContext
 from verisight.rag.knowledge_base import KnowledgeBase
@@ -59,11 +60,12 @@ class KnowledgeExtractionAgent(BaseAgent):
     def execute(
         self,
         spec_path: Optional[str] = None,
-        rtl_path: Optional[str] = None,
+        rtl_path: Optional[Union[str, Sequence[str]]] = None,
         tb_path: Optional[str] = None,
         log_path: Optional[str] = None,
         coverage_path: Optional[str] = None,
         vcd_path: Optional[str] = None,
+        upf_path: Optional[Union[str, Sequence[str]]] = None,
     ) -> UnifiedKnowledge:
         """
         Execute knowledge extraction from all available inputs.
@@ -76,6 +78,7 @@ class KnowledgeExtractionAgent(BaseAgent):
             coverage_path: Optional path to coverage report.
             vcd_path: Optional path to a simulation waveform (VCD), either
                 user-supplied or produced internally by --simulate.
+            upf_path: Optional path to UPF power intent file(s).
 
         Returns:
             UnifiedKnowledge containing all parsed and enriched knowledge.
@@ -118,6 +121,26 @@ class KnowledgeExtractionAgent(BaseAgent):
         else:
             self.logger.warning("No RTL provided")
 
+        # ─── Step 2.5: Parse UPF Power Intent (Optional) ──────────
+        if upf_path:
+            self.logger.info(f"Step 2.5: Parsing UPF Power Intent: {upf_path}")
+            knowledge.upf = parse_upf(upf_path, rtl_knowledge=knowledge.rtl)
+            knowledge.input_files["upf"] = knowledge.upf.file_paths
+            self.logger.info(
+                f"  → {len(knowledge.upf.power_domains)} domains, "
+                f"{len(knowledge.upf.power_switches)} power switches, "
+                f"{len(knowledge.upf.isolation_strategies)} isolation strategies, "
+                f"{len(knowledge.upf.level_shifters)} level shifters, "
+                f"{len(knowledge.upf.retention_strategies)} retention strategies"
+            )
+            for diag in knowledge.upf.diagnostics:
+                if diag.severity == "error":
+                    self.logger.error(f"  [UPF Diagnostic] {diag.file}:{diag.line_number} {diag.message}")
+                else:
+                    self.logger.warning(f"  [UPF Diagnostic] {diag.file}:{diag.line_number} {diag.message}")
+        else:
+            self.logger.info("Step 2.5: No UPF power intent provided (RTL-only analysis)")
+
         # ─── Step 3: Parse UVM Testbench ──────────────────────────
         if tb_path:
             self.logger.info(f"Step 3: Parsing UVM testbench: {tb_path}")
@@ -147,8 +170,13 @@ class KnowledgeExtractionAgent(BaseAgent):
         # ─── Step 5: Parse Coverage (Optional) ────────────────────
         if coverage_path:
             self.logger.info(f"Step 5: Parsing coverage: {coverage_path}")
-            knowledge.coverage = parse_coverage(coverage_path)
-            knowledge.input_files["coverage"] = [coverage_path]
+            try:
+                knowledge.coverage = parse_coverage(coverage_path)
+                knowledge.input_files["coverage"] = [coverage_path]
+            except CoverageFormatError as e:
+                self.logger.warning(f"Coverage conversion warning: {e}")
+                knowledge.coverage = CoverageData()
+                knowledge.input_files["coverage"] = [coverage_path]
         else:
             self.logger.info("Step 5: No coverage report provided (optional)")
 
@@ -180,6 +208,8 @@ class KnowledgeExtractionAgent(BaseAgent):
         self.logger.info("Agent 1: Knowledge Extraction Complete")
         self.logger.info(f"  Spec requirements: {len(knowledge.spec.functional_requirements)}")
         self.logger.info(f"  RTL modules: {len(knowledge.rtl.modules)}")
+        if knowledge.upf:
+            self.logger.info(f"  Power domains: {len(knowledge.upf.power_domains)} (UPF)")
         self.logger.info(f"  TB drivers: {len(knowledge.tb.drivers)}")
         self.logger.info(f"  Log errors: {knowledge.logs.summary.total_errors}")
         self.logger.info(f"  Simulation: {knowledge.logs.summary.pass_fail}")

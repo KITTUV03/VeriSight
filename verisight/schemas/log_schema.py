@@ -27,10 +27,34 @@ class LogEntry(BaseModel):
     timestamp: str = Field(default="", description="Simulation timestamp (e.g., '120 ns')")
     component: str = Field(default="", description="UVM component path")
     message: str = Field(description="Log message text")
+    message_id: str = Field(default="", description="UVM message [ID] tag, e.g. 'SCB' (simulator-independent dedup key)")
     file: str = Field(default="", description="Source file reference")
     line: int = Field(default=0, description="Source line number")
+    phase: str = Field(default="runtime", description="Failure stage: compile/elaboration/runtime")
     raw_line: str = Field(default="", description="Original raw log line")
     line_number_in_log: int = Field(default=0, description="Line number in the log file")
+
+
+class ToolError(BaseModel):
+    """A simulator-native compile/elaboration error (no UVM severity token)."""
+    line_no: int = Field(default=0, description="1-based line number in the log")
+    text: str = Field(default="", description="The error line text")
+    stage: str = Field(default="compile", description="compile/elaboration")
+    tool: str = Field(default="", description="Detected simulator (verilator/vcs/questa/xcelium/iverilog/generic)")
+
+
+class FailureEvent(BaseModel):
+    """A causally-ordered failure event (primary root anchor or cascade symptom)."""
+    kind: str = Field(default="", description="compile_error/elaboration_error/fatal/error/assertion/mismatch")
+    stage: str = Field(default="runtime", description="compile/elaboration/runtime")
+    timestamp: str = Field(default="", description="Simulation timestamp string")
+    time_ns: Optional[float] = Field(default=None, description="Timestamp normalised to nanoseconds (unit-aware)")
+    message: str = Field(default="", description="Event message")
+    file: str = Field(default="", description="Source file if known")
+    line: int = Field(default=0, description="Source line if known")
+    severity: str = Field(default="", description="Severity/kind token")
+    log_line: int = Field(default=0, description="1-based line number in the log")
+    rationale: str = Field(default="", description="Why this event was selected (primary only)")
 
 
 class AssertionFailure(BaseModel):
@@ -128,6 +152,7 @@ class SimulationSummary(BaseModel):
     total_fatals: int = Field(default=0, description="Total UVM_FATAL count")
     simulation_time: str = Field(default="", description="Total simulation time")
     pass_fail: str = Field(default="UNKNOWN", description="Overall PASS/FAIL status")
+    failure_stage: str = Field(default="none", description="Earliest stage that failed: compile/elaboration/runtime/none")
     seed: str = Field(default="", description="Random seed used")
 
 
@@ -180,6 +205,18 @@ class LogKnowledge(BaseModel):
     summary: SimulationSummary = Field(
         default_factory=SimulationSummary,
         description="Overall simulation summary"
+    )
+    tool_errors: List[ToolError] = Field(
+        default_factory=list,
+        description="Simulator-native compile/elaboration errors (non-UVM)"
+    )
+    primary_event: Optional[FailureEvent] = Field(
+        default=None,
+        description="Earliest causally-relevant failure — the root-cause anchor"
+    )
+    cascade_events: List[FailureEvent] = Field(
+        default_factory=list,
+        description="Later events that are candidate downstream symptoms of the primary"
     )
     log_file: str = Field(default="", description="Source log file path")
     total_lines: int = Field(default=0, description="Total lines in log file")

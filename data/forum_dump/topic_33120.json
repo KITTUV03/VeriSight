@@ -1,0 +1,146 @@
+{
+  "id": 33120,
+  "title": "Bind interface for internal DUT forcing",
+  "slug": "bind-interface-for-internal-dut-forcing",
+  "created_at": "2017-05-14T12:57:07.000Z",
+  "bumped_at": "2026-02-21T05:30:05.864Z",
+  "posts_count": 21,
+  "question_raw": "<p>Hi,</p>\n<p>I want to connect an interface to and internal DUT signals and connect it to a VIP driver, then force it through a task that is defined in the interface as follows:</p>\n<pre><code class=\"lang-verilog\">interface vip_axi_wrapper_lbw_if (input aclk, input aresetn, \n    output wire DUT_MASTER_awvalid[0:FC_MAX_NUM_OF_LBW_MASTERS-1],\n    .\n    task drive_if();\n\t force  DUT_MASTER_awvalid[0] = axi_if.master_if[0].awvalid;\nendinterface\n</code></pre>\n<p>Then I’m binding it to the DUT internal signals as foolows:</p>\n<pre><code class=\"lang-verilog\">bind top_tb vip_axi_wrapper_lbw_if pcie_rtr_vif (.aclk(top_if0.lbw_clk[0][0]), \n    .DUT_MASTER_awvalid\t\t('{`RTR_0_0_PATH_TMP.lbw_mstr_awvalid, top_if0.dummy}));\n</code></pre>\n<p>After that I’m passing it through the set_config as follows to an agent:</p>\n<pre><code class=\"lang-verilog\">initial uvm_config_db#(virtual vip_axi_wrapper_lbw_if)::set(null, \"*\" , \"pcie_rtr_lbw_vif\", top_tb.pcie_rtr_vif);\n</code></pre>\n<p>The problem is the force doesn’t apply on the RTL signal which is driven by the RTL and I see 'x’s. Is there a way of doing this?<br>\nThanks,<br>\nBerry</p>",
+  "question_text": "Hi,\nI want to connect an interface to and internal DUT signals and connect it to a VIP driver, then force it through a task that is defined in the interface as follows:\ninterface vip_axi_wrapper_lbw_if (input aclk, input aresetn, \n    output wire DUT_MASTER_awvalid[0:FC_MAX_NUM_OF_LBW_MASTERS-1],\n    .\n    task drive_if();\n\t force  DUT_MASTER_awvalid[0] = axi_if.master_if[0].awvalid;\nendinterface\n\nThen I’m binding it to the DUT internal signals as foolows:\nbind top_tb vip_axi_wrapper_lbw_if pcie_rtr_vif (.aclk(top_if0.lbw_clk[0][0]), \n    .DUT_MASTER_awvalid\t\t('{`RTR_0_0_PATH_TMP.lbw_mstr_awvalid, top_if0.dummy}));\n\nAfter that I’m passing it through the set_config as follows to an agent:\ninitial uvm_config_db#(virtual vip_axi_wrapper_lbw_if)::set(null, \"*\" , \"pcie_rtr_lbw_vif\", top_tb.pcie_rtr_vif);\n\nThe problem is the force doesn’t apply on the RTL signal which is driven by the RTL and I see 'x’s. Is there a way of doing this?\nThanks,\nBerry",
+  "author": "berryvai",
+  "replies": [
+    {
+      "id": 104320,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120\">berryvai</a>:</font></em></p>\n<p>I have two questions:<br>\n(1) why does your SV interface has ports?<br>\n(2) you are binding this Interface to tb_vip and not to the DUT. Is this what you want?</p>",
+      "text": "In reply to berryvai:\nI have two questions:\n(1) why does your SV interface has ports?\n(2) you are binding this Interface to tb_vip and not to the DUT. Is this what you want?",
+      "created_at": "2017-05-14T14:33:24.000Z"
+    },
+    {
+      "id": 104321,
+      "author": "berryvai",
+      "raw": "<p>Hi,</p>\n<p>Thanks for the response.</p>\n<ol>\n<li>The reason for the ports is that I’m trying to create a generic IF that I could connect RTL internal AXI interfaces in different blocks in my DUT, and force them to an AXI VIP. If I won’t use ports I’ll have to create an individual IF per RTL AXI end point.</li>\n<li>No, I’m binding the generic IF I created (vip_axi_wrapper_lbw_if) to my DUT that instantiated in the top_tb. After that I’m passing it through the factory to my agent, which will initiate the internal IF task that force the ports which was binded to the DUT.</li>\n</ol>\n<p>I managed to make this work in the EDA playground with a simple example. But since I’m using the set_config_db to pass the virtual IF, I think it might cause this to fail.</p>\n<p>Please advise.</p>\n<p>Thanks,<br>\nBerry</p>",
+      "text": "Hi,\nThanks for the response.\n\nThe reason for the ports is that I’m trying to create a generic IF that I could connect RTL internal AXI interfaces in different blocks in my DUT, and force them to an AXI VIP. If I won’t use ports I’ll have to create an individual IF per RTL AXI end point.\nNo, I’m binding the generic IF I created (vip_axi_wrapper_lbw_if) to my DUT that instantiated in the top_tb. After that I’m passing it through the factory to my agent, which will initiate the internal IF task that force the ports which was binded to the DUT.\n\nI managed to make this work in the EDA playground with a simple example. But since I’m using the set_config_db to pass the virtual IF, I think it might cause this to fail.\nPlease advise.\nThanks,\nBerry",
+      "created_at": "2017-05-14T14:49:19.000Z"
+    },
+    {
+      "id": 104322,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/3\">berryvai</a>:</font></em></p>\n<p>Unfortunately I do  not understand your Explanation for (1). Having ports in an SV Interface Limits the usage of this Interface.<br>\nThe Syntax for the bind construct is as follows<br>\nbind   &lt;inst. name of this module&gt;</p>",
+      "text": "In reply to berryvai:\nUnfortunately I do  not understand your Explanation for (1). Having ports in an SV Interface Limits the usage of this Interface.\nThe Syntax for the bind construct is as follows\nbind   <inst. name of this module>",
+      "created_at": "2017-05-14T15:29:14.000Z"
+    },
+    {
+      "id": 104323,
+      "author": "berryvai",
+      "raw": "<p>Hi,</p>\n<p>Sorry for being unclear, I’ll try to be more clear this time.<br>\nMy main purpose is to drive internal design IFs when those are already driven by RTL drivers.</p>\n<p>For this discussion these IFs are standard AXI4 IFs. Now, lets say I have few AXI4 IFs in the entire design, and I want to control which are driven by the VIP and overcome the RTL drivers and which are not forced by the VIP and driven by the RTL drivers as usual.</p>\n<p>For that purpose I created only one IF that has ports which correspond to AXI4, and a task that force those ports when the task is activated - as seen above. In this way I can connected each of the AXI4 internal RTL signals to an instance of this IF wrapper, and send them to the factory for the agent to pick them up and control which is active and which is not.</p>\n<p>The problem is that the force only apply on the ports, but the RTL signals, which are driven by the RTL, becomes ‘x’.<br>\nI there a better way of doing what I just described?</p>\n<p>Thanks,<br>\nBerry</p>",
+      "text": "Hi,\nSorry for being unclear, I’ll try to be more clear this time.\nMy main purpose is to drive internal design IFs when those are already driven by RTL drivers.\nFor this discussion these IFs are standard AXI4 IFs. Now, lets say I have few AXI4 IFs in the entire design, and I want to control which are driven by the VIP and overcome the RTL drivers and which are not forced by the VIP and driven by the RTL drivers as usual.\nFor that purpose I created only one IF that has ports which correspond to AXI4, and a task that force those ports when the task is activated - as seen above. In this way I can connected each of the AXI4 internal RTL signals to an instance of this IF wrapper, and send them to the factory for the agent to pick them up and control which is active and which is not.\nThe problem is that the force only apply on the ports, but the RTL signals, which are driven by the RTL, becomes ‘x’.\nI there a better way of doing what I just described?\nThanks,\nBerry",
+      "created_at": "2017-05-14T16:05:15.000Z"
+    },
+    {
+      "id": 104324,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/5\">berryvai</a>:</font></em></p>\n<p>Your wording is still a Little bit confusing to me.<br>\n(1) I guess you want to drive internal nodes or signals and not complete IFs. Right?<br>\n(2) What are RTL drivers? A node/Signal is driven by a RTL signel. Right?<br>\n(3) what is the implementation language of your design?</p>",
+      "text": "In reply to berryvai:\nYour wording is still a Little bit confusing to me.\n(1) I guess you want to drive internal nodes or signals and not complete IFs. Right?\n(2) What are RTL drivers? A node/Signal is driven by a RTL signel. Right?\n(3) what is the implementation language of your design?",
+      "created_at": "2017-05-14T17:39:06.000Z"
+    },
+    {
+      "id": 104325,
+      "author": "berryvai",
+      "raw": "<p>Hi,</p>\n<p>1)Yes. For example I have 3 RTL modules that connected one to another.<br>\nModuleA → ModuleB → ModuleC<br>\nIF1        IF2<br>\nI would like to drive IF1 and IF2 instead of ModuleA and moduleB respectively.<br>\nBut the way I want to do it is as mentioned. Encapsulate IF1 and IF2 in a virtual IF with a task that controls whether I force a VIP on them or not, send it to the UVM factory, and use the task during the simulation.<br>\n2) RTL drivers are moduleA and moduleB in my example.<br>\n3) The design is in Verilog and I do verification in SV and UVM.</p>\n<p>Thanks.</p>",
+      "text": "Hi,\n1)Yes. For example I have 3 RTL modules that connected one to another.\nModuleA → ModuleB → ModuleC\nIF1        IF2\nI would like to drive IF1 and IF2 instead of ModuleA and moduleB respectively.\nBut the way I want to do it is as mentioned. Encapsulate IF1 and IF2 in a virtual IF with a task that controls whether I force a VIP on them or not, send it to the UVM factory, and use the task during the simulation.\n2) RTL drivers are moduleA and moduleB in my example.\n3) The design is in Verilog and I do verification in SV and UVM.\nThanks.",
+      "created_at": "2017-05-14T18:36:09.000Z"
+    },
+    {
+      "id": 104326,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/7\">berryvai</a>:</font></em></p>\n<p>OK, I understand now. You have IF1 in between ModuleA and ModuleB, IF2 in between moduleB and moduleC.<br>\nWhy do you not implement in the SV Interfaces a MUX? One Input is used for the chain and the other one to drive from your testbench?</p>",
+      "text": "In reply to berryvai:\nOK, I understand now. You have IF1 in between ModuleA and ModuleB, IF2 in between moduleB and moduleC.\nWhy do you not implement in the SV Interfaces a MUX? One Input is used for the chain and the other one to drive from your testbench?",
+      "created_at": "2017-05-15T06:04:31.000Z"
+    },
+    {
+      "id": 104327,
+      "author": "berryvai",
+      "raw": "<p>Hi Thanks.</p>\n<p>The modules A-C are a part of the DUT. I do not have access to change them. I wish to force IF1 and IF2 from my test, depending on the configuration object defined by the user running the test.</p>\n<p>My idea was to connect an interface to IF1 and IF2, and use the force task inside it during the simulation. The problem is that I’m getting 'X’s.</p>\n<p>Thanks,<br>\nBerry</p>",
+      "text": "Hi Thanks.\nThe modules A-C are a part of the DUT. I do not have access to change them. I wish to force IF1 and IF2 from my test, depending on the configuration object defined by the user running the test.\nMy idea was to connect an interface to IF1 and IF2, and use the force task inside it during the simulation. The problem is that I’m getting 'X’s.\nThanks,\nBerry",
+      "created_at": "2017-05-15T06:31:24.000Z"
+    },
+    {
+      "id": 104328,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/9\">berryvai</a>:</font></em></p>\n<p>Please check this contribution:<br>\n<a href=\"https://verificationacademy.com/forums/uvm/how-force-dut-internal-signals-uvm-Environment\" class=\"onebox\" target=\"_blank\" rel=\"noopener nofollow ugc\">https://verificationacademy.com/forums/uvm/how-force-dut-internal-signals-uvm-Environment</a></p>",
+      "text": "In reply to berryvai:\nPlease check this contribution:\nhttps://verificationacademy.com/forums/uvm/how-force-dut-internal-signals-uvm-Environment",
+      "created_at": "2017-05-15T07:39:18.000Z"
+    },
+    {
+      "id": 104329,
+      "author": "berryvai",
+      "raw": "<p>Thanks very much.<br>\nI read this contribution, but the problem with that is that they instantiate the DUT, which in my case is already instantiated and is a sub-block of the whole DUT.<br>\nThey do:<br>\ndut dut_instance(.dut_pin(if_instance.dut_pin)); //connect if to DUT</p>\n<p>In my casr I tried something similar:<br>\ndut_if if_instance(.dut_pin(`PATH_TO_SUB_BLOCK.dut_instance.dut_pin)); //connect DUT to if</p>\n<p>But when I do get_uvm_db of the virtual vif in my testcase and drive vif.ctrl to ‘1’:<br>\nif(ctrl) begin<br>\nforce dut_pin = dut_pin_desired_val;<br>\nend, the forces<br>\nthe result is 'X’s on the `PATH_TO_SUB_BLOCK.dut_instance.dut_pin.</p>",
+      "text": "Thanks very much.\nI read this contribution, but the problem with that is that they instantiate the DUT, which in my case is already instantiated and is a sub-block of the whole DUT.\nThey do:\ndut dut_instance(.dut_pin(if_instance.dut_pin)); //connect if to DUT\nIn my casr I tried something similar:\ndut_if if_instance(.dut_pin(`PATH_TO_SUB_BLOCK.dut_instance.dut_pin)); //connect DUT to if\nBut when I do get_uvm_db of the virtual vif in my testcase and drive vif.ctrl to ‘1’:\nif(ctrl) begin\nforce dut_pin = dut_pin_desired_val;\nend, the forces\nthe result is 'X’s on the `PATH_TO_SUB_BLOCK.dut_instance.dut_pin.",
+      "created_at": "2017-05-15T08:34:03.000Z"
+    },
+    {
+      "id": 104330,
+      "author": "berryvai",
+      "raw": "<p>Here is another example of what I’m trying to do:<br>\ninterface whitebox_if(<br>\noutput wire sig<br>\n);<br>\ntask drive_if();<br>\nforce sig = vip.some_value;<br>\nendtask<br>\nendinterface</p>\n<p>module top;<br>\nbind inst_dut whitebox_if wb_if( sub_1.sig ); // bind interface to DUT + connect internal signals<br>\ninitial<br>\nuvm_config_db #(virtual whitebox_if)::set(null, “*”, dut.wb_if); // place (bound/buried) interface into database<br>\nendmodule</p>",
+      "text": "Here is another example of what I’m trying to do:\ninterface whitebox_if(\noutput wire sig\n);\ntask drive_if();\nforce sig = vip.some_value;\nendtask\nendinterface\nmodule top;\nbind inst_dut whitebox_if wb_if( sub_1.sig ); // bind interface to DUT + connect internal signals\ninitial\nuvm_config_db #(virtual whitebox_if)::set(null, “*”, dut.wb_if); // place (bound/buried) interface into database\nendmodule",
+      "created_at": "2017-05-15T08:39:33.000Z"
+    },
+    {
+      "id": 104331,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/12\">berryvai</a>:</font></em></p>\n<p>You are using in this example a hierarchical path (vip.some_value) and the bind. This might conflict.</p>",
+      "text": "In reply to berryvai:\nYou are using in this example a hierarchical path (vip.some_value) and the bind. This might conflict.",
+      "created_at": "2017-05-15T12:06:56.000Z"
+    },
+    {
+      "id": 104332,
+      "author": "berryvai",
+      "raw": "<p>This is not the problem, since I have vip class instance in the virtual interface, so you can assume this:</p>\n<p>force sig = 'h1212;</p>\n<p>So the problem here is much deeper That I can’t figure out. I think this is connected to the fact I’m using the factory to pass the virtual interface.</p>\n<p>Thanks,<br>\nBerry</p>",
+      "text": "This is not the problem, since I have vip class instance in the virtual interface, so you can assume this:\nforce sig = 'h1212;\nSo the problem here is much deeper That I can’t figure out. I think this is connected to the fact I’m using the factory to pass the virtual interface.\nThanks,\nBerry",
+      "created_at": "2017-05-15T12:28:24.000Z"
+    },
+    {
+      "id": 104333,
+      "author": "berryvai",
+      "raw": "<p>BTW, I can solve the whole problem by forcing to the exact RTL internal signal, and not using the ports, but this means I will have to create a unique interface per sub-block (IF1, IF2, IF3 …), and since the interfaces are pretty much the same per block, this will be very ugly.</p>\n<p>Thanks,<br>\nBerry</p>",
+      "text": "BTW, I can solve the whole problem by forcing to the exact RTL internal signal, and not using the ports, but this means I will have to create a unique interface per sub-block (IF1, IF2, IF3 …), and since the interfaces are pretty much the same per block, this will be very ugly.\nThanks,\nBerry",
+      "created_at": "2017-05-15T12:30:34.000Z"
+    },
+    {
+      "id": 104334,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/15\">berryvai</a>:</font></em></p>\n<p>You are using the config_db. This is a very simple and straight Forward mechanism. I do not believe it Comes from there.</p>",
+      "text": "In reply to berryvai:\nYou are using the config_db. This is a very simple and straight Forward mechanism. I do not believe it Comes from there.",
+      "created_at": "2017-05-15T13:02:34.000Z"
+    },
+    {
+      "id": 104335,
+      "author": "berryvai",
+      "raw": "<p>Yes. But this is the only thing I have in mind here. So why does this strategy fail?</p>\n<p>Thanks.</p>",
+      "text": "Yes. But this is the only thing I have in mind here. So why does this strategy fail?\nThanks.",
+      "created_at": "2017-05-15T13:05:53.000Z"
+    },
+    {
+      "id": 104336,
+      "author": "berryvai",
+      "raw": "<p>Anyone has more ideas, please?</p>",
+      "text": "Anyone has more ideas, please?",
+      "created_at": "2017-05-16T08:10:46.000Z"
+    },
+    {
+      "id": 104337,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/bind-interface-for-internal-dut-forcing/33120/18\">berryvai</a>:</font></em></p>\n<p>I was working on a simple example. It is quick and dirty but it works.<br>\nCan you please respond on my email:<br>\n<a href=\"mailto:Christoph@christoph-suehnel.de\">Christoph@christoph-suehnel.de</a></p>",
+      "text": "In reply to berryvai:\nI was working on a simple example. It is quick and dirty but it works.\nCan you please respond on my email:\nChristoph@christoph-suehnel.de",
+      "created_at": "2017-05-16T11:06:11.000Z"
+    },
+    {
+      "id": 156551,
+      "author": "Adithya0708",
+      "raw": "<p>Hi Berry,</p>\n<p>I am newbie to verification and my thoughts  are , why cant we directly take the hierarchical path  for the signal and force it in the DUT(simplest solution possible).</p>\n<p>why do we even need an interface and task to do the same? Is it for configurability or something else?</p>\n<p>please suggest the best solution if  you have one.</p>\n<p>Thank you.</p>",
+      "text": "Hi Berry,\nI am newbie to verification and my thoughts  are , why cant we directly take the hierarchical path  for the signal and force it in the DUT(simplest solution possible).\nwhy do we even need an interface and task to do the same? Is it for configurability or something else?\nplease suggest the best solution if  you have one.\nThank you.",
+      "created_at": "2026-02-20T06:15:57.927Z"
+    }
+  ]
+}

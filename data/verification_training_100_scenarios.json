@@ -1,0 +1,1798 @@
+{
+  "title": "VeriSight Verification Diagnostic Training Dataset",
+  "timestamp": "2026-10-22T14:05:52.915060",
+  "total_scenarios": 100,
+  "total_patterns": 10,
+  "total_protocols": 5,
+  "total_assertions": 5,
+  "scenarios": [
+    {
+      "id": "rtl_func_001_ram_offbyone",
+      "problem": "Scoreboard mismatch in RAM synchronous read test: Mismatch @addr 1 EXP=201 ACT=110 at time 45ns. Address 1 read returned data written to address 2.",
+      "cause": "The RTL synchronous read assignment in ram_rtl.sv:29 indexed the memory array as mem[addr+1] instead of mem[addr], an off-by-one addressing bug that also hazards out-of-bounds index on addr=15.",
+      "fix": "In ram_rtl.sv line 29, change `rdata <= mem[addr+1];` to `rdata <= mem[addr];`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "ram_rtl.sv"
+      ],
+      "metadata": {
+        "protocol": "SRAM",
+        "severity": "HIGH",
+        "bug_type": "off_by_one"
+      }
+    },
+    {
+      "id": "rtl_func_002_fifo_wr_ptr_overflow",
+      "problem": "FIFO pointer corruption: UVM_ERROR at 120ns - FIFO overflow undetected, write pointer wrapped at 15 instead of 16 causing data overwrite in slot 0.",
+      "cause": "Write pointer bit-width declared as [3:0] instead of [4:0] for a 16-deep FIFO. Without the MSB flag for full/empty disambiguation, full condition could not distinguish empty from full.",
+      "fix": "Declare write and read pointers with ADDR_WIDTH bit-width plus one extra MSB: `logic [ADDR_WIDTH:0] wr_ptr, rd_ptr;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "fifo_rtl.sv"
+      ],
+      "metadata": {
+        "protocol": "FIFO",
+        "severity": "HIGH",
+        "bug_type": "pointer_width"
+      }
+    },
+    {
+      "id": "rtl_func_003_fifo_full_flag_latency",
+      "problem": "Data loss: FIFO wrote data into slot 16 when full was asserted 1 clock cycle late, corrupting memory contents.",
+      "cause": "Full flag logic in synchronous FIFO was registered with an extra non-blocking stage without lookahead, delaying the assertion of `full` by 1 clock cycle.",
+      "fix": "Compute full flag combinationally from next-state pointer values or assert lookahead full when `wr_ptr + 1 == rd_ptr ^ MSB_MASK`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "sync_fifo.sv"
+      ],
+      "metadata": {
+        "protocol": "FIFO",
+        "severity": "HIGH",
+        "bug_type": "latency_hazard"
+      }
+    },
+    {
+      "id": "rtl_func_004_fifo_empty_early_deassert",
+      "problem": "Scoreboard underflow error: Read transaction executed while empty flag was deasserted before write data was committed to RAM array.",
+      "cause": "Empty flag deassertion depended directly on `wr_en` input combinational signal rather than registered write pointer count update.",
+      "fix": "Tie empty deassertion to `wr_ptr != rd_ptr` evaluated on synchronous clock edge.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "sync_fifo.sv"
+      ],
+      "metadata": {
+        "protocol": "FIFO",
+        "severity": "MEDIUM",
+        "bug_type": "combinational_hazard"
+      }
+    },
+    {
+      "id": "rtl_func_005_alu_mult_truncation",
+      "problem": "Arithmetic mismatch: ALU MUL operation expected 0x00010000 (65536) but got 0x00000000 at time 210ns.",
+      "cause": "ALU multiplier internal product was assigned to a 16-bit intermediate register before zero-extension to 32-bit output, dropping upper 16 product bits.",
+      "fix": "Cast multiplicands to 32-bit operands prior to multiplication: `result <= 32'(operand_a) * 32'(operand_b);`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "alu.sv"
+      ],
+      "metadata": {
+        "protocol": "ALU",
+        "severity": "HIGH",
+        "bug_type": "truncation"
+      }
+    },
+    {
+      "id": "rtl_func_006_signed_comparator_bug",
+      "problem": "Branch prediction failure: Branch on less-than (BLT) taken for positive value 0x7FFF compared to negative value 0x8001.",
+      "cause": "Operands were compared using default unsigned relational operator `<` instead of signed comparison `$signed(a) < $signed(b)`.",
+      "fix": "Cast operands to signed using `$signed(a) < $signed(b)` when signed comparison instruction is decoded.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "alu_cmp.sv"
+      ],
+      "metadata": {
+        "protocol": "CPU_ALU",
+        "severity": "HIGH",
+        "bug_type": "signed_mismatch"
+      }
+    },
+    {
+      "id": "rtl_func_007_arbiter_starvation",
+      "problem": "Timeout error: Requester 0 experienced starvation after 1000 clock cycles despite continuous request asserted.",
+      "cause": "Priority arbiter lacked round-robin token shift on grant; fixed priority scheme always prioritized Requester 3 and 2 whenever asserted.",
+      "fix": "Implement round-robin rotating priority mask: update `mask <= {grant[N-2:0], grant[N-1]}` on every granted cycle.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "rr_arbiter.sv"
+      ],
+      "metadata": {
+        "protocol": "Arbiter",
+        "severity": "MEDIUM",
+        "bug_type": "starvation"
+      }
+    },
+    {
+      "id": "rtl_func_008_fsm_latch_inference",
+      "problem": "Synthesis warning & simulation glitch: Latch inferred on next_state signal causing unpredictable state transitions at 340ns.",
+      "cause": "Incomplete `unique case` statement in combinational next_state logic missing assignments for `next_state` in ERROR branch.",
+      "fix": "Provide a default assignment `next_state = current_state;` at the beginning of the combinational `always_comb` block.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "fsm_controller.sv"
+      ],
+      "metadata": {
+        "protocol": "FSM",
+        "severity": "HIGH",
+        "bug_type": "latch_inference"
+      }
+    },
+    {
+      "id": "rtl_func_009_fsm_illegal_lockup",
+      "problem": "FSM lockup: Controller entered state 3'b111 following parity error and failed to return to IDLE on reset deassertion.",
+      "cause": "FSM state variable lacked `default` branch in state decoder, leaving unmapped states without exit transitions.",
+      "fix": "Add `default: next_state = STATE_IDLE;` inside state transition `case(current_state)`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "protocol_fsm.sv"
+      ],
+      "metadata": {
+        "protocol": "FSM",
+        "severity": "HIGH",
+        "bug_type": "deadlock"
+      }
+    },
+    {
+      "id": "rtl_func_010_blocking_seq_race",
+      "problem": "Clock edge race condition: Pipeline stage 2 sampled stage 1 output from the current clock cycle instead of previous cycle.",
+      "cause": "Sequential `always_ff @(posedge clk)` block used blocking assignment `=` instead of non-blocking `<=`, creating intra-assignment delta-delay races.",
+      "fix": "Replace all blocking assignments `=` with non-blocking `<=` inside sequential `always_ff` blocks.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "pipeline_stage.sv"
+      ],
+      "metadata": {
+        "protocol": "Pipeline",
+        "severity": "CRITICAL",
+        "bug_type": "assignment_race"
+      }
+    },
+    {
+      "id": "rtl_func_011_comb_nonblocking_oscillation",
+      "problem": "Simulator hang: Simulation locked up at 500ns in infinite zero-delay evaluation loop.",
+      "cause": "Combinational `always_comb` block used non-blocking `<=` to update internal temporary wire, triggering cyclic re-evaluation.",
+      "fix": "Use blocking assignment `=` for all combinational evaluation variables inside `always_comb`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "decode_comb.sv"
+      ],
+      "metadata": {
+        "protocol": "Decoder",
+        "severity": "CRITICAL",
+        "bug_type": "comb_loop"
+      }
+    },
+    {
+      "id": "rtl_func_012_active_low_reset_inverted",
+      "problem": "Device fails to initialize: Output registers held at 0 throughout simulation; operational commands ignored.",
+      "cause": "RTL used `if (rst_n)` instead of `if (!rst_n)` in reset check, holding design in perpetual reset when rst_n is driven High (1).",
+      "fix": "Change condition to `if (!rst_n)` for active-low reset.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "device_top.sv"
+      ],
+      "metadata": {
+        "protocol": "Reset",
+        "severity": "CRITICAL",
+        "bug_type": "reset_polarity"
+      }
+    },
+    {
+      "id": "rtl_func_013_sync_reset_missed_flops",
+      "problem": "Stale valid transaction on startup: Valid output asserted at time 10ns immediately following reset deassertion.",
+      "cause": "Pipeline valid register was not included in synchronous reset clause, allowing power-on uninitialized value to propagate as valid.",
+      "fix": "Add `pipe_valid <= 1'b0;` inside the `if (!rst_n)` branch.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "pipe_ctrl.sv"
+      ],
+      "metadata": {
+        "protocol": "Pipeline",
+        "severity": "HIGH",
+        "bug_type": "uninitialized_flop"
+      }
+    },
+    {
+      "id": "rtl_func_014_raw_data_forwarding_hazard",
+      "problem": "Read-After-Write (RAW) data corruption: ALU read register R3 immediately after writing R3 and obtained old value 0x05 instead of 0x09.",
+      "cause": "Execution forwarding unit lacked comparator for writeback destination register `wb_rd == ex_rs1`.",
+      "fix": "Implement forwarding multiplexer: `assign fwd_rs1 = (wb_reg_write && (wb_rd != 0) && (wb_rd == ex_rs1)) ? wb_data : id_rs1;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "forwarding_unit.sv"
+      ],
+      "metadata": {
+        "protocol": "CPU",
+        "severity": "HIGH",
+        "bug_type": "raw_hazard"
+      }
+    },
+    {
+      "id": "rtl_func_015_endianness_swap_bug",
+      "problem": "Data byte order reversed: Expected 32'h12345678, received 32'h78563412 on AHB 32-bit read.",
+      "cause": "RTL byte packing packed byte 0 to bits [31:24] instead of [7:0] for little-endian memory bus.",
+      "fix": "Reorder byte assignment: `assign dout = {din[7:0], din[15:8], din[23:16], din[31:24]};` according to required endianness.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "bus_packer.sv"
+      ],
+      "metadata": {
+        "protocol": "AHB",
+        "severity": "MEDIUM",
+        "bug_type": "endianness"
+      }
+    },
+    {
+      "id": "rtl_func_016_burst_len_underflow",
+      "problem": "Burst transaction runaway: Memory read issued 256 beats instead of 4 beats.",
+      "cause": "Burst counter decrement `burst_count <= burst_count - 1` decremented on burst_count == 0 because zero-check condition was missing.",
+      "fix": "Guard decrement with: `if (burst_count > 0 && beat_valid) burst_count <= burst_count - 1;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "dma_controller.sv"
+      ],
+      "metadata": {
+        "protocol": "DMA",
+        "severity": "HIGH",
+        "bug_type": "underflow"
+      }
+    },
+    {
+      "id": "rtl_func_017_read_only_register_writable",
+      "problem": "Security violation: Hardware STATUS register at offset 0x04 was overwritten by software write transaction.",
+      "cause": "Address decoder write-enable equation lacked qualification to exclude read-only address offset 0x04.",
+      "fix": "Ensure write strobe requires: `if (addr == 0x00 && we) ctrl_reg <= wdata;` and ignore writes to `0x04`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "csr_bank.sv"
+      ],
+      "metadata": {
+        "protocol": "CSR",
+        "severity": "HIGH",
+        "bug_type": "access_permission"
+      }
+    },
+    {
+      "id": "rtl_func_018_parity_odd_even_inversion",
+      "problem": "Parity check error: Frame rejected with parity mismatch on data byte 0x55.",
+      "cause": "Parity bit was computed as `^data` (even parity) while specification demanded odd parity `~(^data)`.",
+      "fix": "Update parity generation: `assign parity_bit = (PARITY_MODE == ODD) ? ~(^data) : ^data;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "uart_tx.sv"
+      ],
+      "metadata": {
+        "protocol": "UART",
+        "severity": "LOW",
+        "bug_type": "parity_mismatch"
+      }
+    },
+    {
+      "id": "rtl_func_019_credit_flow_underflow",
+      "problem": "Credit-based buffer exhaustion: Transmitter stalled permanently with credit_count=0.",
+      "cause": "Credit count decremented on packet transmit request without checking if credit_count > 0.",
+      "fix": "Only transmit and decrement when credits are available: `if (tx_req && credit_count > 0) credit_count <= credit_count - 1;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "flow_control.sv"
+      ],
+      "metadata": {
+        "protocol": "Network",
+        "severity": "HIGH",
+        "bug_type": "credit_leak"
+      }
+    },
+    {
+      "id": "rtl_func_020_icg_clock_glitch",
+      "problem": "Spurious register clocking: Downstream flip-flops updated during inactive clock periods.",
+      "cause": "Clock gating was implemented with combinational AND gate `assign gclk = clk & enable;` instead of integrated latch-based clock gating cell (ICG).",
+      "fix": "Use standard ICG cell or latch-based gating: latch enable on low phase of clk before ANDing with clk.",
+      "classification": "RTL Bug",
+      "category": "Timing",
+      "files": [
+        "clock_gate.sv"
+      ],
+      "metadata": {
+        "protocol": "Clocking",
+        "severity": "CRITICAL",
+        "bug_type": "clock_glitch"
+      }
+    },
+    {
+      "id": "rtl_func_021_interrupt_clear_race",
+      "problem": "Dropped interrupt: Hardware interrupt arriving concurrently with CPU read clear was erased without notification.",
+      "cause": "Interrupt clear logic cleared interrupt register unconditionally on CPU read without masking newly arriving hardware triggers.",
+      "fix": "Use write-1-to-clear (W1C) or mask clear: `irq_reg <= (irq_reg & ~cpu_clear_mask) | hw_irq_pulse;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "irq_controller.sv"
+      ],
+      "metadata": {
+        "protocol": "Interrupt",
+        "severity": "HIGH",
+        "bug_type": "race_condition"
+      }
+    },
+    {
+      "id": "rtl_func_022_dma_4kb_boundary_cross",
+      "problem": "AXI Protocol Violation: AXI burst address crossed 4KB boundary without burst split.",
+      "cause": "DMA address incrementer added burst length directly without checking `(start_addr & 12'hFFF) + (len << size) > 4096`.",
+      "fix": "Split any burst crossing a 4KB boundary into two separate bursts in the DMA master.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "dma_axi_master.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4",
+        "severity": "CRITICAL",
+        "bug_type": "boundary_cross"
+      }
+    },
+    {
+      "id": "rtl_func_023_cache_dirty_evict_drop",
+      "problem": "Data loss in memory hierarchy: Modified cache line overwritten without writeback on replacement.",
+      "cause": "Cache replacement controller missed `dirty` bit check during evict state, skipping the writeback buffer push.",
+      "fix": "Check dirty bit during evict: `if (line_valid && line_dirty) next_state = STATE_WRITEBACK; else next_state = STATE_ALLOCATE;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "cache_controller.sv"
+      ],
+      "metadata": {
+        "protocol": "Cache",
+        "severity": "CRITICAL",
+        "bug_type": "coherency"
+      }
+    },
+    {
+      "id": "rtl_func_024_gray_code_slice_mismatch",
+      "problem": "CDC FIFO pointer corrupt: Gray code counter jumped by 2 bit-flips in single clock step.",
+      "cause": "Gray conversion used `bin ^ (bin >> 1)` on a non-power-of-2 depth counter, causing multi-bit transition upon wrap.",
+      "fix": "Ensure Gray-coded asynchronous FIFO depth is strictly a power of 2, or use symmetric modular Gray counters.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "async_fifo_gray.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC_FIFO",
+        "severity": "HIGH",
+        "bug_type": "gray_code"
+      }
+    },
+    {
+      "id": "rtl_func_025_crc32_polynomial_bit_order",
+      "problem": "Ethernet frame FCS check failed: Calculated CRC was bit-reversed from standard IEEE 802.3 CRC32.",
+      "cause": "CRC shift register shifted MSB first while Ethernet transmits byte LSB first, causing bit inversion of polynomial result.",
+      "fix": "Reflect input data bits and output CRC register bits according to IEEE 802.3 specification.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "eth_crc32.sv"
+      ],
+      "metadata": {
+        "protocol": "Ethernet",
+        "severity": "MEDIUM",
+        "bug_type": "bit_order"
+      }
+    },
+    {
+      "id": "tb_env_026_monitor_latency_drop",
+      "problem": "Transactions missing in UVM Scoreboard: Monitor captured transaction 1 and 3, but completely missed transaction 2 during back-to-back reads.",
+      "cause": "The UVM monitor executed a blocking `@(inf.mon_cb)` inside `if (!tx.we)` to wait for read latency, then waited `@(inf.mon_cb)` again at top of forever loop, skipping the interleaved cycle.",
+      "fix": "Use a non-blocking queue in the monitor to store in-flight read tags, sampling `inf.mon_cb.rdata` each cycle while concurrently checking for new requests.",
+      "classification": "TB Bug",
+      "category": "Scoreboard",
+      "files": [
+        "ram_monitor.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "monitor_deadlock"
+      }
+    },
+    {
+      "id": "tb_env_027_monitor_skew_zero_race",
+      "problem": "Intermittent scoreboard mismatch: Monitor sampled previous transaction data during simultaneous drive/sample edge.",
+      "cause": "Interface clocking block used `#0` input skew instead of `#1step`, creating non-deterministic Active vs Observed region race.",
+      "fix": "Define clocking block input skew as `#1step` or `#1ps`: `default input #1step output #100ps;`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "interface.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "HIGH",
+        "bug_type": "clocking_skew"
+      }
+    },
+    {
+      "id": "tb_env_028_driver_item_done_early",
+      "problem": "Protocol violation: Driver initiated new transfer before previous transfer slave ready was asserted.",
+      "cause": "UVM driver called `seq_item_port.item_done()` before waiting for `vif.drv_cb.ready == 1` pin handshake to complete.",
+      "fix": "Move `seq_item_port.item_done()` to after the wait loop: `do @(vif.drv_cb); while (!vif.drv_cb.ready); seq_item_port.item_done();`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "axi_driver.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "handshake_premature"
+      }
+    },
+    {
+      "id": "tb_env_029_scoreboard_fifo_order",
+      "problem": "Scoreboard comparison mismatch: Expected transaction 5 matched with transaction 6 in UVM scoreboard.",
+      "cause": "Scoreboard used a single FIFO queue to compare out-of-order responses from an AXI bus that allows response reordering by transaction ID.",
+      "fix": "Store expected items in an associative array keyed by Transaction ID: `ram_seq_item exp_table[int][$];`.",
+      "classification": "TB Bug",
+      "category": "Scoreboard",
+      "files": [
+        "axi_scoreboard.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "out_of_order_mismatch"
+      }
+    },
+    {
+      "id": "tb_env_030_scoreboard_leak_hang",
+      "problem": "Testbench memory leak / timeout: Scoreboard queue grew to 50,000 items, simulator memory exhausted at 10us.",
+      "cause": "Scoreboard push logic pushed every request to expected queue, but response pop logic ignored error response packets.",
+      "fix": "Pop expected items on both successful completions and acknowledged error responses, or add cleanup on timeout.",
+      "classification": "TB Bug",
+      "category": "Scoreboard",
+      "files": [
+        "packet_scoreboard.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "MEDIUM",
+        "bug_type": "queue_leak"
+      }
+    },
+    {
+      "id": "tb_env_031_scoreboard_stale_after_reset",
+      "problem": "Scoreboard mismatch at 500ns: Scoreboard reported 5 mismatches immediately after middle-of-test hardware reset.",
+      "cause": "Scoreboard did not implement reset handling to clear its internal expected transaction queues when `rst_n` dropped low.",
+      "fix": "Add a reset monitor or export in scoreboard that clears all internal queues: `expected_queue.delete();` on reset assert.",
+      "classification": "TB Bug",
+      "category": "Scoreboard",
+      "files": [
+        "ram_scoreboard.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "reset_flush"
+      }
+    },
+    {
+      "id": "tb_env_032_constraint_contradiction",
+      "problem": "Simulation fatal: Randomization failed in sequence item at time 50ns: `solve...before` constraint contradiction.",
+      "cause": "Sequence item had mutually contradictory constraints: `constraint c1 { burst_len == 16; }` and `constraint c2 { burst_type == WRAP4; }`.",
+      "fix": "Harmonize constraints or use conditional constraints: `constraint c2 { burst_type == WRAP4 -> burst_len == 4; }`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "seq_item.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "CRITICAL",
+        "bug_type": "randomization_failure"
+      }
+    },
+    {
+      "id": "tb_env_033_missing_phase_objection",
+      "problem": "Premature simulation exit: Simulation finished at time 0 with 0 cycles executed and NO_TESTS_RUN.",
+      "cause": "The UVM test `run_phase` did not raise an objection: missing `phase.raise_objection(this);`.",
+      "fix": "Enclose sequence execution inside `phase.raise_objection(this);` and `phase.drop_objection(this);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "base_test.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "CRITICAL",
+        "bug_type": "objection_missing"
+      }
+    },
+    {
+      "id": "tb_env_034_early_drop_objection",
+      "problem": "Incomplete test: Test terminated before last 3 write transactions appeared on DUT interface pins.",
+      "cause": "Sequence dropped objection immediately after `seq_item_port.put()`, without waiting for pipeline drain or scoreboard completion.",
+      "fix": "Wait for scoreboard drained or interface idle before dropping objection, or set a drain time: `phase.phase_done.set_drain_time(this, 100ns);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "write_sequence.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "MEDIUM",
+        "bug_type": "drain_time"
+      }
+    },
+    {
+      "id": "tb_env_035_factory_override_direct_new",
+      "problem": "Factory override ignored: Testbench instantiated base driver despite `set_type_override_by_type` in test.",
+      "cause": "Agent instantiated driver using concrete `drv = new(\"drv\", this);` instead of factory `drv = my_driver::type_id::create(\"drv\", this);`.",
+      "fix": "Replace `new()` with `type_id::create()` for all UVM components and sequence items.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "agent.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "MEDIUM",
+        "bug_type": "factory_override"
+      }
+    },
+    {
+      "id": "tb_env_036_null_virtual_interface",
+      "problem": "Fatal null pointer dereference: Exception at time 0 in driver `vif.drv_cb.rst_n <= 0;`.",
+      "cause": "`uvm_config_db#(virtual my_if)::get()` failed because path in `testbench.sv` set was `\"uvm_test_top.env.*\"` while agent was `\"uvm_test_top.env.agent\"`.",
+      "fix": "Ensure matching config_db scope: `uvm_config_db#(virtual my_if)::set(null, \"*\", \"vif\", vif);` in top testbench module.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "driver.sv",
+        "testbench.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "CRITICAL",
+        "bug_type": "null_pointer"
+      }
+    },
+    {
+      "id": "tb_env_037_clocking_block_drive_race",
+      "problem": "Hold time glitch: Driver drove data combinationally on posedge clk instead of via clocking block.",
+      "cause": "Driver wrote directly to `vif.wdata = tx.wdata;` instead of `vif.drv_cb.wdata <= tx.wdata;`.",
+      "fix": "Drive all synchronous signals exclusively through clocking block outputs with non-blocking assignments: `vif.drv_cb.wdata <= tx.wdata;`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "driver.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "HIGH",
+        "bug_type": "clocking_drive"
+      }
+    },
+    {
+      "id": "tb_env_038_virtual_sequencer_null_handle",
+      "problem": "Null object access: Virtual sequence failed on `p_sequencer.m_seqr.start()`.",
+      "cause": "Environment `connect_phase` omitted assigning sub-sequencer handles to the virtual sequencer.",
+      "fix": "In env connect_phase: `v_seqr.m_seqr = m_agent.m_seqr;`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "env.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "CRITICAL",
+        "bug_type": "null_pointer"
+      }
+    },
+    {
+      "id": "tb_env_039_coverage_sampling_during_reset",
+      "problem": "Corrupted functional coverage: Zero-address and invalid opcodes reported 100% coverage during reset cycle.",
+      "cause": "Covergroup sample method was triggered unconditionally on every clock edge without gating on `rst_n`.",
+      "fix": "Guard coverage sampling: `if (vif.rst_n) cg.sample();`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "coverage_collector.sv"
+      ],
+      "metadata": {
+        "protocol": "Coverage",
+        "severity": "LOW",
+        "bug_type": "coverage_skew"
+      }
+    },
+    {
+      "id": "tb_env_040_infinite_sequence_loop_no_delay",
+      "problem": "Simulator freezing: Simulator stuck at simulation time 1000ns consuming 100% CPU.",
+      "cause": "Sequence contained a `while(status != DONE)` loop without an `@(posedge vif.clk)` or delay statement.",
+      "fix": "Add clock wait inside the poll loop: `while(status != DONE) @(vif.mon_cb);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "poll_sequence.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "CRITICAL",
+        "bug_type": "zero_delay_loop"
+      }
+    },
+    {
+      "id": "tb_env_041_unconnected_analysis_port",
+      "problem": "Simulation warning: UVM analysis port `mon_ap` unconnected, scoreboard receiving no transactions.",
+      "cause": "In `env::connect_phase`, `agent.mon.mon_ap.connect(sb.sb_export)` was omitted.",
+      "fix": "Connect analysis port in env: `agent.mon.mon_ap.connect(sb.analysis_export);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "env.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "unbound_port"
+      }
+    },
+    {
+      "id": "tb_env_042_transaction_shallow_copy_bug",
+      "problem": "Data corruption in scoreboard: Modifying new transaction corrupted previously logged transaction in scoreboard history.",
+      "cause": "Sequence item omitted `do_copy()` implementation; shallow assignment `tx2 = tx1` caused shared memory pointer.",
+      "fix": "Implement proper deep copy in `do_copy()`: `$cast(rhs_, rhs); this.payload = new[rhs_.payload.size()](rhs_.payload);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "seq_item.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "shallow_copy"
+      }
+    },
+    {
+      "id": "tb_env_043_event_trigger_race",
+      "problem": "Thread deadlock: Sequence waiting on `uvm_event.wait_trigger()` never awoke.",
+      "cause": "Event was triggered in monitor before sequence reached `wait_trigger()`. UVM event without persistence dropped the notification.",
+      "fix": "Use `wait_ptrigger()` or state variable to allow late arriving waiters to see the event.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "sync_layer.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "event_race"
+      }
+    },
+    {
+      "id": "tb_env_044_config_db_type_mismatch",
+      "problem": "Config DB get failure: Virtual interface remained null despite successful `set()` in top.",
+      "cause": "Top set type as `virtual ram_if` but component called `get()` with `virtual ram_if#(.DATA_WIDTH(16))`.",
+      "fix": "Ensure parameterized interface types match exactly between set and get calls.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "driver.sv",
+        "testbench.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "type_mismatch"
+      }
+    },
+    {
+      "id": "tb_env_045_reg_model_auto_predict_race",
+      "problem": "RAL mirror mismatch: Register model mirror value out-of-sync with hardware register after write sequence.",
+      "cause": "Auto-prediction was enabled (`set_auto_predict(1)`) while explicit predictor was also connected to monitor analysis port.",
+      "fix": "Disable auto-prediction when using an explicit `uvm_reg_predictor`: `reg_model.default_map.set_auto_predict(0);`.",
+      "classification": "TB Bug",
+      "category": "Scoreboard",
+      "files": [
+        "env.sv"
+      ],
+      "metadata": {
+        "protocol": "RAL",
+        "severity": "MEDIUM",
+        "bug_type": "double_prediction"
+      }
+    },
+    {
+      "id": "tb_env_046_restricted_address_constraint",
+      "problem": "Incomplete verification: Bug at address 15 was not discovered by random testing.",
+      "cause": "Sequence item constrained address `addr inside {[0:2]};`, leaving 81% of address space unexercised.",
+      "fix": "Expand constraint: `constraint c_addr { addr inside {[0:(1<<ADDR_WIDTH)-1]}; }`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "ram_sequence_item.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "HIGH",
+        "bug_type": "constraint_blindspot"
+      }
+    },
+    {
+      "id": "tb_env_047_driver_premature_read_sample",
+      "problem": "Incorrect read data returned to sequence: Driver sampled `inf.drv_cb.rdata` in the same clock cycle as read command.",
+      "cause": "Driver sampled synchronous RAM data at cycle T0 instead of waiting 1 clock cycle for read latency.",
+      "fix": "Wait for read latency or delegate read data sampling exclusively to the monitor.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "ram_driver.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "premature_sample"
+      }
+    },
+    {
+      "id": "tb_env_048_testbench_interface_clock_assign",
+      "problem": "Simulator compile error / delta race: `assign inf.clk = clk;` applied to input port of interface.",
+      "cause": "Interface instantiated with empty argument list `ram_if inf();` then continuously assigned clock.",
+      "fix": "Instantiate interface with clock connection: `ram_if inf(clk);`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "testbench.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "MEDIUM",
+        "bug_type": "interface_binding"
+      }
+    },
+    {
+      "id": "tb_env_049_scoreboard_duplicate_filename",
+      "problem": "Package compile warning: Multiple definitions of scoreboard class due to typo file include.",
+      "cause": "Package included both `ram_scoeboard.sv` and `ram_scoreboard.sv`.",
+      "fix": "Remove `ram_scoeboard.sv` and keep single canonical `ram_scoreboard.sv` in `ram_package.sv`.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "ram_package.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "LOW",
+        "bug_type": "duplicate_file"
+      }
+    },
+    {
+      "id": "tb_env_050_uvm_objection_leak_timeout",
+      "problem": "UVM_FATAL @100000ns: Test timed out. Active objection held by `write_sequence`.",
+      "cause": "Exception in sequence triggered premature return before `phase.drop_objection(this)` line was reached.",
+      "fix": "Use a `try...finally` equivalent block or ensure drop_objection is called prior to every return path.",
+      "classification": "TB Bug",
+      "category": "Environment",
+      "files": [
+        "sequence.sv"
+      ],
+      "metadata": {
+        "protocol": "UVM",
+        "severity": "HIGH",
+        "bug_type": "objection_leak"
+      }
+    },
+    {
+      "id": "proto_051_axi_awvalid_awready_deadlock",
+      "problem": "AXI Protocol Violation / Deadlock: Master waits for AWREADY before asserting AWVALID, Slave waits for AWVALID before asserting AWREADY.",
+      "cause": "Combinational loop in master: `AWVALID = AWREADY & internal_req`, violating AMBA AXI spec Section A3.2.1.",
+      "fix": "Ensure AWVALID assertion does not depend on AWREADY. Once asserted, AWVALID must remain High until AWREADY is sampled High.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axi_master.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4",
+        "severity": "CRITICAL",
+        "bug_type": "handshake_dependency"
+      }
+    },
+    {
+      "id": "proto_052_axi_wlast_premature",
+      "problem": "AXI Protocol Error: WLAST asserted at beat 2 of an 8-beat burst (AWLEN=7).",
+      "cause": "Write burst counter decremented twice per clock cycle due to redundant enable logic.",
+      "fix": "Only decrement beat counter when `WVALID && WREADY` handshake is active.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axi_master_w.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4",
+        "severity": "HIGH",
+        "bug_type": "burst_length"
+      }
+    },
+    {
+      "id": "proto_053_axi_wrap_boundary_align",
+      "problem": "AXI Slave decode error: WRAP burst start address 0x1002 not aligned to total burst size (4 bytes * 4 beats = 16 bytes).",
+      "cause": "Master generated unaligned address for WRAP burst, violating AMBA AXI rule that WRAP burst start address must be aligned to total transaction size.",
+      "fix": "Align start address: `addr = start_addr & ~((1 << (burst_size + burst_len)) - 1);`.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axi_generator.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4",
+        "severity": "HIGH",
+        "bug_type": "unaligned_wrap"
+      }
+    },
+    {
+      "id": "proto_054_axi_stream_tvalid_drop",
+      "problem": "AXI-Stream data loss: TVALID de-asserted without TREADY handshake while TDATA changed.",
+      "cause": "Stream master dropped TVALID when internal FIFO became empty without completing handshake with downstream consumer.",
+      "fix": "Once TVALID is asserted, it MUST remain High until the rising edge of clock where TREADY is also High.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axis_master.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4-Stream",
+        "severity": "CRITICAL",
+        "bug_type": "stability_violation"
+      }
+    },
+    {
+      "id": "proto_055_axi_out_of_order_tag_clash",
+      "problem": "AXI reordering corruption: Slave responded with RID=1 before completing prior read burst with same RID=1.",
+      "cause": "Slave allowed interleaving of reads sharing the same ARID, which is forbidden under AXI4 specification.",
+      "fix": "Enforce strict in-order completion for transactions sharing identical transaction IDs (ARID/AWID).",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axi_interconnect.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4",
+        "severity": "CRITICAL",
+        "bug_type": "id_interleaving"
+      }
+    },
+    {
+      "id": "proto_056_apb_paddr_changed_in_access",
+      "problem": "APB Protocol Violation: PADDR changed from 0x10 to 0x14 while PENABLE was High.",
+      "cause": "APB master updated address register combinationally on next transaction request during wait states.",
+      "fix": "Hold PADDR, PWRITE, PWDATA stable throughout both SETUP and ACCESS phases until PREADY is sampled High.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "apb_master.sv"
+      ],
+      "metadata": {
+        "protocol": "APB",
+        "severity": "HIGH",
+        "bug_type": "signal_stability"
+      }
+    },
+    {
+      "id": "proto_057_apb_penable_without_psel",
+      "problem": "APB Protocol Error: PENABLE asserted High when PSEL was Low at time 180ns.",
+      "cause": "FSM transition asserted PENABLE in ACCESS state even when peripheral select was aborted.",
+      "fix": "Qualify PENABLE assertion with PSEL: `assign PENABLE = (state == ACCESS) && PSEL;`.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "apb_ctrl.sv"
+      ],
+      "metadata": {
+        "protocol": "APB",
+        "severity": "HIGH",
+        "bug_type": "enable_without_sel"
+      }
+    },
+    {
+      "id": "proto_058_apb_pready_hung_low",
+      "problem": "Bus Lockup: APB bus locked permanently; PREADY remained Low for over 2000 clock cycles.",
+      "cause": "Peripheral slave FSM entered UNKNOWN state and failed to assert PREADY to finish the transfer.",
+      "fix": "Add a bus timeout watchdog timer that asserts PSLVERR and terminates transfer if PREADY stalls for > 32 cycles.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "apb_slave.sv"
+      ],
+      "metadata": {
+        "protocol": "APB",
+        "severity": "CRITICAL",
+        "bug_type": "slave_hang"
+      }
+    },
+    {
+      "id": "proto_059_ahb_hready_not_polled",
+      "problem": "AHB protocol violation: Master changed HADDR and HTRANS while HREADY was Low.",
+      "cause": "AHB master pipeline ignored slave wait state (`HREADY == 0`) and issued next pipelined address.",
+      "fix": "Freeze master pipeline registers whenever `HREADY` is Low: `if (!HREADY) keep_state;`.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "ahb_master.sv"
+      ],
+      "metadata": {
+        "protocol": "AHB",
+        "severity": "CRITICAL",
+        "bug_type": "wait_state_ignore"
+      }
+    },
+    {
+      "id": "proto_060_ahb_hburst_wrap4_jump",
+      "problem": "AHB address calculation error: WRAP4 burst from address 0x0C jumped to 0x10 instead of wrapping to 0x00.",
+      "cause": "Address generator used normal INCR logic instead of wrapping modulo the burst size (16 bytes).",
+      "fix": "Calculate wrapping address: `HADDR <= {HADDR[31:4], HADDR[3:0] + 4'h4};`.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "ahb_addr_gen.sv"
+      ],
+      "metadata": {
+        "protocol": "AHB",
+        "severity": "HIGH",
+        "bug_type": "wrap_calculation"
+      }
+    },
+    {
+      "id": "proto_061_spi_mode_cpha_mismatch",
+      "problem": "SPI bit reception error: Data sampled on wrong clock edge resulting in bit shift by 1 position.",
+      "cause": "Master configured for SPI Mode 0 (CPOL=0, CPHA=0) while Slave was configured for Mode 1 (CPHA=1).",
+      "fix": "Align CPHA configuration between Master and Slave: sample on leading clock edge for CPHA=0.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "spi_controller.sv"
+      ],
+      "metadata": {
+        "protocol": "SPI",
+        "severity": "HIGH",
+        "bug_type": "cpha_mismatch"
+      }
+    },
+    {
+      "id": "proto_062_spi_cs_deassert_early",
+      "problem": "SPI truncated transfer: Chip select (CS_N) went High before bit 7 was shifted out of shift register.",
+      "cause": "CS deassertion counter triggered on 8th clock edge instead of waiting half SCLK period after transfer.",
+      "fix": "Hold CS_N Low until trailing edge of last bit plus programmed hold time.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "spi_master.sv"
+      ],
+      "metadata": {
+        "protocol": "SPI",
+        "severity": "MEDIUM",
+        "bug_type": "chip_select_timing"
+      }
+    },
+    {
+      "id": "proto_063_i2c_start_condition_glitch",
+      "problem": "I2C bus arbitration error: SDA transitioned from 0 to 1 while SCL was High, triggering false STOP.",
+      "cause": "SDA output driver changed during SCL high phase instead of during SCL low phase.",
+      "fix": "Only update SDA when SCL is confirmed Low, except during explicit START (SDA 1->0 while SCL=1) and STOP (SDA 0->1 while SCL=1).",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "i2c_master.sv"
+      ],
+      "metadata": {
+        "protocol": "I2C",
+        "severity": "CRITICAL",
+        "bug_type": "start_stop_violation"
+      }
+    },
+    {
+      "id": "proto_064_i2c_nack_release_hang",
+      "problem": "I2C bus lockup: Slave held SDA Low continuously after receiving NACK from master.",
+      "cause": "Slave receiver did not release open-drain SDA line upon receiving NACK bit at 9th clock pulse.",
+      "fix": "Release SDA driver `sda_oe <= 1'b0` when NACK is received.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "i2c_slave.sv"
+      ],
+      "metadata": {
+        "protocol": "I2C",
+        "severity": "HIGH",
+        "bug_type": "bus_lockup"
+      }
+    },
+    {
+      "id": "proto_065_uart_framing_error",
+      "problem": "UART Framing Error: Stop bit sampled as 0 instead of 1.",
+      "cause": "Baud rate generator divider calculation accumulated rounding error, causing 8% clock drift by 10th bit.",
+      "fix": "Use fractional baud rate divisor or 16x oversampling clock with mid-bit sampling counter.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "uart_rx.sv"
+      ],
+      "metadata": {
+        "protocol": "UART",
+        "severity": "MEDIUM",
+        "bug_type": "baud_drift"
+      }
+    },
+    {
+      "id": "proto_066_pcie_tlp_payload_mismatch",
+      "problem": "PCIe Malformed TLP: Length field in header indicated 4 DW but only 3 DW payload arrived.",
+      "cause": "TLP assembler decremented payload DW count on empty packet header creation.",
+      "fix": "Ensure TLP header Length field exactly matches DW count of payload.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "pcie_tx_engine.sv"
+      ],
+      "metadata": {
+        "protocol": "PCIe",
+        "severity": "CRITICAL",
+        "bug_type": "tlp_malformed"
+      }
+    },
+    {
+      "id": "proto_067_pcie_flow_control_credit_timeout",
+      "problem": "PCIe Flow Control Timeout: Link stopped transmitting due to lack of UpdateFC DLLPs.",
+      "cause": "Flow control update timer reset logic failed to trigger DLLP transmit when credits changed.",
+      "fix": "Transmit UpdateFC DLLPs at least once every 30us or whenever credits increase.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "pcie_fc.sv"
+      ],
+      "metadata": {
+        "protocol": "PCIe",
+        "severity": "HIGH",
+        "bug_type": "fc_timeout"
+      }
+    },
+    {
+      "id": "proto_068_wishbone_cyc_stb_drop",
+      "problem": "Wishbone bus error: Master deasserted STB and CYC before slave asserted ACK.",
+      "cause": "Master timeout counter aborted transfer without waiting for slave acknowledgement.",
+      "fix": "Wishbone protocol requires CYC and STB to remain asserted until ACK or ERR is returned.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "wb_master.sv"
+      ],
+      "metadata": {
+        "protocol": "Wishbone",
+        "severity": "HIGH",
+        "bug_type": "premature_deassertion"
+      }
+    },
+    {
+      "id": "proto_069_tilelink_channel_a_d_deadlock",
+      "problem": "TileLink Protocol Deadlock: Channel A request blocked waiting for Channel D response.",
+      "cause": "TileLink Channel D depends on Channel A, but master buffer created reverse combinational dependency.",
+      "fix": "Forward progress rule: Channel D MUST be able to complete independently of Channel A.",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "tl_adapter.sv"
+      ],
+      "metadata": {
+        "protocol": "TileLink",
+        "severity": "CRITICAL",
+        "bug_type": "deadlock"
+      }
+    },
+    {
+      "id": "proto_070_axis_tkeep_sparse_null",
+      "problem": "AXI-Stream packing error: Intermediate bytes masked with TKEEP=0 when unaligned transfers disabled.",
+      "cause": "Stream adapter set sparse TKEEP bits within packet body violating TKEEP continuous packing mode.",
+      "fix": "Ensure TKEEP bytes are contiguous up to the final beat (`TLAST`).",
+      "classification": "RTL Bug",
+      "category": "Protocol",
+      "files": [
+        "axis_packer.sv"
+      ],
+      "metadata": {
+        "protocol": "AXI4-Stream",
+        "severity": "MEDIUM",
+        "bug_type": "tkeep_packing"
+      }
+    },
+    {
+      "id": "cdc_071_multibit_bus_crossing",
+      "problem": "CDC Data Corruption: Multi-bit FIFO read pointer sampled with intermittent incoherency across clock domains.",
+      "cause": "Multi-bit binary pointer crossed clock domains directly using individual flip-flop synchronizers, allowing bit skew to produce transient invalid values.",
+      "fix": "Convert multi-bit binary counter to Gray-code before crossing clock domains, or use a synchronized handshake/FIFO.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "cdc_fifo.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC",
+        "severity": "CRITICAL",
+        "bug_type": "bus_skew"
+      }
+    },
+    {
+      "id": "cdc_072_missing_2flop_sync",
+      "problem": "Metastability failure: Asynchronous external interrupt signal connected directly to internal control state machine.",
+      "cause": "Missing 2-stage flip-flop synchronizer on asynchronous input pin.",
+      "fix": "Pass asynchronous input through standard 2-flop synchronizer: `always_ff @(posedge clk) begin s1 <= async_in; s2 <= s1; end`.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "irq_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC",
+        "severity": "CRITICAL",
+        "bug_type": "missing_sync"
+      }
+    },
+    {
+      "id": "cdc_073_fast_to_slow_pulse_drop",
+      "problem": "Dropped event: Fast clock domain (200MHz) 1-cycle pulse failed to register in slow clock domain (50MHz).",
+      "cause": "Pulse duration (5ns) was shorter than the slow clock period (20ns), violating sampling setup time.",
+      "fix": "Use a toggle synchronizer (toggle flip-flop in fast domain, 2-flop sync in slow domain, XOR edge detector).",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "pulse_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC",
+        "severity": "HIGH",
+        "bug_type": "pulse_drop"
+      }
+    },
+    {
+      "id": "cdc_074_async_reset_removal_glitch",
+      "problem": "Metastability on startup: Random flip-flops awoke in inconsistent states on reset release.",
+      "cause": "Asynchronous reset deasserted asynchronously with respect to clock, violating recovery and removal timing.",
+      "fix": "Implement reset synchronizer: assert reset asynchronously, but deassert synchronously with a 2-flop reset bridge.",
+      "classification": "RTL Bug",
+      "category": "Reset",
+      "files": [
+        "reset_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "Reset",
+        "severity": "CRITICAL",
+        "bug_type": "reset_recovery"
+      }
+    },
+    {
+      "id": "cdc_075_reconvergent_fanout_race",
+      "problem": "CDC functional race: Two independently synchronized control bits arrived in destination domain in reversed order.",
+      "cause": "Reconvergent synchronization: Two related signals were synchronized through separate 2-flop synchronizers.",
+      "fix": "Synchronize a single encoded request signal or use a valid/ack handshake instead of two independent synchronizers.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "ctrl_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC",
+        "severity": "HIGH",
+        "bug_type": "reconvergent_fanout"
+      }
+    },
+    {
+      "id": "cdc_076_reset_domain_crossing",
+      "problem": "False reset trigger: Logic in power domain B underwent reset when domain A reset was toggled.",
+      "cause": "Reset signal crossed power domains without isolation or level shifter.",
+      "fix": "Isolate cross-domain reset signals using low-power isolation cells clamped to inactive state.",
+      "classification": "RTL Bug",
+      "category": "Reset",
+      "files": [
+        "power_mgr.sv"
+      ],
+      "metadata": {
+        "protocol": "UPF",
+        "severity": "CRITICAL",
+        "bug_type": "isolation_missing"
+      }
+    },
+    {
+      "id": "cdc_077_handshake_sync_ack_drop",
+      "problem": "Handshake deadlock: Source domain waited indefinitely for `dst_ack` that was deasserted early.",
+      "cause": "Destination domain deasserted `ack` before confirming that source domain deasserted `req`.",
+      "fix": "Four-phase handshake: Destination must hold `ack` asserted until `req` is observed Low.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "handshake_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC",
+        "severity": "HIGH",
+        "bug_type": "handshake_protocol"
+      }
+    },
+    {
+      "id": "cdc_078_glitchy_clock_mux",
+      "problem": "Clock runt pulse: Glitch on system clock caused downstream counters to double-step during clock frequency change.",
+      "cause": "Clock selection multiplexer switched asynchronously between 100MHz and 50MHz clocks.",
+      "fix": "Use a glitch-free clock multiplexer with dual synchronizers on the select line for both clock domains.",
+      "classification": "RTL Bug",
+      "category": "Timing",
+      "files": [
+        "clk_mux.sv"
+      ],
+      "metadata": {
+        "protocol": "Clocking",
+        "severity": "CRITICAL",
+        "bug_type": "clock_glitch"
+      }
+    },
+    {
+      "id": "cdc_079_uninitialized_flops_at_poweron",
+      "problem": "X-state propagation: All outputs driven to 'X after power-on reset sequence.",
+      "cause": "Control registers lacked asynchronous reset connection: `always_ff @(posedge clk)` without `or negedge rst_n`.",
+      "fix": "Add reset branch to all state registers: `always_ff @(posedge clk or negedge rst_n) if (!rst_n) ...`.",
+      "classification": "RTL Bug",
+      "category": "Reset",
+      "files": [
+        "core_reg.sv"
+      ],
+      "metadata": {
+        "protocol": "Reset",
+        "severity": "CRITICAL",
+        "bug_type": "missing_reset"
+      }
+    },
+    {
+      "id": "cdc_080_false_path_masking_real_violation",
+      "problem": "Silicon failure: Real CDC path failed in hardware despite 100% STA timing pass.",
+      "cause": "SDC timing constraint applied `set_false_path` to entire bus instead of only the handshake control bit.",
+      "fix": "Constrain data bus using `set_max_delay -datapath_only` and limit `set_false_path` to synchronized 1-bit flags.",
+      "classification": "RTL Bug",
+      "category": "Timing",
+      "files": [
+        "constraints.sdc"
+      ],
+      "metadata": {
+        "protocol": "STA",
+        "severity": "CRITICAL",
+        "bug_type": "sdc_constraint"
+      }
+    },
+    {
+      "id": "cdc_081_fifo_pointer_gray_wrap_glitch",
+      "problem": "FIFO pointer jump: Asynchronous FIFO overflowed because pointer wrap toggled 3 bits simultaneously.",
+      "cause": "FIFO depth was configured to 10 (not a power of 2), causing Gray-code wrap from 9 to 0 to flip multiple bits.",
+      "fix": "Enforce FIFO depth = 2^N (e.g. 16), or implement custom non-power-of-2 Gray code sequence.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "async_fifo.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC_FIFO",
+        "severity": "HIGH",
+        "bug_type": "gray_code_wrap"
+      }
+    },
+    {
+      "id": "cdc_082_reset_assertion_glitch",
+      "problem": "Spurious reset: Noise spike on external reset wire triggered system reboot.",
+      "cause": "Asynchronous reset input lacked glitch filtering or digital debounce logic.",
+      "fix": "Sample reset line with a 3-cycle digital debounce filter before driving system reset synchronizer.",
+      "classification": "RTL Bug",
+      "category": "Reset",
+      "files": [
+        "reset_filter.sv"
+      ],
+      "metadata": {
+        "protocol": "Reset",
+        "severity": "MEDIUM",
+        "bug_type": "reset_noise"
+      }
+    },
+    {
+      "id": "cdc_083_reset_polarity_mismatch",
+      "problem": "Constant reset state: Subsystem held permanently in reset.",
+      "cause": "Active-high reset output `rst_high` connected to active-low reset input `rst_n` of slave IP.",
+      "fix": "Invert reset connection at instantiation: `.rst_n(~rst_high)`.",
+      "classification": "RTL Bug",
+      "category": "Reset",
+      "files": [
+        "soc_top.sv"
+      ],
+      "metadata": {
+        "protocol": "Reset",
+        "severity": "HIGH",
+        "bug_type": "polarity_inversion"
+      }
+    },
+    {
+      "id": "cdc_084_asymmetric_clock_duty_cycle",
+      "problem": "Timing setup violation on negative edge: Register transfer failed at 200MHz.",
+      "cause": "Clock divider generated 25% duty cycle pulse instead of symmetric 50% duty cycle, cutting high-phase time in half.",
+      "fix": "Ensure symmetric clock generation with balanced high/low duration counters.",
+      "classification": "RTL Bug",
+      "category": "Timing",
+      "files": [
+        "clk_gen.sv"
+      ],
+      "metadata": {
+        "protocol": "Clocking",
+        "severity": "MEDIUM",
+        "bug_type": "duty_cycle"
+      }
+    },
+    {
+      "id": "cdc_085_fifo_full_empty_sync_latency",
+      "problem": "False empty report: FIFO indicated empty for 3 cycles after write occurred.",
+      "cause": "Pointer synchronization latency across clock domains delayed write pointer arrival in read domain.",
+      "fix": "Document 2-cycle latency in spec as pessimistic; empty deassertion is guaranteed safe and never causes underflow.",
+      "classification": "RTL Bug",
+      "category": "CDC",
+      "files": [
+        "async_fifo_sync.sv"
+      ],
+      "metadata": {
+        "protocol": "CDC_FIFO",
+        "severity": "LOW",
+        "bug_type": "pessimistic_flag"
+      }
+    },
+    {
+      "id": "xprop_086_ram_uninitialized_array",
+      "problem": "X-state infection: Scoreboard mismatch with ACT=xx after reading unwritten memory address 0x07.",
+      "cause": "RAM RTL reset logic only cleared `rdata <= '0` and did not initialize internal `mem` storage array.",
+      "fix": "Initialize memory array on reset or during simulation initial block: `for (int i=0; i<DEPTH; i++) mem[i] = '0;`.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "ram_rtl.sv"
+      ],
+      "metadata": {
+        "protocol": "SRAM",
+        "severity": "HIGH",
+        "bug_type": "uninitialized_mem"
+      }
+    },
+    {
+      "id": "xprop_087_case_without_default",
+      "problem": "X-propagation in downstream logic: Multiplexer output produced 'x when control bus was 3'b101.",
+      "cause": "Case statement covered only values 0, 1, 2, 3 and lacked `default:` branch, inferring latch with unassigned states.",
+      "fix": "Add `default: out = '0;` to all `case` statements.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "mux_4to1.sv"
+      ],
+      "metadata": {
+        "protocol": "Verilog",
+        "severity": "HIGH",
+        "bug_type": "latch_inference"
+      }
+    },
+    {
+      "id": "xprop_088_x_optimism_in_if_condition",
+      "problem": "Simulation/Silicon mismatch: RTL simulation passed, but gate-level netlist failed.",
+      "cause": "RTL used `if (ready)` where ready was 'x. Verilog `if` treats 'x as False (X-optimism), whereas real hardware enters indeterminate state.",
+      "fix": "Use `$isunknown(ready)` assertion or run simulation with `-xprop` flag in simulator.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "control_unit.sv"
+      ],
+      "metadata": {
+        "protocol": "Verilog",
+        "severity": "HIGH",
+        "bug_type": "x_optimism"
+      }
+    },
+    {
+      "id": "xprop_089_multiple_continuous_assign",
+      "problem": "Multi-driver contention: Signal `data_bus` resolved to 'x at time 10ns.",
+      "cause": "Two continuous `assign` statements assigned values to the same wire net simultaneously.",
+      "fix": "Remove duplicate assignment and route through multiplexer: `assign data_bus = sel ? src_a : src_b;`.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "bus_mux.sv"
+      ],
+      "metadata": {
+        "protocol": "Verilog",
+        "severity": "CRITICAL",
+        "bug_type": "multi_driver"
+      }
+    },
+    {
+      "id": "xprop_090_out_of_range_bit_select",
+      "problem": "X value in ALU result: Bit 8 of a 8-bit bus selected dynamically, returning 'x.",
+      "cause": "Dynamic index variable `shift_amount` exceeded bus bounds `[7:0]` without saturation.",
+      "fix": "Clamp index: `index = (idx > 7) ? 7 : idx;`.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "barrel_shifter.sv"
+      ],
+      "metadata": {
+        "protocol": "ALU",
+        "severity": "MEDIUM",
+        "bug_type": "out_of_bounds"
+      }
+    },
+    {
+      "id": "xprop_091_div_by_zero_x",
+      "problem": "Divide by zero: Hardware divider returned 'X when divisor was 0x0000.",
+      "cause": "Divider circuit lacked check for divisor == 0 before starting restore division state machine.",
+      "fix": "Check for zero divisor: `if (divisor == 0) begin div_by_zero <= 1'b1; quotient <= '0; end`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "divider.sv"
+      ],
+      "metadata": {
+        "protocol": "ALU",
+        "severity": "MEDIUM",
+        "bug_type": "divide_by_zero"
+      }
+    },
+    {
+      "id": "xprop_092_undefined_enum_state",
+      "problem": "FSM lockup in 'X state: State variable became 2'bxx after single-cycle glitch.",
+      "cause": "State variable declared as 2-bit logic without safe state encoding.",
+      "fix": "Use SystemVerilog `typedef enum logic [1:0]` with default recovery: `default: next = IDLE;`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "state_machine.sv"
+      ],
+      "metadata": {
+        "protocol": "FSM",
+        "severity": "HIGH",
+        "bug_type": "enum_safety"
+      }
+    },
+    {
+      "id": "xprop_093_floating_tristate_wire",
+      "problem": "High-impedance 'Z converted to 'X: Input buffer generated 'X on un-driven bidirectional pin.",
+      "cause": "Bidirectional I/O pin lacked internal pull-up/pull-down resistor when tri-stated.",
+      "fix": "Add weak pull-up: `tri1 sda_pin;` or pullup primitive in pad cell.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "io_pad.sv"
+      ],
+      "metadata": {
+        "protocol": "Pad",
+        "severity": "LOW",
+        "bug_type": "floating_pin"
+      }
+    },
+    {
+      "id": "xprop_094_incomplete_sensitivity_list",
+      "problem": "Event simulation mismatch: Output did not update when input `b` changed.",
+      "cause": "Legacy Verilog block `always @(a)` only listened to changes on `a`, ignoring `b`.",
+      "fix": "Replace legacy block with SystemVerilog `always_comb` or `always @*`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "legacy_adder.v"
+      ],
+      "metadata": {
+        "protocol": "Verilog",
+        "severity": "MEDIUM",
+        "bug_type": "sensitivity_list"
+      }
+    },
+    {
+      "id": "xprop_095_power_domain_isolation_missing",
+      "problem": "X-state leakage across power domains: Active domain corrupted by dormant domain.",
+      "cause": "Signals from unpowered domain crossed into always-on domain without isolation cell clamping to 0.",
+      "fix": "Insert UPF isolation cells clamped to ground on all cross-domain boundaries.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "power_top.sv"
+      ],
+      "metadata": {
+        "protocol": "UPF",
+        "severity": "CRITICAL",
+        "bug_type": "isolation_cell"
+      }
+    },
+    {
+      "id": "xprop_096_zero_delay_gate_race",
+      "problem": "Simulator race condition: Glitch in inverter chain causing simulation non-determinism.",
+      "cause": "Zero-delay combinational feedback loop without physical gate delay.",
+      "fix": "Insert explicit gate delays or break combinational feedback with flip-flop.",
+      "classification": "RTL Bug",
+      "category": "Timing",
+      "files": [
+        "ring_osc.sv"
+      ],
+      "metadata": {
+        "protocol": "Verilog",
+        "severity": "HIGH",
+        "bug_type": "zero_delay_loop"
+      }
+    },
+    {
+      "id": "xprop_097_mbist_collar_leakage",
+      "problem": "Functional memory corrupted by MBIST: RAM address corrupted during normal mission mode.",
+      "cause": "MBIST multiplexer select line floated high during functional mode, driving BIST address lines.",
+      "fix": "Tie BIST select line to ground with active pull-down during mission mode.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "mbist_collar.sv"
+      ],
+      "metadata": {
+        "protocol": "DFT",
+        "severity": "CRITICAL",
+        "bug_type": "mbist_mux"
+      }
+    },
+    {
+      "id": "xprop_098_uninitialized_clock_enable",
+      "problem": "Gated clock dead: Registers never received clock after power-on.",
+      "cause": "Clock enable flip-flop powered on in state 1'bx, disabling clock gate.",
+      "fix": "Add reset to clock enable flip-flop: `if (!rst_n) en <= 1'b0;`.",
+      "classification": "RTL Bug",
+      "category": "Clocking",
+      "files": [
+        "icg_enable.sv"
+      ],
+      "metadata": {
+        "protocol": "Clocking",
+        "severity": "HIGH",
+        "bug_type": "uninitialized_en"
+      }
+    },
+    {
+      "id": "xprop_099_array_dimension_reversal",
+      "problem": "Data bitfield corruption: Memory bus width transposed from 8x32 to 32x8.",
+      "cause": "Packed vs unpacked array dimensions swapped: `logic [31:0] mem [7:0]` swapped with `logic [7:0] mem [31:0]`.",
+      "fix": "Define packed dimension for word width and unpacked dimension for memory depth: `logic [DATA_WIDTH-1:0] mem [0:DEPTH-1];`.",
+      "classification": "RTL Bug",
+      "category": "Functional",
+      "files": [
+        "mem_array.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "HIGH",
+        "bug_type": "dimension_reversal"
+      }
+    },
+    {
+      "id": "xprop_100_ternary_operator_x_pessimism",
+      "problem": "X-pessimism in multiplexer: Output resolved to 'x when condition was 'x, even though both true and false inputs were 0.",
+      "cause": "SystemVerilog ternary operator `cond ? a : b` evaluates to 'x if `cond` is 'x even when `a == b`.",
+      "fix": "Use `if (cond === 1'b1)` or explicit logical gating `(a & cond) | (b & ~cond)` to suppress X-pessimism.",
+      "classification": "RTL Bug",
+      "category": "X-Propagation",
+      "files": [
+        "mux_safe.sv"
+      ],
+      "metadata": {
+        "protocol": "SystemVerilog",
+        "severity": "LOW",
+        "bug_type": "ternary_xprop"
+      }
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pat_off_by_one_ram",
+      "category": "Functional",
+      "description": "Pattern: Off-by-one addressing in synchronous RAM. Indicator: Scoreboard reports expected value from address N matches actual data returned from address N+1 (or N-1). Cause: Indexing array with `mem[addr+1]` or pointer increment prior to registered access. Resolution: Verify synchronous read register indexing matches request address without arithmetic offset.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "ram"
+      }
+    },
+    {
+      "id": "pat_monitor_back_to_back_drop",
+      "category": "Scoreboard",
+      "description": "Pattern: UVM Monitor dropping transactions during back-to-back bus cycles. Indicator: Scoreboard misses every alternate transaction during pipelined or back-to-back reads/writes. Cause: Blocking `@(clocking_cb)` inside read latency branch followed by second clocking wait at loop start. Resolution: Use non-blocking in-flight queues in monitor to track latency.",
+      "metadata": {
+        "scope": "TB",
+        "module": "monitor"
+      }
+    },
+    {
+      "id": "pat_axi_handshake_combinational_loop",
+      "category": "Protocol",
+      "description": "Pattern: AXI4 handshake deadlock. Indicator: Simulation hangs indefinitely with AWVALID and AWREADY both low, neither side asserting. Cause: Master waits for AWREADY before asserting AWVALID, creating forbidden dependency. Resolution: Ensure AWVALID is asserted independently of AWREADY per AMBA spec.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "axi"
+      }
+    },
+    {
+      "id": "pat_cdc_multibit_incoherence",
+      "category": "CDC",
+      "description": "Pattern: Multi-bit CDC data bus incoherence. Indicator: Intermittent illegal state or corrupted values observed in destination clock domain. Cause: Independent 2-flop synchronizers on individual data/pointer bits experiencing skew. Resolution: Use Gray-code encoding for counters or asynchronous FIFO with gray pointers.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "cdc"
+      }
+    },
+    {
+      "id": "pat_xprop_uninitialized_memory",
+      "category": "X-Propagation",
+      "description": "Pattern: X-state propagation from memory array. Indicator: Scoreboard mismatch with ACT=xx or 'X' appearing in data path after read. Cause: Reset logic clears output registers but leaves storage array uninitialized. Resolution: Initialize RAM array on reset or guard reads to unwritten addresses.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "ram"
+      }
+    },
+    {
+      "id": "pat_latch_incomplete_case",
+      "category": "Functional",
+      "description": "Pattern: Inferred latch in combinational decoder. Indicator: Synthesis warning 'Latch inferred' and unexpected glitching in simulation. Cause: Missing default branch in `case` statement. Resolution: Assign default value at start of `always_comb` block.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "fsm"
+      }
+    },
+    {
+      "id": "pat_driver_early_item_done",
+      "category": "Environment",
+      "description": "Pattern: UVM Driver premature item_done. Indicator: New transaction driven while peripheral slave has not deasserted ready/wait states. Cause: Calling `seq_item_port.item_done()` before bus pin handshake completes. Resolution: Wait for slave handshake confirmation before calling item_done.",
+      "metadata": {
+        "scope": "TB",
+        "module": "driver"
+      }
+    },
+    {
+      "id": "pat_constraint_blindspot",
+      "category": "Environment",
+      "description": "Pattern: Constrained random blind spot. Indicator: 100% test pass rate but bugs escape into boundary conditions. Cause: Address or mode constraint restricted to narrow range (e.g., `addr inside {[0:2]}`). Resolution: Expand constraint to full parameter range with corner-case weights.",
+      "metadata": {
+        "scope": "TB",
+        "module": "sequence"
+      }
+    },
+    {
+      "id": "pat_reset_polarity_inversion",
+      "category": "Reset",
+      "description": "Pattern: Reset polarity inversion. Indicator: Outputs remain 0 throughout simulation; operational commands ignored. Cause: Using `if (rst_n)` instead of `if (!rst_n)` for active-low reset. Resolution: Invert reset condition to match active-low convention.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "reset"
+      }
+    },
+    {
+      "id": "pat_blocking_assignment_in_seq",
+      "category": "Functional",
+      "description": "Pattern: Race condition from blocking assignment in sequential logic. Indicator: Flip-flop samples current cycle input instead of previous cycle in multi-stage pipeline. Cause: Using `=` instead of `<=` inside `always_ff`. Resolution: Strictly use non-blocking `<=` inside sequential blocks.",
+      "metadata": {
+        "scope": "RTL",
+        "module": "pipeline"
+      }
+    }
+  ],
+  "protocols": [
+    {
+      "id": "proto_spec_axi4",
+      "name": "AXI4 Protocol Specification Rules",
+      "document": "AXI4 Protocol Rules:\n1. Handshake Stability: Once VALID is asserted, it MUST remain High until the rising clock edge where READY is High.\n2. Handshake Independence: A Master MUST NOT wait for READY before asserting VALID. A Slave CAN wait for VALID before asserting READY.\n3. 4KB Boundary Rule: Burst transactions MUST NOT cross a 4KB address boundary.\n4. Out-of-Order Response: Transactions with identical ARID/AWID must be completed in order. Transactions with different IDs may be reordered.\n5. Write Strobe (WSTRB): WSTRB bits indicate valid byte lanes; WLAST must coincide with the final write beat specified by AWLEN.",
+      "metadata": {
+        "family": "AMBA",
+        "protocol": "AXI4"
+      }
+    },
+    {
+      "id": "proto_spec_apb",
+      "name": "APB Protocol Specification Rules",
+      "document": "APB Protocol Rules:\n1. Phases: Every transfer consists of SETUP phase (PSEL=1, PENABLE=0) followed by ACCESS phase (PSEL=1, PENABLE=1).\n2. PADDR Stability: PADDR, PWRITE, and PWDATA must remain completely stable throughout both SETUP and ACCESS phases.\n3. Ready Handshake: Transfer completes on the rising edge where PSEL=1, PENABLE=1, and PREADY=1.\n4. Error Response: PSLVERR is only valid when PREADY is High at the end of the transfer.",
+      "metadata": {
+        "family": "AMBA",
+        "protocol": "APB"
+      }
+    },
+    {
+      "id": "proto_spec_ahb",
+      "name": "AHB-Lite Protocol Specification Rules",
+      "document": "AHB-Lite Protocol Rules:\n1. Address Phase precedes Data Phase by 1 clock cycle.\n2. Wait States: When HREADY is Low, Master MUST hold HADDR, HTRANS, HBURST, and HSIZE stable.\n3. Burst Continuity: Incremental bursts must not change size or transfer type until burst count completes.\n4. HRESP Error: Slave error response requires a 2-cycle sequence with HRESP=ERROR.",
+      "metadata": {
+        "family": "AMBA",
+        "protocol": "AHB"
+      }
+    },
+    {
+      "id": "proto_spec_spi",
+      "name": "SPI Protocol Specification Rules",
+      "document": "SPI Protocol Rules:\n1. Mode 0: CPOL=0, CPHA=0 (Clock idle Low, sample on rising edge, drive on falling edge).\n2. Mode 1: CPOL=0, CPHA=1 (Clock idle Low, sample on falling edge, drive on rising edge).\n3. Mode 2: CPOL=1, CPHA=0 (Clock idle High, sample on falling edge, drive on rising edge).\n4. Mode 3: CPOL=1, CPHA=1 (Clock idle High, sample on rising edge, drive on falling edge).\n5. Chip Select (CS_N): Must remain Low throughout all bits of the frame.",
+      "metadata": {
+        "family": "Serial",
+        "protocol": "SPI"
+      }
+    },
+    {
+      "id": "proto_spec_i2c",
+      "name": "I2C Protocol Specification Rules",
+      "document": "I2C Protocol Rules:\n1. START Condition: SDA transitions High-to-Low while SCL is High.\n2. STOP Condition: SDA transitions Low-to-High while SCL is High.\n3. Data Stability: SDA must be stable while SCL is High; SDA may only change when SCL is Low.\n4. Acknowledge: Receiver pulls SDA Low during the 9th clock pulse for ACK, releases High for NACK.",
+      "metadata": {
+        "family": "Serial",
+        "protocol": "I2C"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "id": "sva_read_data_latency",
+      "name": "SVA Synchronous Read Data Latency Check",
+      "document": "property p_read_data_latency;\n  @(posedge clk) disable iff (!rst_n)\n  (!we) |=> (rdata == $past(mem[addr]));\nendproperty\na_read_data: assert property (p_read_data_latency)\n  else $error(\"SVA ERROR: Synchronous read latency violation! Expected: %h, Actual: %h\", $past(mem[addr]), rdata);",
+      "metadata": {
+        "type": "SVA",
+        "category": "Functional"
+      }
+    },
+    {
+      "id": "sva_no_x_on_read",
+      "name": "SVA No Unknown (X/Z) On Read Data",
+      "document": "property p_no_x_on_read;\n  @(posedge clk) disable iff (!rst_n)\n  (!we) |=> (!$isunknown(rdata));\nendproperty\na_no_x_on_read: assert property (p_no_x_on_read)\n  else $error(\"SVA ERROR: Unknowns (X/Z) detected on rdata output!\");",
+      "metadata": {
+        "type": "SVA",
+        "category": "X-Propagation"
+      }
+    },
+    {
+      "id": "sva_axi_valid_stability",
+      "name": "SVA AXI Valid Stability Handshake",
+      "document": "property p_axi_valid_stable;\n  @(posedge clk) disable iff (!rst_n)\n  (valid && !ready) |=> (valid && $stable(data));\nendproperty\na_axi_valid_stable: assert property (p_axi_valid_stable)\n  else $error(\"SVA ERROR: AXI VALID deasserted or DATA changed before READY handshake!\");",
+      "metadata": {
+        "type": "SVA",
+        "category": "Protocol"
+      }
+    },
+    {
+      "id": "sva_apb_paddr_stable",
+      "name": "SVA APB Address Stability During Access Phase",
+      "document": "property p_apb_addr_stable;\n  @(posedge clk) disable iff (!rst_n)\n  (psel && penable && !pready) |=> $stable(paddr);\nendproperty\na_apb_addr_stable: assert property (p_apb_addr_stable)\n  else $error(\"SVA ERROR: APB PADDR changed during ACCESS wait states!\");",
+      "metadata": {
+        "type": "SVA",
+        "category": "Protocol"
+      }
+    },
+    {
+      "id": "sva_fifo_no_overflow",
+      "name": "SVA FIFO Overflow Protection",
+      "document": "property p_fifo_no_overflow;\n  @(posedge clk) disable iff (!rst_n)\n  (full && wr_en) |-> $error(\"SVA ERROR: FIFO write attempted while full!\");\nendproperty\na_fifo_no_overflow: assert property (p_fifo_no_overflow);",
+      "metadata": {
+        "type": "SVA",
+        "category": "Functional"
+      }
+    }
+  ]
+}

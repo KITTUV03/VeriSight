@@ -1,0 +1,66 @@
+# =========================================================================
+# UPF 2.1 / IEEE 1801 Power Intent Specification for Multi-File SoC
+# =========================================================================
+
+# 1. Power Domains
+create_power_domain TOP -include_scope
+create_power_domain PD_CORE -elements { u_apb_slave }
+create_power_domain PD_PERIPH -elements { u_i2c }
+
+# 2. Supply Ports
+create_supply_port VDD -direction in
+create_supply_port VDD_LOW -direction in
+create_supply_port VSS -direction in
+
+# 3. Supply Nets
+create_supply_net VDD -domain TOP
+create_supply_net VDD_SW -domain PD_CORE
+create_supply_net VDD_LOW -domain PD_PERIPH
+create_supply_net VSS -domain TOP -reuse
+
+connect_supply_net VDD -ports { VDD }
+connect_supply_net VDD_LOW -ports { VDD_LOW }
+connect_supply_net VSS -ports { VSS }
+
+set_domain_supply_net TOP -primary_power_net VDD -primary_ground_net VSS
+set_domain_supply_net PD_CORE -primary_power_net VDD_SW -primary_ground_net VSS
+set_domain_supply_net PD_PERIPH -primary_power_net VDD_LOW -primary_ground_net VSS
+
+# 4. Power Switch for PD_CORE
+create_power_switch sw_core \
+    -domain PD_CORE \
+    -input_supply_port {in VDD} \
+    -output_supply_port {out VDD_SW} \
+    -control_port {ctrl pwr_gate_en} \
+    -on_state {ON in {!ctrl}}
+
+# 5. Output Isolation for PD_CORE
+set_isolation iso_core \
+    -domain PD_CORE \
+    -applies_to outputs \
+    -clamp_value 0 \
+    -isolation_signal pwr_iso_en \
+    -isolation_sense high \
+    -location self
+
+# 6. Level Shifter for PD_PERIPH (Voltage Domain Crossing)
+set_level_shifter ls_periph \
+    -domain PD_PERIPH \
+    -applies_to inputs \
+    -rule both \
+    -location self
+
+# 7. Retention Strategy for Sequential Registers in PD_CORE
+set_retention ret_slave \
+    -domain PD_CORE \
+    -retention_power_net VDD \
+    -retention_ground_net VSS \
+    -save_signal {pwr_iso_en high} \
+    -restore_signal {pwr_gate_en low}
+
+# 8. Power State Table (PST)
+create_pst pst_soc -supplies { VDD VDD_SW VDD_LOW VSS }
+add_pst_state ALL_ON  -pst pst_soc -state { ON  ON  ON  GND }
+add_pst_state SLEEP   -pst pst_soc -state { ON  OFF ON  GND }
+add_pst_state LOW_PWR -pst pst_soc -state { ON  OFF OFF GND }
+

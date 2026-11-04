@@ -1,0 +1,26 @@
+{
+  "id": "ram_offbyone",
+  "title": "RAM synchronous-read returns mem[addr+1] (off-by-one address)",
+  "category_tag": "functional_rtl_bug",
+  "source": "VeriSight projects/ram. Ground truth from ram_rtl.sv:29 vs ram scoreboard expected values.",
+  "ground_truth_confidence": "high",
+  "inputs": {
+    "spec": "projects/ram/specs/spec.md",
+    "rtl": "projects/ram/rtl/",
+    "tb": "projects/ram/tb/",
+    "log": "projects/ram/logs/sim.log"
+  },
+  "ground_truth": {
+    "classification": "RTL Bug",
+    "category_keywords": ["functional", "address", "read", "off-by-one", "offset"],
+    "root_cause_keywords_any": ["addr+1", "addr + 1", "address", "offset", "off-by-one", "wrong address"],
+    "responsible_files": ["ram_rtl.sv"],
+    "responsible_lines": {"ram_rtl.sv": [29, 29]},
+    "first_causal_error_substring": "Mismatch @addr 1 EXP=201 ACT=110",
+    "expect_insufficient_evidence": false,
+    "notes": "ram_rtl.sv:29 reads `mem[addr+1]` instead of `mem[addr]`. Read of addr returns the value stored at addr+1, matching EXP=201 ACT=110 (110 was written to the next location)."
+  },
+  "fabrication_guard": {
+    "forbidden_claims": ["apb_slave", "alu.sv"]
+  }
+}

@@ -1977,16 +1977,16 @@ def build_pdf():
          ],
          "// SystemVerilog DPI-C Declaration\nimport \"DPI-C\" function int compute_crc32(input int len, input byte data[]);\nexport \"DPI-C\" task sv_notify_irq;"),
 
-        (59, "PyVerilog AST Extraction and Netlist Topology Generation",
-         "Static Analysis & Netlist Traversal",
-         "Building abstract syntax trees to traverse hardware connectivity graphs programmatically.",
+        (59, "pyslang AST Extraction and SystemVerilog Static Analysis",
+         "Static Analysis & AST Traversal",
+         "Parsing and elaborating SystemVerilog into a real IEEE-1800 AST (via the Slang frontend) to analyse hardware structure programmatically.",
          [
-             ("Lexical Tokenization", "Tokenizes raw Verilog syntax into AST node hierarchies."),
-             ("Fan-In Cone Traversal", "Recursively traces driving signals backwards from failing flip-flops."),
-             ("Continuous Assignment Traversal", "Resolves complex ternary expressions and combinational gates."),
-             ("VeriSight Rule 2 Checking", "Drives the X-Tracer deterministic root-cause engine.")
+             ("Parse & Elaborate", "pyslang parses and elaborates SystemVerilog into typed symbols with source locations."),
+             ("Static X-Origin Scan", "Flags sequential registers written but not assigned in their reset branch."),
+             ("Signal Read/Write Sets", "Derives per-block written/read signals from assignment expressions in the AST."),
+             ("VeriSight Rule 2 Checking", "Drives the X-Tracer deterministic candidate-origin engine (static layer).")
          ],
-         "# PyVerilog AST Node Traversal\nfrom pyverilog.vparser.parser import parse\nast, _ = parse(['dut.v'])\n# Traverse AST nodes recursively to extract netlist graph"),
+         "# pyslang AST parse + elaborate\nfrom pyslang import driver\nd = driver.Driver(); d.addStandardArgs()\nd.parseCommandLine('slang dut.sv'); d.processOptions(); d.parseAllSources()\ncomp = d.createCompilation()\nfor inst in comp.getRoot().topInstances:\n    for sym in inst.body: ...  # walk ports/nets/procedural blocks"),
 
         (60, "Docker Containerization for Isolated Multi-Tool EDA Execution",
          "Verification Infrastructure & DevOps",
@@ -2049,7 +2049,7 @@ def build_pdf():
          "Synthesizing mathematically valid patches and validating syntax in sandboxes.",
          [
              ("Unified Diff Synthesis", "Generates minimal git diffs altering only defective logic lines."),
-             ("AST Syntax Pre-Check", "Parses modified code with PyVerilog before committing to disk."),
+             ("AST Syntax Pre-Check", "Parses modified code with pyslang before committing to disk, distinguishing genuine syntax errors from missing-dependency diagnostics."),
              ("Sandbox Compilation", "Runs compiler (iverilog/verilator) in temporary directory."),
              ("Regression Safety", "Verifies failing test passes without breaking existing regression suite.")
          ],

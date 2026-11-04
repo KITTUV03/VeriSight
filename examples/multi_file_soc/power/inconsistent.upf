@@ -1,0 +1,21 @@
+# Inconsistent and Invalid UPF File for Diagnostic Verification
+create_power_domain TOP -include_scope
+create_power_domain PD_FAULTY -elements { u_nonexistent_subsystem }
+
+# Reference undeclared domain in supply assignment
+set_domain_supply_net PD_UNDECLARED -primary_power_net VDD_GHOST -primary_ground_net VSS
+
+# Missing isolation control signal and undeclared signal
+set_isolation iso_bad -domain PD_FAULTY -applies_to outputs -clamp_value 0
+set_isolation_control iso_bad -domain PD_FAULTY -isolation_signal nonexistent_iso_signal
+
+# Retention connected to switched net (loses state on power-off)
+create_supply_net VDD_SW_FAULTY -domain PD_FAULTY
+set_domain_supply_net PD_FAULTY -primary_power_net VDD_SW_FAULTY -primary_ground_net VSS
+set_retention ret_bad -domain PD_FAULTY -retention_power_net VDD_SW_FAULTY
+
+# Illegal power state in PST: switched supply ON while parent VDD is OFF
+create_power_switch sw_faulty -domain PD_FAULTY -input_supply_port {in VDD} -output_supply_port {out VDD_SW_FAULTY} -control_port {ctrl ghost_ctrl}
+create_pst pst_illegal -supplies { VDD VDD_SW_FAULTY VSS }
+add_pst_state ILLEGAL_STATE -pst pst_illegal -state { OFF ON GND }
+

@@ -1,0 +1,146 @@
+{
+  "id": 29373,
+  "title": "What is the difference between uvm_config_db and uvm_resource_db?",
+  "slug": "what-is-the-difference-between-uvm-config-db-and-uvm-resource-db",
+  "created_at": "2014-04-18T10:10:43.000Z",
+  "bumped_at": "2026-07-21T14:52:03.963Z",
+  "posts_count": 23,
+  "question_raw": "<p>Hi</p>\n<p>I would like to know What is the difference between uvm_config_db and uvm_resource_db ?<br>\nPlease let me know the difference between the the two config_db’s, when it can be used and how it is used with an example?<br>\nI went through so many articles but it is vague and unclear.can some one point me with the expamples and usage ?</p>\n<p>-Thanks,<br>\n-Raja.</p>",
+  "question_text": "Hi\nI would like to know What is the difference between uvm_config_db and uvm_resource_db ?\nPlease let me know the difference between the the two config_db’s, when it can be used and how it is used with an example?\nI went through so many articles but it is vague and unclear.can some one point me with the expamples and usage ?\n-Thanks,\n-Raja.",
+  "author": "rajasravan",
+  "replies": [
+    {
+      "id": 88662,
+      "author": "tfitz",
+      "raw": "<p>Don’t worry about the differences, and just use uvm_config_db.<br>\nuvm_config_db is a convenience layer built on top of uvm_resource_db, but that convenience is very important. In particular, uvm_resource_db uses a “last write wins” approach. The uvm_config_db, on the other hand, looks at where things are in the hierarchy up through end_of_elaboration, so “parent wins.” Once you start start_of_simulation, the config_db becomes “last write wins.”</p>",
+      "text": "Don’t worry about the differences, and just use uvm_config_db.\nuvm_config_db is a convenience layer built on top of uvm_resource_db, but that convenience is very important. In particular, uvm_resource_db uses a “last write wins” approach. The uvm_config_db, on the other hand, looks at where things are in the hierarchy up through end_of_elaboration, so “parent wins.” Once you start start_of_simulation, the config_db becomes “last write wins.”",
+      "created_at": "2014-04-18T12:59:05.000Z"
+    },
+    {
+      "id": 88663,
+      "author": "rajasravan",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/2\">tfitz</a>:</font></em></p>\n<p>Hi tfitz,</p>\n<p>Thanks alot for the reply.</p>\n<p>It would be really helpful if you can give explaination on this last write approach/last write wins.<br>\nPlease can you give with an exmaple if possible to see the difference.<br>\nThis would be really helpful.</p>\n<p>-Thanks,<br>\n-Sravan</p>",
+      "text": "In reply to tfitz:\nHi tfitz,\nThanks alot for the reply.\nIt would be really helpful if you can give explaination on this last write approach/last write wins.\nPlease can you give with an exmaple if possible to see the difference.\nThis would be really helpful.\n-Thanks,\n-Sravan",
+      "created_at": "2014-04-21T04:17:10.000Z"
+    },
+    {
+      "id": 88664,
+      "author": "rajasravan",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/3\">rajasravan</a>:</font></em></p>\n<p>Can you please comment on this.</p>\n<p>-Thanks,<br>\n-Sravan.</p>",
+      "text": "In reply to rajasravan:\nCan you please comment on this.\n-Thanks,\n-Sravan.",
+      "created_at": "2014-04-22T07:49:35.000Z"
+    },
+    {
+      "id": 88665,
+      "author": "tfitz",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/4\">rajasravan</a>:</font></em></p>\n<p>The build-time behavior of uvm_config_db is explained in the <a href=\"https://verificationacademy.com/sessions/understanding-factory-and-configuration\" rel=\"noopener nofollow ugc\">Advanced UVM</a> video course. If a test and an env both set a config_db value during build-time, the test’s value will be used because it is higher in the component hierarchy. This is what you would expect.<br>\nHowever, using the uvm_resource_db, since build_phase() is called top-down, the env’s build_phase is called after the test’s, so the env value would overwrite the test value.<br>\nOnce start_of_simulation_phase is reached, a write using either the config_db or the resource_db will overwrite whatever is currently in the database for that specific parameter. This is what we mean by “last write wins.”</p>",
+      "text": "In reply to rajasravan:\nThe build-time behavior of uvm_config_db is explained in the Advanced UVM video course. If a test and an env both set a config_db value during build-time, the test’s value will be used because it is higher in the component hierarchy. This is what you would expect.\nHowever, using the uvm_resource_db, since build_phase() is called top-down, the env’s build_phase is called after the test’s, so the env value would overwrite the test value.\nOnce start_of_simulation_phase is reached, a write using either the config_db or the resource_db will overwrite whatever is currently in the database for that specific parameter. This is what we mean by “last write wins.”",
+      "created_at": "2014-04-22T12:59:22.000Z"
+    },
+    {
+      "id": 88666,
+      "author": "rajasravan",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/5\">tfitz</a>:</font></em></p>\n<p>Hi,</p>\n<p>This is really helpful to my understading.And i can see the main difference betwee uvm_config_db and uvm_resource_db is <strong>“When you want to share object and access it from different location without using the hierarchy you can use uvm_resource_db.” Can you comment on this?</strong></p>\n<p><strong>uvm_config_db :: set function parameter</strong></p>\n<p>static function void set( \tuvm_component  \tcntxt,<br>\nstring  \tinst_name,<br>\nstring  \tfield_name,<br>\nT  \tvalue \t)</p>\n<p><strong>uvm_resource_db :: set function parameter</strong></p>\n<p>static function void set( \tinput  \tstring  \tscope, \t   \t<br>\ninput  \tstring  \tname, \t   \t<br>\nT  \tval, \t   \t<br>\ninput  \tuvm_object  \taccessor \t =  \tnull \t)</p>\n<p>There is no instance name in resource_db.</p>\n<p>-Thanks,<br>\n-Sravan.</p>",
+      "text": "In reply to tfitz:\nHi,\nThis is really helpful to my understading.And i can see the main difference betwee uvm_config_db and uvm_resource_db is “When you want to share object and access it from different location without using the hierarchy you can use uvm_resource_db.” Can you comment on this?\nuvm_config_db :: set function parameter\nstatic function void set( \tuvm_component  \tcntxt,\nstring  \tinst_name,\nstring  \tfield_name,\nT  \tvalue \t)\nuvm_resource_db :: set function parameter\nstatic function void set( \tinput  \tstring  \tscope, \t   \t\ninput  \tstring  \tname, \t   \t\nT  \tval, \t   \t\ninput  \tuvm_object  \taccessor \t =  \tnull \t)\nThere is no instance name in resource_db.\n-Thanks,\n-Sravan.",
+      "created_at": "2014-04-23T09:52:53.000Z"
+    },
+    {
+      "id": 88667,
+      "author": "tfitz",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/6\">rajasravan</a>:</font></em></p>\n<p>Using the resource_db requires that the scope (arbitrary string) for the set and get match. For trivial environments this isn’t difficult. However, for complex environments, including IP from different sources, it’s more difficult to manage. That, along with some other non-intuitive behaviors of the resource_db is why you should always just use the config_db.<br>\nI have never written a testbench that required using the resource_db and I suggest you do the same.<br>\nGood luck,<br>\n-Tom</p>",
+      "text": "In reply to rajasravan:\nUsing the resource_db requires that the scope (arbitrary string) for the set and get match. For trivial environments this isn’t difficult. However, for complex environments, including IP from different sources, it’s more difficult to manage. That, along with some other non-intuitive behaviors of the resource_db is why you should always just use the config_db.\nI have never written a testbench that required using the resource_db and I suggest you do the same.\nGood luck,\n-Tom",
+      "created_at": "2014-04-23T13:00:53.000Z"
+    },
+    {
+      "id": 88668,
+      "author": "rajasravan",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/7\">tfitz</a>:</font></em></p>\n<p>Thanks alot Tom.For the valuable &amp; informative reply.</p>\n<p>-Thanks,<br>\n-Sravan.</p>",
+      "text": "In reply to tfitz:\nThanks alot Tom.For the valuable & informative reply.\n-Thanks,\n-Sravan.",
+      "created_at": "2014-04-24T08:49:39.000Z"
+    },
+    {
+      "id": 88669,
+      "author": "Sagar_Shah",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/8\">tfitz</a>:</font></em></p>\n<p>Hi Tom,<br>\nI tried one example with uvm_resource_db.<br>\nBut it is not working as you explained for uvm_resource_db during build_phase.<br>\nIn uvm_resource_db also top hierarchy win during build_phase.</p>\n<pre><code class=\"lang-verilog\">class my_agent extends uvm_agent;\n  `uvm_component_utils (my_agent)\n  int var1;\n  function new (string name = \"my_agent\", uvm_component parent = null);\n   super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    if(!uvm_resource_db #(int)::read_by_name(\"\", \"var1\", var1, this))\n      `uvm_error (\"GET-FAIL\", \"not able to get value\")\n    else \n      `uvm_info (\"GET-PASS\", $sformatf(\"var1=%0d\", var1), UVM_NONE)\n  endfunction\nendclass\n\n/////////////////\nclass my_env extends uvm_env;\n  `uvm_component_utils (my_env)\n  int var1;\n  my_agent agnt;\n  function new (string name = \"my_env\", uvm_component parent = null);\n    super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    agnt = my_agent::type_id::create(\"angt\", this);\n    var1 = 60;\n    uvm_resource_db #(int)::set(\"*\", \"var1\", var1, this);\n    `uvm_info (\"SET\", $sformatf(\"From ENV=%0d\", var1), UVM_NONE)\n  endfunction\nendclass\n\n/////////////////\nclass my_test extends uvm_test;\n  `uvm_component_utils (my_test)\n  int var1;\n  my_env env;\n  function new (string name = \"my_test\", uvm_component parent = null);\n    super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    env = my_env::type_id::create(\"env\", this);\n    var1 = 70;\n    uvm_resource_db #(int)::set(\"*\", \"var1\", var1, this);\n    `uvm_info (\"SET\", $sformatf(\"From TEST=%0d\", var1), UVM_NONE) \n  endfunction\n  task run_phase (uvm_phase phase);\n    phase.raise_objection(this);\n    #500;\n    phase.drop_objection(this);\n  endtask\nendclass\n\n///////////////\nmodule top();\n  initial begin\n    run_test(\"my_test\");\n  end\nendmodule\n\n//Output:\n//UVM_INFO @ 0: reporter [RNTST] Running test my_test...\n//UVM_INFO testbench.sv(15) @ 0: uvm_test_top [SET] From TEST=70\n//UVM_INFO design.sv(36) @ 0: uvm_test_top.env [SET] From ENV=60\n//UVM_INFO design.sv(14) @ 0: uvm_test_top.env.angt [GET-PASS] var1=70\n//UVM_INFO /apps/vcsmx/etc/uvm-1.1/src/base/uvm_objection.svh(1267) @ 500: reporter [TEST_DONE] 'run' phase is ready to proceed to the 'extract' phase\n\n</code></pre>\n<p>Here I set value 70 from test, 60 from env, and getting value 70 in agent instead of 60.<br>\nCan you please explain what is wrong I am doing here?</p>",
+      "text": "In reply to tfitz:\nHi Tom,\nI tried one example with uvm_resource_db.\nBut it is not working as you explained for uvm_resource_db during build_phase.\nIn uvm_resource_db also top hierarchy win during build_phase.\nclass my_agent extends uvm_agent;\n  `uvm_component_utils (my_agent)\n  int var1;\n  function new (string name = \"my_agent\", uvm_component parent = null);\n   super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    if(!uvm_resource_db #(int)::read_by_name(\"\", \"var1\", var1, this))\n      `uvm_error (\"GET-FAIL\", \"not able to get value\")\n    else \n      `uvm_info (\"GET-PASS\", $sformatf(\"var1=%0d\", var1), UVM_NONE)\n  endfunction\nendclass\n\n/////////////////\nclass my_env extends uvm_env;\n  `uvm_component_utils (my_env)\n  int var1;\n  my_agent agnt;\n  function new (string name = \"my_env\", uvm_component parent = null);\n    super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    agnt = my_agent::type_id::create(\"angt\", this);\n    var1 = 60;\n    uvm_resource_db #(int)::set(\"*\", \"var1\", var1, this);\n    `uvm_info (\"SET\", $sformatf(\"From ENV=%0d\", var1), UVM_NONE)\n  endfunction\nendclass\n\n/////////////////\nclass my_test extends uvm_test;\n  `uvm_component_utils (my_test)\n  int var1;\n  my_env env;\n  function new (string name = \"my_test\", uvm_component parent = null);\n    super.new(name, parent);\n  endfunction\n  function void build_phase (uvm_phase phase);\n    super.build_phase (phase);\n    env = my_env::type_id::create(\"env\", this);\n    var1 = 70;\n    uvm_resource_db #(int)::set(\"*\", \"var1\", var1, this);\n    `uvm_info (\"SET\", $sformatf(\"From TEST=%0d\", var1), UVM_NONE) \n  endfunction\n  task run_phase (uvm_phase phase);\n    phase.raise_objection(this);\n    #500;\n    phase.drop_objection(this);\n  endtask\nendclass\n\n///////////////\nmodule top();\n  initial begin\n    run_test(\"my_test\");\n  end\nendmodule\n\n//Output:\n//UVM_INFO @ 0: reporter [RNTST] Running test my_test...\n//UVM_INFO testbench.sv(15) @ 0: uvm_test_top [SET] From TEST=70\n//UVM_INFO design.sv(36) @ 0: uvm_test_top.env [SET] From ENV=60\n//UVM_INFO design.sv(14) @ 0: uvm_test_top.env.angt [GET-PASS] var1=70\n//UVM_INFO /apps/vcsmx/etc/uvm-1.1/src/base/uvm_objection.svh(1267) @ 500: reporter [TEST_DONE] 'run' phase is ready to proceed to the 'extract' phase\n\n\nHere I set value 70 from test, 60 from env, and getting value 70 in agent instead of 60.\nCan you please explain what is wrong I am doing here?",
+      "created_at": "2016-05-01T12:03:45.000Z"
+    },
+    {
+      "id": 88670,
+      "author": "dhserfer",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/9\">Sagar Shah</a>:</font></em></p>\n<p>Your code appears to be working correctly.  ‘my_test’ is above ‘my_env’.  Also, his suggestion was to NOT use the resource_db.</p>\n<p>From the file resource.svh:</p>\n<p>// Multiple resources that have the same name are stored in a queue.<br>\n// Each resource is pushed into a queue with the first one at the front<br>\n// of the queue and each subsequent one behind it.  The same happens for<br>\n// multiple resources that have the same type.  The resource queues are<br>\n// searched front to back, so those placed earlier in the queue have<br>\n// precedence over those placed later.</p>",
+      "text": "In reply to Sagar Shah:\nYour code appears to be working correctly.  ‘my_test’ is above ‘my_env’.  Also, his suggestion was to NOT use the resource_db.\nFrom the file resource.svh:\n// Multiple resources that have the same name are stored in a queue.\n// Each resource is pushed into a queue with the first one at the front\n// of the queue and each subsequent one behind it.  The same happens for\n// multiple resources that have the same type.  The resource queues are\n// searched front to back, so those placed earlier in the queue have\n// precedence over those placed later.",
+      "created_at": "2016-05-02T00:13:11.000Z"
+    },
+    {
+      "id": 88671,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/10\">dhserfer</a>:</font></em></p>\n<p>The configuration database is implemented on top of the resource database. The resource database<br>\nis a pool of name-value pairs each associated with a scope string.<br>\nThe configuration database associates this scope string with full hierarchical names in the component hierarchy such that entriesin the configuration database, but not the resource database, are tied to the component hierarchy.</p>",
+      "text": "In reply to dhserfer:\nThe configuration database is implemented on top of the resource database. The resource database\nis a pool of name-value pairs each associated with a scope string.\nThe configuration database associates this scope string with full hierarchical names in the component hierarchy such that entriesin the configuration database, but not the resource database, are tied to the component hierarchy.",
+      "created_at": "2016-05-02T06:23:36.000Z"
+    },
+    {
+      "id": 88672,
+      "author": "dhserfer",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/11\">chr_sue</a>:</font></em></p>\n<p>For the code that is provided, each of the uvm_resource_db::set functions are identical and performed in the build phases of the my_test and my_env components.  If the ‘names’ are the same, don’t they utilize the same queue (and my_test build_phase ‘sets’ the head of the queue)?</p>",
+      "text": "In reply to chr_sue:\nFor the code that is provided, each of the uvm_resource_db::set functions are identical and performed in the build phases of the my_test and my_env components.  If the ‘names’ are the same, don’t they utilize the same queue (and my_test build_phase ‘sets’ the head of the queue)?",
+      "created_at": "2016-05-02T11:10:10.000Z"
+    },
+    {
+      "id": 88673,
+      "author": "chr_sue",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/12\">dhserfer</a>:</font></em></p>\n<p>The resource_db commands have only two lookup arguments, the scope and the name. Both are strings.<br>\nThe accessor, last argument, is used only for auditting. You do not have to provide an actual argument, because it has a default value.<br>\nThe config_db commands have 3 lookup arguments, the contxt, the scope and the name. The contxt is not a simple string, it is of type uvm_component. The cntxt and name argument give you more flexibility when defining what you want to set or get. Typical arguments for the contxt are ‘this’, indicating the lookup-path is a relative path from the component where the command was issued and ‘null’ indicating there is nothing above, meaning an absolute path.</p>",
+      "text": "In reply to dhserfer:\nThe resource_db commands have only two lookup arguments, the scope and the name. Both are strings.\nThe accessor, last argument, is used only for auditting. You do not have to provide an actual argument, because it has a default value.\nThe config_db commands have 3 lookup arguments, the contxt, the scope and the name. The contxt is not a simple string, it is of type uvm_component. The cntxt and name argument give you more flexibility when defining what you want to set or get. Typical arguments for the contxt are ‘this’, indicating the lookup-path is a relative path from the component where the command was issued and ‘null’ indicating there is nothing above, meaning an absolute path.",
+      "created_at": "2016-05-02T11:39:10.000Z"
+    },
+    {
+      "id": 88674,
+      "author": "peter1",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/what-is-the-difference-between-uvm-config-db-and-uvm-resource-db/29373/13\">chr_sue</a>:</font></em></p>\n<p>Hi chr, what it the meaning of the scope in resouce_db?<br>\nwhy do we need the scope?<br>\nThanks!</p>",
+      "text": "In reply to chr_sue:\nHi chr, what it the meaning of the scope in resouce_db?\nwhy do we need the scope?\nThanks!",
+      "created_at": "2018-09-12T23:56:56.000Z"
+    },
+    {
+      "id": 149410,
+      "author": "skumarts",
+      "raw": "<p><a class=\"mention\" href=\"/forums/u/tfitz\">@tfitz</a><br>\nI am facing a similar Problem in my environment what is being discussed here, but i am not able to understand this behavior.</p>\n<p>I am setting a object in the  base_test.sv in the build_phase  using<br>\nuvm_resource_db::set</p>\n<p>uvm_resource_db #(uvm_object)::set(scope, “my_agent”, my_agent, this);</p>\n<p>in my extended base_test    my_base_test extends base_test.sv<br>\ni am setting the same instance name in the build_phase.<br>\nuvm_config_db #(uvm_object)::set(this, “my_env”, “my_agent”, this.new_agent);</p>\n<p>it is never taking the instance new_agent which i am setting from the my_base_test.sv in build phase.</p>\n<p>i also tried to do this in the start_of_simulation phase in my_base_test.sv</p>\n<p>// func: start_of_simulation_phase<br>\nvirtual function void start_of_simulation_phase(uvm_phase phase);<br>\nsuper.start_of_simulation_phase(phase);<br>\n`uvm_info(“mai_base_test”, “Setting arf_agent config from start_of_simulation”, UVM_NONE);<br>\nuvm_config_db #(uvm_object)::set(this, “my_env”, “arf_agent”, this.new_agent);<br>\nendfunction : start_of_simulation_phase</p>\n<p>its not picking new_agent still,</p>\n<p>uvm_resource_db setting in base_test is overriding all other settings , even last write is not taking affect here.<br>\nThe way only i got this working was using uvm_config_db::set in the base_test.sv but this base_test.sv is not managed be my, i am trying just to re-use form other tb.<br>\nit seems that if someone is using a uvm_resource_db setting in the base_test.sv,<br>\nwe are not able to override this in the extended my_base_test.sv</p>\n<p>i didn’t find any description related resolving multiple uvm_resource_db setting or uvm_config_db setting.<br>\nThanks for your Help</p>",
+      "text": "@tfitz\nI am facing a similar Problem in my environment what is being discussed here, but i am not able to understand this behavior.\nI am setting a object in the  base_test.sv in the build_phase  using\nuvm_resource_db::set\nuvm_resource_db #(uvm_object)::set(scope, “my_agent”, my_agent, this);\nin my extended base_test    my_base_test extends base_test.sv\ni am setting the same instance name in the build_phase.\nuvm_config_db #(uvm_object)::set(this, “my_env”, “my_agent”, this.new_agent);\nit is never taking the instance new_agent which i am setting from the my_base_test.sv in build phase.\ni also tried to do this in the start_of_simulation phase in my_base_test.sv\n// func: start_of_simulation_phase\nvirtual function void start_of_simulation_phase(uvm_phase phase);\nsuper.start_of_simulation_phase(phase);\n`uvm_info(“mai_base_test”, “Setting arf_agent config from start_of_simulation”, UVM_NONE);\nuvm_config_db #(uvm_object)::set(this, “my_env”, “arf_agent”, this.new_agent);\nendfunction : start_of_simulation_phase\nits not picking new_agent still,\nuvm_resource_db setting in base_test is overriding all other settings , even last write is not taking affect here.\nThe way only i got this working was using uvm_config_db::set in the base_test.sv but this base_test.sv is not managed be my, i am trying just to re-use form other tb.\nit seems that if someone is using a uvm_resource_db setting in the base_test.sv,\nwe are not able to override this in the extended my_base_test.sv\ni didn’t find any description related resolving multiple uvm_resource_db setting or uvm_config_db setting.\nThanks for your Help",
+      "created_at": "2024-07-23T07:43:55.869Z"
+    },
+    {
+      "id": 149412,
+      "author": "chr_sue",
+      "raw": "<p>I’m trying to understand why you are passing uvm_components through your UVM testbench. It does not make really sense in my eyes. uvm_componets will be created at runtime 0. Then they exist until the end of the simulation. In your uvm_config_db calls you are using as type uvm_object, which is not correct. It should be uvm_component. You should clean-up your code and restart again .</p>",
+      "text": "I’m trying to understand why you are passing uvm_components through your UVM testbench. It does not make really sense in my eyes. uvm_componets will be created at runtime 0. Then they exist until the end of the simulation. In your uvm_config_db calls you are using as type uvm_object, which is not correct. It should be uvm_component. You should clean-up your code and restart again .",
+      "created_at": "2024-07-23T09:18:10.823Z"
+    },
+    {
+      "id": 149413,
+      "author": "skumarts",
+      "raw": "<p>my_agent is a class, and class get created only when we create them, so they are objects,  if i Replace uvm_config_db #(uvm_object)::   with uvm_config_db #(uvm_Component)::<br>\nNothing is getting passed to the Destination get function, its a nul_object.</p>",
+      "text": "my_agent is a class, and class get created only when we create them, so they are objects,  if i Replace uvm_config_db #(uvm_object)::   with uvm_config_db #(uvm_Component)::\nNothing is getting passed to the Destination get function, its a nul_object.",
+      "created_at": "2024-07-23T10:45:44.136Z"
+    },
+    {
+      "id": 149415,
+      "author": "chr_sue",
+      "raw": "<p>All classes belonging to the testbench topology are bsased on uvm_components. They will be created during buil_phase automatically. They are dynamic but not transient objects. All extensions from uvm_object are transient objects. They are created at any time and will disappear after they are processed/finished.</p>",
+      "text": "All classes belonging to the testbench topology are bsased on uvm_components. They will be created during buil_phase automatically. They are dynamic but not transient objects. All extensions from uvm_object are transient objects. They are created at any time and will disappear after they are processed/finished.",
+      "created_at": "2024-07-23T11:22:11.521Z"
+    },
+    {
+      "id": 153509,
+      "author": "rawrakesh",
+      "raw": "<p>This article can help: <a href=\"https://www.thetechieblog.com/uvm/difference-between-uvm_config_db-and-uvm_resource_db/\" class=\"inline-onebox\" rel=\"noopener nofollow ugc\">Difference between uvm_config_db and uvm_resource_db? - THETECHIEBLOG</a></p>",
+      "text": "This article can help: Difference between uvm_config_db and uvm_resource_db? - THETECHIEBLOG",
+      "created_at": "2025-04-24T21:37:15.098Z"
+    },
+    {
+      "id": 153550,
+      "author": "Amoch",
+      "raw": "<p>I find the resource db very handy if I want to pass something to a sequence.</p>\n<p>Or you can do the normal “to sequence” UVM gymnastics and go through a component with the config_db to a UVM component with hierarchy.</p>",
+      "text": "I find the resource db very handy if I want to pass something to a sequence.\nOr you can do the normal “to sequence” UVM gymnastics and go through a component with the config_db to a UVM component with hierarchy.",
+      "created_at": "2025-04-28T16:47:20.191Z"
+    }
+  ]
+}

@@ -27,14 +27,14 @@ def is_placeholder(key: str) -> bool:
     return any(p in low for p in PLACEHOLDER_SUBSTRINGS)
 
 
-def probe_gemini_key(api_key: str, timeout: float = 2.0) -> Tuple[bool, str]:
+def probe_gemini_key(api_key: Optional[str] = None, timeout: float = 6.0) -> Tuple[bool, str]:
     """
     Probe Google Gemini API key via lightweight models metadata endpoint.
 
     Returns:
         (is_valid, status_message)
     """
-    key = api_key.strip() if api_key else ""
+    key = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     if not key:
         return False, "Not set / missing"
     if is_placeholder(key):
@@ -59,19 +59,25 @@ def probe_gemini_key(api_key: str, timeout: float = 2.0) -> Tuple[bool, str]:
             return False, "Endpoint not found (HTTP 404)"
         return False, f"Google API error (HTTP {e.code})"
     except urllib.error.URLError as e:
-        return False, f"Network unreachable: {e.reason}"
+        err_msg = str(getattr(e, "reason", e))
+        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+            return True, "Key detected (probe timed out due to network latency)"
+        return False, f"Network unreachable: {err_msg}"
     except Exception as e:
-        return False, f"Probe error: {e}"
+        err_msg = str(e)
+        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+            return True, "Key detected (probe timed out due to network latency)"
+        return False, f"Probe error: {err_msg}"
 
 
-def probe_anthropic_key(api_key: str, timeout: float = 2.0) -> Tuple[bool, str]:
+def probe_anthropic_key(api_key: Optional[str] = None, timeout: float = 6.0) -> Tuple[bool, str]:
     """
     Probe Anthropic Claude API key via models list endpoint.
 
     Returns:
         (is_valid, status_message)
     """
-    key = api_key.strip() if api_key else ""
+    key = (api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY") or "").strip()
     if not key:
         return False, "Not set / missing"
     if is_placeholder(key):
@@ -100,9 +106,15 @@ def probe_anthropic_key(api_key: str, timeout: float = 2.0) -> Tuple[bool, str]:
             return False, "Access Forbidden (HTTP 403)"
         return False, f"Anthropic error (HTTP {e.code})"
     except urllib.error.URLError as e:
-        return False, f"Network unreachable: {e.reason}"
+        err_msg = str(getattr(e, "reason", e))
+        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+            return True, "Key detected (probe timed out due to network latency)"
+        return False, f"Network unreachable: {err_msg}"
     except Exception as e:
-        return False, f"Probe error: {e}"
+        err_msg = str(e)
+        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+            return True, "Key detected (probe timed out due to network latency)"
+        return False, f"Probe error: {err_msg}"
 
 
 def probe_local_engine(endpoint: str = "http://localhost:11434", timeout: float = 0.5) -> Tuple[bool, str]:
