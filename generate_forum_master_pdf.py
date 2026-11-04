@@ -60,7 +60,7 @@ class NumberedCanvas(canvas.Canvas):
             # Running Footer
             self.setFont("Helvetica", 8)
             self.setFillColor(colors.HexColor("#64748b"))
-            self.drawString(54, 32, "Mirafra VeriSight DV Intelligence • Multi-Source Verified Compendium")
+            self.drawString(54, 32, "VeriSight Autonomous DV Intelligence • Multi-Source Verified Compendium")
             self.drawRightString(558, 32, f"Page {self._pageNumber} of {page_count}")
         self.restoreState()
 
@@ -251,7 +251,7 @@ def build_pdf(filename="Verification_Academy_UVM_Forum_Master_Solutions.pdf"):
         [Paragraph("<b>Verification Standard:</b>", styles['BodyDark']), Paragraph("IEEE 1800.2-2020 / UVM 1.2 / IEEE 1800-2023 SystemVerilog", styles['BodyDark'])],
         [Paragraph("<b>Authoritative Sources:</b>", styles['BodyDark']), Paragraph("Dave Rich, Cliff Cummings, Tudor Timisescu, Mark Peryer, Siemens EDA", styles['BodyDark'])],
         [Paragraph("<b>Audited By:</b>", styles['BodyDark']), Paragraph("Independent Autonomous Verification Auditor Subagent (Grade: A / 98.2%)", styles['BodyDark'])],
-        [Paragraph("<b>Publication By:</b>", styles['BodyDark']), Paragraph("Mirafra Technologies / VeriSight Autonomous DV Intelligence", styles['BodyDark'])],
+        [Paragraph("<b>Curated By:</b>", styles['BodyDark']), Paragraph("VeriSight Autonomous DV Intelligence", styles['BodyDark'])],
         [Paragraph("<b>Date of Release:</b>", styles['BodyDark']), Paragraph("November 2026", styles['BodyDark'])]
     ]
     t_cover = Table(cover_meta, colWidths=[130, 374])

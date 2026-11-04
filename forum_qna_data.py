@@ -720,7 +720,7 @@ endclass""",
         "citations": [
             "IEEE 1800-2023 / IEEE 1800.2-2020 Compliance Standards",
             "DVCon 2024 Industry Panel: 'Benchmarking AI in Hardware Verification'",
-            "Mirafra VeriSight Technical Evaluation Framework"
+            "VeriSight Technical Evaluation Framework"
         ],
         "analysis": (
             "Evaluating AI tools in hardware verification differs fundamentally from software engineering because a single bug in silicon "
