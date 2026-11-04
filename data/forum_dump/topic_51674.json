@@ -1,0 +1,20 @@
+{
+  "id": 51674,
+  "title": "UVM Field Macros - Positive flag",
+  "slug": "uvm-field-macros-positive-flag",
+  "created_at": "2026-06-15T12:24:15.782Z",
+  "bumped_at": "2026-06-15T17:27:59.128Z",
+  "posts_count": 2,
+  "question_raw": "<p>I was reading about UVM field macro flags and came across the following statement:</p>\n<blockquote>\n<p>Specifying <code>UVM_COPY</code> with no other flags actually turns on all of the other operations (<code>copy()</code>, <code>compare()</code>, <code>print()</code>, <code>pack()</code>, <code>unpack()</code>, <code>record()</code>).</p>\n</blockquote>\n<p>My question is: if specifying <code>UVM_COPY</code> alone effectively enables all operations, then what is the purpose of defining positive flags such as <code>UVM_COPY</code>, <code>UVM_COMPARE</code>, <code>UVM_PRINT</code>, etc.?</p>\n<p>In what situations are these positive flags intended to be used? Are they mainly meant to be combined with other flags (e.g., <code>UVM_ALL_ON | UVM_NOCOPY</code>), or is there a practical use case where a positive flag by itself changes the behavior as expected?</p>\n<p>I would appreciate any clarification on the design intent behind these flags.</p>",
+  "question_text": "I was reading about UVM field macro flags and came across the following statement:\n\nSpecifying UVM_COPY with no other flags actually turns on all of the other operations (copy(), compare(), print(), pack(), unpack(), record()).\n\nMy question is: if specifying UVM_COPY alone effectively enables all operations, then what is the purpose of defining positive flags such as UVM_COPY, UVM_COMPARE, UVM_PRINT, etc.?\nIn what situations are these positive flags intended to be used? Are they mainly meant to be combined with other flags (e.g., UVM_ALL_ON | UVM_NOCOPY), or is there a practical use case where a positive flag by itself changes the behavior as expected?\nI would appreciate any clarification on the design intent behind these flags.",
+  "author": "trushali",
+  "replies": [
+    {
+      "id": 156858,
+      "author": "dave_59",
+      "raw": "<aside class=\"quote\" data-post=\"1\" data-topic=\"28906\">\n  <div class=\"title\">\n    <div class=\"quote-controls\"></div>\n    <img alt=\"\" width=\"24\" height=\"24\" src=\"https://verificationacademy.com/forums/letter_avatar_proxy/v4/letter/j/ed8c4c/48.png\" class=\"avatar\">\n    <div class=\"quote-title__text-content\">\n      <a href=\"https://verificationacademy.com/forums/t/field-automation-macros/28906\">Field automation macros</a> <a class=\"badge-category__wrapper \" href=\"/forums/c/uvm/5\"><span data-category-id=\"5\" style=\"--category-badge-color: #0087BE; --category-badge-text-color: #000028;\" data-drop-close=\"true\" class=\"badge-category --style-square \" title=\"This forum is for topics related to UVM - Universal Verification Methodology.\"><span class=\"badge-category__name\">UVM</span></span></a>\n    </div>\n  </div>\n  <blockquote>\n    Hi, \nCan anyone clear the following doubts? \n\nwhat is the default flag value set for a field, in field automation macros of an UVM class?\nI read that it is set to OVM_ALL_ON, if so why we need to explicitly set the same flag to the variable in the code?\nIs there any way to set the same flag for all the user defined fields in the derived class from an UVM base class? Or can we use regular expressions for the field name ?\n\nThanks\n  </blockquote>\n</aside>\n",
+      "text": "Field automation macros UVM\n    \n  \n  \n    Hi, \nCan anyone clear the following doubts? \n\nwhat is the default flag value set for a field, in field automation macros of an UVM class?\nI read that it is set to OVM_ALL_ON, if so why we need to explicitly set the same flag to the variable in the code?\nIs there any way to set the same flag for all the user defined fields in the derived class from an UVM base class? Or can we use regular expressions for the field name ?\n\nThanks",
+      "created_at": "2026-06-15T17:27:59.128Z"
+    }
+  ]
+}

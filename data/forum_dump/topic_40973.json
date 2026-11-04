@@ -1,0 +1,34 @@
+{
+  "id": 40973,
+  "title": "Back door access for uvm_mem",
+  "slug": "back-door-access-for-uvm-mem",
+  "created_at": "2022-11-03T15:59:15.000Z",
+  "bumped_at": "2026-03-13T16:37:37.127Z",
+  "posts_count": 4,
+  "question_raw": "<p>Hi All,</p>\n<p>How can we add path for memory to access back-door.<br>\nThere are lot of questions/information on accessing the back door register not for uvm_mem.</p>\n<p>I’m looking a back door access of memory derived from uvm_mem.</p>\n<p>For an example:</p>\n<p>class my_mem extends uvm_mem;<br>\n…</p>\n<p>In top reg class:</p>\n<p>my_mem_h = my_mem :: type_id::create(“my_mem_h”);<br>\nmy_mem_h.configure(this,“my_mem_h”);</p>\n<p>From test I need a following:</p>\n<p>top_block.read(status,read_data_mem,UVM_BACKDOOR);</p>\n<p>Now uvm_mem methods to add hdl path:</p>\n<p>// Function: add_hdl_path<br>\n//<br>\n// Add an HDL path<br>\n//<br>\n// Add the specified HDL path to the memory instance for the specified<br>\n// design abstraction. This method may be called more than once for the<br>\n// same design abstraction if the memory is physically duplicated<br>\n// in the design abstraction<br>\n//<br>\nextern function void add_hdl_path (uvm_hdl_path_slice slices<span class=\"chcklst-box fa fa-square-o fa-fw\"></span>,<br>\nstring kind = “RTL”);</p>\n<ol>\n<li>How we can do a back-door access here?</li>\n<li>How to add a path here?</li>\n</ol>\n<p>Any example would be appreciated.</p>",
+  "question_text": "Hi All,\nHow can we add path for memory to access back-door.\nThere are lot of questions/information on accessing the back door register not for uvm_mem.\nI’m looking a back door access of memory derived from uvm_mem.\nFor an example:\nclass my_mem extends uvm_mem;\n…\nIn top reg class:\nmy_mem_h = my_mem :: type_id::create(“my_mem_h”);\nmy_mem_h.configure(this,“my_mem_h”);\nFrom test I need a following:\ntop_block.read(status,read_data_mem,UVM_BACKDOOR);\nNow uvm_mem methods to add hdl path:\n// Function: add_hdl_path\n//\n// Add an HDL path\n//\n// Add the specified HDL path to the memory instance for the specified\n// design abstraction. This method may be called more than once for the\n// same design abstraction if the memory is physically duplicated\n// in the design abstraction\n//\nextern function void add_hdl_path (uvm_hdl_path_slice slices,\nstring kind = “RTL”);\n\nHow we can do a back-door access here?\nHow to add a path here?\n\nAny example would be appreciated.",
+  "author": "Geet",
+  "replies": [
+    {
+      "id": 136224,
+      "author": "rgarcia07",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/back-door-access-for-uvm-mem/40973\">Geet</a>:</font></em></p>\n<p>This <a href=\"https://www.edaplayground.com/x/6DJg\" class=\"inline-onebox\" rel=\"noopener nofollow ugc\">UVM register user-defined memory backdoor - EDA Playground</a> might be helpful<br>\nand this presentation as well <a href=\"https://dvcon-proceedings.org/document/doing-funny-stuff-with-the-uvm-register-layer-experiences-using-front-door-sequences-predictors-and-callbacks-presentation/\" class=\"inline-onebox\" rel=\"noopener nofollow ugc\">Doing Funny Stuff with the UVM Register Layer: Experiences Using Front Door Sequences, Predictors, and Callbacks – DVCon Proceedings Archive</a></p>\n<p>HTH,</p>\n<p>-R</p>",
+      "text": "In reply to Geet:\nThis UVM register user-defined memory backdoor - EDA Playground might be helpful\nand this presentation as well Doing Funny Stuff with the UVM Register Layer: Experiences Using Front Door Sequences, Predictors, and Callbacks – DVCon Proceedings Archive\nHTH,\n-R",
+      "created_at": "2022-11-03T16:06:07.000Z"
+    },
+    {
+      "id": 136225,
+      "author": "Geet",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/back-door-access-for-uvm-mem/40973/2\">rgarcia07</a>:</font></em></p>\n<p>Hi,</p>\n<p>I was looking for uvm_mem. Not uvm_reg_backdoor.<br>\nAnyways, Got solution by myself by reading several methods on How to add path.</p>\n<p>It can be done using providing path in configure method.<br>\nmy_mem_h = my_mem :: type_id::create(“my_mem_h”);<br>\nmy_mem_h.configure(this,“RTL_PATH_TO_LOCATION”);</p>\n<p>Still facing below error:<br>\nUVM_ERROR /proj/eda/CADENCE/XLM/20.09.009/tools/methodology/UVM/CDNS-1.1d/sv/src/reg/uvm_reg_block.svh(2049) @ 11020.00 ns: reporter [RegModel] Block does not have hdl path defined for abstraction ‘RTL’</p>\n<p>I’m trying to access<br>\ntop_reg_block.my_mem.read(offset,read_data,UVM_BACKDOOR);<br>\nCan we not read/write using read method with UVM_BACKDOOR of uvm_mem class?</p>\n<p>If anyone has small pseudo code with uvm_mem, Please share.</p>",
+      "text": "In reply to rgarcia07:\nHi,\nI was looking for uvm_mem. Not uvm_reg_backdoor.\nAnyways, Got solution by myself by reading several methods on How to add path.\nIt can be done using providing path in configure method.\nmy_mem_h = my_mem :: type_id::create(“my_mem_h”);\nmy_mem_h.configure(this,“RTL_PATH_TO_LOCATION”);\nStill facing below error:\nUVM_ERROR /proj/eda/CADENCE/XLM/20.09.009/tools/methodology/UVM/CDNS-1.1d/sv/src/reg/uvm_reg_block.svh(2049) @ 11020.00 ns: reporter [RegModel] Block does not have hdl path defined for abstraction ‘RTL’\nI’m trying to access\ntop_reg_block.my_mem.read(offset,read_data,UVM_BACKDOOR);\nCan we not read/write using read method with UVM_BACKDOOR of uvm_mem class?\nIf anyone has small pseudo code with uvm_mem, Please share.",
+      "created_at": "2022-11-04T10:53:18.000Z"
+    },
+    {
+      "id": 156608,
+      "author": "kevin.young",
+      "raw": "<p>Were you ever able to find a solution for this? I also experienced the same UVM_ERROR. Thanks!</p>",
+      "text": "Were you ever able to find a solution for this? I also experienced the same UVM_ERROR. Thanks!",
+      "created_at": "2026-03-13T16:37:37.127Z"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": 51767,
+  "title": "Suggestions for basic SystemVerilog/UVM projects for freshers",
+  "slug": "suggestions-for-basic-systemverilog-uvm-projects-for-freshers",
+  "created_at": "2026-10-20T05:56:28.210Z",
+  "bumped_at": "2026-10-21T10:17:23.048Z",
+  "posts_count": 2,
+  "question_raw": "<p>Hi all,</p>\n<p>I’m looking for suggestions on basic SystemVerilog and UVM projects that freshers can work on to build hands-on verification experience.</p>\n<p>A few ideas I have in mind so far:</p>\n<ul>\n<li>Synchronous/asynchronous FIFO or simple memory with a class-based SV testbench</li>\n<li>ALU or counter with constrained-random stimulus and functional coverage</li>\n<li>UART, SPI or I2C controller with a complete UVM environment (agent, sequencer, driver, monitor, scoreboard)</li>\n<li>APB or AHB-Lite slave with a UVM register model (RAL)</li>\n</ul>\n<p>Questions:</p>\n<ol>\n<li>What other designs would you recommend for someone just starting out?</li>\n<li>Are there any open-source DUTs or reference testbenches (GitHub, EDA Playground, etc.) that are good starting points?</li>\n<li>Which concepts (assertions, coverage, RAL, virtual sequences, etc.) should a beginner project aim to cover?</li>\n</ol>\n<p>Any pointers or resources would be really appreciated. Thanks!</p>",
+  "question_text": "Hi all,\nI’m looking for suggestions on basic SystemVerilog and UVM projects that freshers can work on to build hands-on verification experience.\nA few ideas I have in mind so far:\n\nSynchronous/asynchronous FIFO or simple memory with a class-based SV testbench\nALU or counter with constrained-random stimulus and functional coverage\nUART, SPI or I2C controller with a complete UVM environment (agent, sequencer, driver, monitor, scoreboard)\nAPB or AHB-Lite slave with a UVM register model (RAL)\n\nQuestions:\n\nWhat other designs would you recommend for someone just starting out?\nAre there any open-source DUTs or reference testbenches (GitHub, EDA Playground, etc.) that are good starting points?\nWhich concepts (assertions, coverage, RAL, virtual sequences, etc.) should a beginner project aim to cover?\n\nAny pointers or resources would be really appreciated. Thanks!",
+  "author": "asmitha_vdtt",
+  "replies": [
+    {
+      "id": 157129,
+      "author": "graeme_jessiman",
+      "raw": "<p>all of your suggestions for simple DUTs are good ones.  <a href=\"http://opencores.org\" rel=\"noopener nofollow ugc\">opencores.org</a> is a good place to look for IP cores or GitHub.  If you have access to a decent Co-Pilot, I used it within VSCode to generate a Dual Port RAM model in VHDL that I could use with a UVM Framework testbench to demonstrate something.<br>\nYou can access UVM Framework here in the Academy pages at  : <a href=\"https://verificationacademy.com/topics/uvm-universal-verification-methodology/uvmf/\">https://verificationacademy.com/topics/uvm-universal-verification-methodology/uvmf/</a><br>\nUVMF only uses a subset of UVM, so reduces the amount you have to learn plus enforces an architecture that ensures your agents &amp; environments are reusable</p>",
+      "text": "all of your suggestions for simple DUTs are good ones.  opencores.org is a good place to look for IP cores or GitHub.  If you have access to a decent Co-Pilot, I used it within VSCode to generate a Dual Port RAM model in VHDL that I could use with a UVM Framework testbench to demonstrate something.\nYou can access UVM Framework here in the Academy pages at  : https://verificationacademy.com/topics/uvm-universal-verification-methodology/uvmf/\nUVMF only uses a subset of UVM, so reduces the amount you have to learn plus enforces an architecture that ensures your agents & environments are reusable",
+      "created_at": "2026-10-21T10:17:23.048Z"
+    }
+  ]
+}

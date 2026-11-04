@@ -1,0 +1,41 @@
+{
+  "id": 51597,
+  "title": "I need to know how many UVM active/Passive agents are required",
+  "slug": "i-need-to-know-how-many-uvm-active-passive-agents-are-required",
+  "created_at": "2026-04-01T19:25:51.237Z",
+  "bumped_at": "2026-04-04T07:36:01.100Z",
+  "posts_count": 5,
+  "question_raw": "<p>So I went through the solution which said that uvm agents depends on the interface not on ports . So is it like when i am having a writing operation i need 2 agents like in case of DUAL port RAM and If its 8:1 mux when there is no writing into register so only 1 agent? and in ALU we need to write the output into register so 2 agents?</p>",
+  "question_text": "So I went through the solution which said that uvm agents depends on the interface not on ports . So is it like when i am having a writing operation i need 2 agents like in case of DUAL port RAM and If its 8:1 mux when there is no writing into register so only 1 agent? and in ALU we need to write the output into register so 2 agents?",
+  "author": "Madhushree_06",
+  "replies": [
+    {
+      "id": 156658,
+      "author": "dave_59",
+      "raw": "<p>You went through the solution to which problem?</p>",
+      "text": "You went through the solution to which problem?",
+      "created_at": "2026-04-02T19:41:55.210Z"
+    },
+    {
+      "id": 156659,
+      "author": "Madhushree_06",
+      "raw": "<p>I meant through the discussion here where everyone mentioned it’s based on protocol and interface whereas I have seen people using 2 agents when both the protocol and interface is 1 . So i am confused on how to decide how many agents should be selected</p>",
+      "text": "I meant through the discussion here where everyone mentioned it’s based on protocol and interface whereas I have seen people using 2 agents when both the protocol and interface is 1 . So i am confused on how to decide how many agents should be selected",
+      "created_at": "2026-04-03T14:44:07.544Z"
+    },
+    {
+      "id": 156660,
+      "author": "dave_59",
+      "raw": "<p>I believe you were referring to a discussion similar to this one: <a href=\"https://verificationacademy.com/forums/t/how-to-decide-number-of-agents/35074\">How to Decide Number of Agents</a>. There might be a blurred line between a <em>port</em> and a functional <em>interface</em>. An interface serves as a communication channel. Depending on the protocol it supports, a channel can support either one-to-one or many-to-many connections. An agent typically represents one end of a connection. However, in some cases, a single agent may control multiple connections if they are tightly coupled. For instance, when dealing with dual-port RAM, you may to have an agent for each port.</p>",
+      "text": "I believe you were referring to a discussion similar to this one: How to Decide Number of Agents. There might be a blurred line between a port and a functional interface. An interface serves as a communication channel. Depending on the protocol it supports, a channel can support either one-to-one or many-to-many connections. An agent typically represents one end of a connection. However, in some cases, a single agent may control multiple connections if they are tightly coupled. For instance, when dealing with dual-port RAM, you may to have an agent for each port.",
+      "created_at": "2026-04-03T16:51:48.133Z"
+    },
+    {
+      "id": 156661,
+      "author": "Madhushree_06",
+      "raw": "<p>Thanks for the reply.</p>",
+      "text": "Thanks for the reply.",
+      "created_at": "2026-04-04T07:36:01.100Z"
+    }
+  ]
+}

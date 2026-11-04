@@ -1,0 +1,27 @@
+{
+  "id": 51694,
+  "title": "What are the biggest pain points in simulation debugging for DV engineers?",
+  "slug": "what-are-the-biggest-pain-points-in-simulation-debugging-for-dv-engineers",
+  "created_at": "2026-06-29T12:44:46.854Z",
+  "bumped_at": "2026-07-01T11:59:32.542Z",
+  "posts_count": 3,
+  "question_raw": "<p>Hi everyone! I’m a BE ECE student currently learning Design Verification. I’m doing some research on real workflow pain points that DV engineers face — specifically around simulation debugging and waveform analysis.</p>\n<p>Would love to hear from experienced engineers:</p>\n<ul>\n<li>\n<p>What slows you down the most during debug?</p>\n</li>\n<li>\n<p>Is tracing failures in waveforms a major time sink?</p>\n</li>\n</ul>\n<p>Not selling anything — purely trying to understand real workflows. Any insight is hugely appreciated! <img src=\"https://verificationacademy.com/forums/images/emoji/apple/folded_hands.png?v=15\" title=\":folded_hands:\" class=\"emoji\" alt=\":folded_hands:\" loading=\"lazy\" width=\"20\" height=\"20\"></p>",
+  "question_text": "Hi everyone! I’m a BE ECE student currently learning Design Verification. I’m doing some research on real workflow pain points that DV engineers face — specifically around simulation debugging and waveform analysis.\nWould love to hear from experienced engineers:\n\n\nWhat slows you down the most during debug?\n\n\nIs tracing failures in waveforms a major time sink?\n\n\nNot selling anything — purely trying to understand real workflows. Any insight is hugely appreciated!",
+  "author": "Aditi03",
+  "replies": [
+    {
+      "id": 156917,
+      "author": "AVAQ_Semiconductor",
+      "raw": "<p>From my experience, the biggest challenge is usually not finding <strong>where</strong> the failure occurred, but understanding <strong>why</strong> it happened.</p>\n<p>On a modern SoC verification environment, a single regression failure may involve UVM sequences, scoreboards, assertions, protocol checkers, multiple agents, and millions of waveform transitions. Manually correlating simulator logs, waveforms, and transaction traces can consume far more time than the simulation itself.</p>\n<p>Another pain point is reproducing intermittent failures. Bugs caused by randomization, race conditions, timing dependencies, or seed-specific behavior are often difficult to reproduce consistently, making root-cause analysis much slower.</p>\n<p>I also think better observability is more valuable than simply generating more debug data. Well-written assertions, transaction-level logging, meaningful error messages, and deterministic testbenches can reduce debug time significantly. In my experience, investing in a self-checking environment with good traceability pays off much more than spending hours scrolling through waveforms after every failure.</p>\n<p>Ultimately, simulation speed is important, but debug productivity is what has the biggest impact on verification schedules.</p>",
+      "text": "From my experience, the biggest challenge is usually not finding where the failure occurred, but understanding why it happened.\nOn a modern SoC verification environment, a single regression failure may involve UVM sequences, scoreboards, assertions, protocol checkers, multiple agents, and millions of waveform transitions. Manually correlating simulator logs, waveforms, and transaction traces can consume far more time than the simulation itself.\nAnother pain point is reproducing intermittent failures. Bugs caused by randomization, race conditions, timing dependencies, or seed-specific behavior are often difficult to reproduce consistently, making root-cause analysis much slower.\nI also think better observability is more valuable than simply generating more debug data. Well-written assertions, transaction-level logging, meaningful error messages, and deterministic testbenches can reduce debug time significantly. In my experience, investing in a self-checking environment with good traceability pays off much more than spending hours scrolling through waveforms after every failure.\nUltimately, simulation speed is important, but debug productivity is what has the biggest impact on verification schedules.",
+      "created_at": "2026-07-01T06:55:39.607Z"
+    },
+    {
+      "id": 156923,
+      "author": "Aditi03",
+      "raw": "<p>This is incredibly insightful — thank you! The point about correlating logs, waveforms, and transaction traces manually resonating strongly. Would you say that if a tool could automatically correlate these sources and explain the root cause in plain English, that would genuinely save time even for experienced engineers?</p>",
+      "text": "This is incredibly insightful — thank you! The point about correlating logs, waveforms, and transaction traces manually resonating strongly. Would you say that if a tool could automatically correlate these sources and explain the root cause in plain English, that would genuinely save time even for experienced engineers?",
+      "created_at": "2026-07-01T11:59:32.542Z"
+    }
+  ]
+}

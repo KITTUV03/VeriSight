@@ -1,0 +1,2032 @@
+
+================================================================================
+TOPIC #1 [ID: 51767] : Suggestions for basic SystemVerilog/UVM projects for freshers
+Author: asmitha_vdtt | Created: 2026-10-20T05:56:28.210Z | Bumped: 2026-10-21T10:17:23.048Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi all,
+I’m looking for suggestions on basic SystemVerilog and UVM projects that freshers can work on to build hands-on verification experience.
+A few ideas I have in mind so far:
+
+Synchronous/asynchronous FIFO or simple memory with a class-based SV testbench
+ALU or counter with constrained-random stimulus and functional coverage
+UART, SPI or I2C controller with a complete UVM environment (agent, sequencer, driver, monitor, scoreboard)
+APB or AHB-Lite slave with a UVM register model (RAL)
+
+Questions:
+
+What other designs would you recommend for someone just starting out?
+Are there any open-source DUTs or reference testbenches (GitHub, EDA Playground, etc.) that are good starting points?
+Which concepts (assertions, coverage, RAL, virtual sequences, etc.) should a beginner project aim to cover?
+
+Any pointers or resources would be really appreciated. Thanks!
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by graeme_jessiman at 2026-10-21T10:17:23.048Z ---
+all of your suggestions for simple DUTs are good ones.  opencores.org is a good place to look for IP cores or GitHub.  If you have access to a decent Co-Pilot, I used it within VSCode to generate a Dual Port RAM model in VHDL that I could use with a UVM Framework testbench to demonstrate something.
+You can access UVM Framework here in the Academy pages at  : https://verificationacademy.com/topics/uvm-universal-verification-methodology/uvmf/
+UVMF only uses a subset of UVM, so reduces the amount you have to learn plus enforces an architecture that ensures your agents & environments are reusable
+================================================================================
+
+================================================================================
+TOPIC #2 [ID: 51764] : Use run_phase in scoreboard 
+Author: mo_niazy | Created: 2026-10-13T13:48:30.637Z | Bumped: 2026-10-14T03:30:07.080Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+I am implementing a verification environment where the Monitor samples and sends interface data to the Scoreboard strictly upon edge changes (not constantly over time). Because of this event-driven behavior, the Scoreboard cannot natively detect if the interface has completely locked up or gotten “stuck” mid-simulation.
+To solve this, I need to implement an inactivity watchdog timer inside the Scoreboard to track simulation time and trigger an error if too much time passes without a transaction.
+Problem Statement:
+Since a watchdog requires tracking simulation time and waiting for events (#timeout or @activity_event), this logic cannot reside inside zero-time TLM write() functions. I need to use the time-consuming run_phase task within my scoreboard component to execute this tracking loop in the background.
+Is utilizing the run_phase in this specific manner considered a clean architectural practice for a UVM Scoreboard when handling interface deadlocks/stuck conditions?
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by dave_59 at 2026-10-14T03:30:07.080Z ---
+Suggest looking at uvm_heartbeat
+
+  
+    
+    
+    
+      UVM Simulation is not ending UVM
+    
+  
+  
+    Adding some additional thoughts to summarize the thread: 
+
+Use a Global Timeout 
+All tests should include a runtime guard using a global timeout to avoid endless hangs. 
+This can be done via:
+
+
+The command-line plusarg: 
++UVM_TIMEOUT
+Or programmatically via: set_timeout
+
+
+Basic Progress Monitoring (Quick Hack) 
+As a simple debug aid, you can spawn a forever loop in the run_phase that periodically prints a message like "test progress: $time" to the log with a large delay between prints (to preven…
+================================================================================
+
+================================================================================
+TOPIC #3 [ID: 51759] : UVMF 2023.4_2 examples
+Author: unc_erik | Created: 2026-10-05T15:22:37.966Z | Bumped: 2026-10-05T15:22:38.233Z | Posts: 1
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+I’ve been looking at the examples in 2023.4_2, and they appear to all be built using the old templates. Are there any examples built using the 2023.4_2 version of the scripts, with things filled in?
+If there are and I’ve missed them, my apologies.
+--------------------------------------------------------------------------------
+REPLIES (0):
+================================================================================
+
+================================================================================
+TOPIC #4 [ID: 28195] : UVM Test is not comming out
+Author: Raj2004 | Created: 2012-10-22T10:13:04.000Z | Bumped: 2026-09-30T10:17:04.487Z | Posts: 21
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+I am running a UVM testcase having AXI Driver(as one of the interface) to the Memory Control and on the other side is the Memory Block. But when i am running a simple WRITE sequence, the testcase got hanged (means its not coming out).
+The last message what i am getting in the log file (I enabled UVM_OBJECTION_TRACE)::
+UVM_INFO @ 0: run [OBJTN_TRC] Object uvm_test_top subtracted 1 objection(s)its total(dropped from source object uvm_test_top.tb.v_seqr.simple_vseq): count=0 total=0.
+UVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase
+My basic code is something like this::
+class simple_vtest extends uvm_test
+…
+function build_phase(uvm_phase phase)
+uvm_config_wrapper::set(this,“env.v_seqr.run_phase”,“default_sequence”,simple_vseq::type_id::get());
+super.build_phase(phase);
+endfunction
+class simple_vseq extends uvm_sequence;
+…
+write_seq seq_a;
+task pre_body();
+uvm_test_done.raise_objection(this);
+endtask
+task bosy();
+`uvm_do_on(seq_a,p_sequncer.axi_seqr)
+endtask
+task post_body();
+uvm_test_done.drop_objection(this);
+endtask
+endclass
+I am also getting the display after “uvm_test_done.drop_objection(this)” i.e., inside task post_body.
+And i also tried to finish the test by using $finish from the top after putting some delay.
+module top();
+…
+initial begin
+run_test();
+end
+initial begin
+#1000
+$finish;
+end
+…
+endmodule
+But this is also not working as its seems like testcase got hang in #0 time only.
+Can anyone please help me in this. Its urgent. Please HELP
+Thanks
+--------------------------------------------------------------------------------
+REPLIES (19):
+
+--- Reply #1 by Raj2004 at 2012-10-23T05:50:33.000Z ---
+Hi ,
+Please anyone can help me in this?
+Thanks
+
+--- Reply #2 by dave_59 at 2012-10-23T05:56:38.000Z ---
+In reply to Raj2004:
+Are you aware in which conditions pre/post_body are called or not called? We generally do not recommend using them because are not aware of the different situations.
+Do you have a typo in your source code, or is it just in your post - bosy() should be body().
+
+--- Reply #3 by Raj2004 at 2012-10-23T06:00:54.000Z ---
+In reply to dave_59:
+Hi Dave,
+Thanks for the reply. bosy() its just a typing mistake.
+So if i don’t want to use pre/post_body for objection raise and drop then what i suppose to use?
+
+--- Reply #4 by Raj2004 at 2012-10-23T06:16:10.000Z ---
+In reply to Raj2004:
+Hi Dave,
+The Last message what i am getting is ::
+UVM_INFO …/base/uvm_objection.svh(1120) @ 0:reporter [TEST_DONE] 'run’phase is ready to proceed to the ‘extract’ phase
+After this its Not completing , just hanged there?
+Do you need any details so please ask?
+Thanks
+
+--- Reply #5 by dave_59 at 2012-10-23T07:54:35.000Z ---
+In reply to Raj2004:
+You can put what was in pre/post_body() as the first/last statements of your body().
+This does not explain your hang. You will have to interrupt it and see what is executing while hanging using the debugger.
+
+--- Reply #6 by Raj2004 at 2012-10-23T08:17:11.000Z ---
+In reply to dave_59:
+Hi,
+I also tried fork join_any to come out from the sequence but still getting the same result.
+…
+virtual task body();
+starting_phase.raise_objection(this,get_type_name());
+fork
+begin
+`uvm_do_on(veq_b,p_sequencer.axi_seqr)
+end
+begin
+#1000;
+end
+join_any
+disable fork;
+starting_phase.drop_objection(this,get_type_name());
+endtask
+…
+Can you please tell me how to use the debugger or please share any link for this.
+Thanks
+
+--- Reply #7 by Raj2004 at 2012-10-23T08:21:42.000Z ---
+In reply to Raj2004:
+I am using Cadence NcSim.
+Thanks
+
+--- Reply #8 by mperyer at 2012-10-23T09:35:02.000Z ---
+What the trace is telling you is that for some reason the body() task is completing in zero time and the post_body() task is dropping the objection leading to the end of the run_phase(). The UVM simulation then terminates.
+Therefore you need to look at what is going on in the write_seq and/or the driver. Is there something happening that causes the body() method in write_seq to return in 0 time? Is it something like the driver doing a get(), and the write_seq only sending a single write sequence_item? If this is the case you would get this type of behaviour.
+Something you could try is raising an objection in the run_phase of the test, or another component, to extend the run_phase, this will allow you to see whether your driver is actually doing anything. (Your initial block is outside the UVM and will have no effect).
+
+task run_phase(uvm_phase phase);
+  phase.raise_objection(this);
+  #1000us;
+  phase.drop_objection(this);
+endtask: run_phase
+
+--- Reply #9 by nash123 at 2012-12-21T03:43:37.000Z ---
+In reply to mperyer:
+Hi Raj2004,
+I am seeing a similar issue…my build and connect phases are done…simulation enters run phase and hangs at time 0…Could you figure out what caused your simulation to hang?
+Thanks
+
+--- Reply #10 by Raj2004 at 2012-12-21T11:06:19.000Z ---
+In reply to nash123:
+Hi Nash,
+There may be few possibilities but the important one is may be some thing (process) is running in background, That the same with me.Please check the loops in your code as may be some loops are going in infinite condition or its waiting for some signals or values.
+Thanks
+Anubhaw
+
+--- Reply #11 by Ajeetha_Kumari_CVC at 2013-01-04T18:38:53.000Z ---
+In reply to Raj2004:
+A wild guess, perhaps one of your raised-objections are not dropped yet? See a way to debug that kind of scenario @ 404
+HTH
+Ajeetha, CVC
+  
+      
+
+      My cvcblr
+  
+
+  
+    
+
+Verification Course Blog | VeriLog Courses | CVC
+
+  Read our verification course blog to find out more about what CVC can offer, if you are looking for online courses contact us today.
+
+  
+    Est. reading time: 1 minute
+
+--- Reply #12 by nash123 at 2013-01-14T07:47:46.000Z ---
+In reply to ajeetha:
+Thanks All for the help…I actually had an infinite loop in one of the components
+
+--- Reply #13 by Bhanu_Prakash at 2013-08-13T06:21:17.000Z ---
+Hi all,
+I’m facing the similar issue, forever loops in the monitor are running even after dropping all the objections (enabled objection trace). How to end the testcase, in this case? Can’t we control this using objection mechanism only ?
+Thanks in advance,
+Bhanu
+
+--- Reply #14 by dave_59 at 2013-08-13T23:21:10.000Z ---
+In reply to Bhanu Prakash:
+For debugging, try changing your monitor’s forever loop to break out after some timeout, or by checking some variable that you interactively set when you notice the simulation not ending. Then see what the remaining activity in the testbench is doing.
+
+--- Reply #15 by Bhanu_Prakash at 2013-08-14T04:36:00.000Z ---
+In reply to dave_59:
+Thanks Dave,
+I found that objection is raised in main_phase of driver, but in run_phase all the objections are dropped. So the main_phase in env is not completed.
+Is this the reason why this happened?
+Regards,
+Bhanu
+
+--- Reply #16 by dave_59 at 2013-08-14T05:17:22.000Z ---
+In reply to Bhanu Prakash:
+Hard to know without seeing your code. But this is why we recommend sticking with the run_phase, especially in your driver. Also, you driver should not be raising and dropping objections.
+
+--- Reply #17 by Mr_Verification at 2016-07-09T16:36:14.000Z ---
+In my case, all phases were ending and reporting was run, but the sim never stopped.  What?  Why?
+So I finally looked at uvm_root:
+class uvm_root extends uvm_component;
+// Task: run_test
+//
+// Phases all components through all registered phases. If the optional
+// test_name argument is provided, or if a command-line plusarg,
+// +UVM_TESTNAME=TEST_NAME, is found, then the specified component is created
+// just prior to phasing. The test may contain new verification components or
+// the entire testbench, in which case the test and testbench can be chosen from
+// the command line without forcing recompilation. If the global (package)
+// variable, finish_on_completion, is set, then $finish is called after
+// phasing completes.
+. . .
+// Variable: finish_on_completion
+//
+// If set, then run_test will call $finish after all phases are executed.
+bit  finish_on_completion = 1;
+. . .
+task uvm_root::run_test(string test_name=“”);
+. . .
+// if test now defined, create it using common factory
+if (test_name != “”) begin
+$cast(uvm_test_top, factory.create_component_by_name(test_name,
+“”, “uvm_test_top”, null));
+. . .
+// phase runner, isolated from calling process
+fork begin
+// spawn the phase runner task
+phase_runner_proc = process::self();
+uvm_phase::m_run_phases();
+end
+join_none
+#0; // let the phase runner start
+. . .
+wait (m_phase_all_done == 1);
+// clean up after ourselves
+phase_runner_proc.kill();
+l_rs = uvm_report_server::get_server();
+l_rs.report_summarize();
+if (finish_on_completion)
+$finish;
+endtask
+I was trying to bring up a BFM only full chip TB (CPUs stubbed out).  The Top TB had this code, so UVM wouldn’t finish before the C tests:
+uvm_top.finish_on_completion=0;
+Solution: In full chip tests (non-BFM), C tests now write to a GPIO pin when they are finished.  A UVM monitor waits for write and drops an objection, allowing UVM to finish.  C tests no longer need a cycle count arg and finish_on_completion gets axed!!!
+
+--- Reply #18 by tan_27 at 2026-09-30T04:07:42.196Z ---
+Could you please explain the usage of UVM_OBJECTION_TRACE and provide a simple code example for better understanding?
+
+--- Reply #19 by MichaelP at 2026-09-30T06:42:43.299Z ---
+tan_27:
+
+UVM_OBJECTION_TRACE
+
+
++UVM_OBJECTION_TRACE
+is a command-line plusarg used in the UVM to trace objection activity and debug simulation hangs or premature terminations.
+Add it to your test command-line, and run the test, finally open the test log: you would see many prints to the test log, which are tracking the rise and drop of each objection in a UVM test.
+In SoC/Full-Chip environments those prints could be quite overwhelming…
+Please first try to read on UVM objection mechanism:
+  
+
+      verificationacademy.com
+  
+
+  
+    
+
+Objection Mechanism
+
+
+
+  
+
+  
+    
+    
+  
+
+  
+
+
+And on UVM command line processor which receives this TRACE plusarg:
+  
+
+      verificationacademy.com
+  
+
+  
+    
+
+uvm_cmdline_processor
+
+
+
+  
+
+  
+    
+    
+  
+
+  
+
+
+I don’t have a simple code example, but sure you could find one on the Internet or ask one of the chatbots to generate one.
+================================================================================
+
+================================================================================
+TOPIC #5 [ID: 33231] : What is the output of the tlm_fifo model?
+Author: Rajaraman_R | Created: 2017-06-21T13:21:36.000Z | Bumped: 2026-09-30T05:52:25.202Z | Posts: 3
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hii,
+I am beginner of the UVM. I am try to code a producer consumer transaction via the tlm fifo. But I am not get the expected value.So how to improve my code .
+Tell your suggestion
+And my code is below
+import uvm_pkg::*;
+`include "uvm_macros.svh"
+
+
+class tlm_seq_item extends uvm_sequence_item;
+  
+  rand bit a;
+  rand byte b;
+  rand int c;
+
+  `uvm_object_utils_begin(tlm_seq_item)
+     `uvm_field_int(a,UVM_ALL_ON)
+     `uvm_field_int(b,UVM_ALL_ON)
+     `uvm_field_int(c,UVM_ALL_ON)
+   `uvm_object_utils_end
+
+  function new(string name="tlm_seq_item");
+     super.new(name);
+   endfunction
+ 
+ endclass
+
+class tlm_producer extends uvm_component;
+  
+    `uvm_component_utils(tlm_producer)
+
+    uvm_blocking_put_port #(tlm_seq_item) my_put_port;
+
+    function new(string name="tlm_produce", uvm_component parent=null);
+     super.new(name,parent);
+     my_put_port=new("my_put_port",this);
+     endfunction
+ 
+  virtual task run_phase(uvm_phase phase);
+    for(int i=0;i<5;i++)
+      begin
+        tlm_seq_item seq;
+        seq=tlm_seq_item::type_id::create("seq",this);
+        seq.randomize();
+        seq.print();
+          //$display("IT IS PRODUCER");
+        my_put_port.put(seq);
+        `uvm_info("SEND",$sformatf("the data ia i=%d %p",i,seq),UVM_LOW)
+        #10;
+       end
+
+   endtask  
+
+  endclass
+
+class tlm_consumer extends uvm_component;
+   
+  `uvm_component_utils(tlm_consumer) 
+
+   uvm_blocking_get_port #(tlm_seq_item) my_get_port;
+
+    function new(string name="tlm_consumer",uvm_component parent=null);
+       super.new(name,parent);
+       my_get_port=new("my_get_port",this);
+     endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        for(int i=0;i<5;i++)
+         begin
+           tlm_seq_item seq;
+           seq=tlm_seq_item::type_id::create("seq",this);
+           my_get_port.get(seq);
+           `uvm_info("REC",$sformatf("recieved packet i=%0d %p",i,seq),UVM_LOW)
+          end
+      endtask
+  endclass
+
+class tlm_env extends uvm_env;
+ 
+   `uvm_component_utils(tlm_env)
+
+    uvm_tlm_fifo #(tlm_seq_item) my_fifo;
+
+    tlm_producer producer;
+    tlm_consumer consumer;
+
+    function new (string name="tlm_env",uvm_component parent=null);
+       super.new(name,parent);
+      endfunction
+
+    function void buid_phase(uvm_phase phase);
+       super.build_phase(phase);
+       producer=tlm_producer::type_id::create("producer",this);
+       consumer=tlm_consumer::type_id::create("consumer",this);
+         //$display("builded or producer and consumer");
+      endfunction
+
+    function void connect_phase(uvm_phase phase);
+       producer.my_put_port.connect(my_fifo.put_export);
+       consumer.my_get_port.connect(my_fifo.get_export);
+      endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        phase.raise_objection(this);
+         #1000;
+        phase.drop_objection(this);
+      endtask
+
+  endclass     
+
+module top;
+    tlm_env env;
+    
+    initial begin
+      env=new();
+      $display("calling");
+      run_test();
+      $display("end calling");
+      end
+  endmodule
+--------------------------------------------------------------------------------
+REPLIES (2):
+
+--- Reply #1 by chr_sue at 2017-06-21T14:26:33.000Z ---
+In reply to Rajaraman R:
+I did not check all your code, but the question is what you get?
+For Scenarios like this there is a sequencer/driver connection adequate.
+Both have all ports and exports you need.
+See examples here: https://verificationacademy.com/cookbook/cookbook-code-examples#UVM_Examples:#UVM_Examples:#UVM_Examples:
+BTW on the same level of hierarchy you can only connect ports with exports.
+
+--- Reply #2 by tan_27 at 2026-09-30T05:52:25.202Z ---
+May I know is it required to use TLM FIFOs when non-blocking methods(try_put(),try_get(),try_peek()) are used? And which is preferrable blocking or non-blocking methods here?
+An example code snippet will also be helpful reg this topic
+================================================================================
+
+================================================================================
+TOPIC #6 [ID: 51750] : UVM_WARNING : map 'reg_map' does not seem to be initialized correctly, check that the top register model is locked()
+Author: gpkaran.vlsi | Created: 2026-09-29T19:34:58.865Z | Bumped: 2026-09-29T19:34:59.022Z | Posts: 1
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+In my TB env, I have a total of 5 interfaces(1 I2C and 4 SPIs) which can access the reg bank concurrently. And the ‘default_map’ provided by the regmodel won’t be enough to achieve this parallelism. Hence, I have added 5 different reg_maps(1 for i2c and 1 for each SPI).
+The regmodel is generated by a script and currently there is no way to add user maps to this. Hence, I have extended the top_reg_block (of type reg_block and contains all the register objects) and top_reg_model (also of type reg_block and contains the object of top_reg_block class called m_top_reg_block) and created a child class called ‘tb_reg_block’ and ‘tb_reg_model’ where I am adding my user maps.
+top_reg_block  <---------- tb_reg_block (child class)
+top_reg_model <--------- tb_reg_model (child class)
+I am getting ~2000 lines of warnings as shown below from uvm_reg_map when I call the “regs[i].get_offset(default_map)” and “regs[i].get_rights(default_maps)” function.
+UVM_WARNING : map ‘reg_map’ does not seem to be initialized correctly, check that the top register model is locked().
+After analysis, it looks like the map is set to intialized only when we call the lock_model(). But once the model is locked, we won’t be able to add mem/maps to it. I don’t find any other public API’s to set the default_map to initialized except Xinit_address_mapX( ), but, I don’t want to use this method as it seems to be local with its naming convention though it is not.
+Functionally, this code is working fine as expected, but, please let me know
+
+
+If this approach is correct ?
+
+
+How to get rid of these warnings ?
+
+
+Thanks in advance for your response.
+PFB the example code ( EDA Playground )
+`define CPU_MEM_NAME "cpu_mem"
+`define SYS_MEM_NAME "sys_mem"
+`define CPU_MEM_SIZE 256
+`define SYS_MEM_SIZE 256
+`define CPU_MEM_START_ADDR 0
+`define SYS_MEM_START_ADDR 1024
+
+`include "uvm_macros.svh"
+
+//--------------------------------------------------------------------------------------------
+//                                       RAL PACKAGE                                          
+//--------------------------------------------------------------------------------------------
+package ral_pkg;
+  import uvm_pkg::*;
+
+class reg1 extends uvm_reg;
+  `uvm_object_utils(reg1)
+  uvm_reg_field m_minor; 
+  
+  function new(string name = "reg1");
+    super.new(name, 32, build_coverage(UVM_NO_COVERAGE));        
+  endfunction: new
+
+    virtual function void build();
+        m_minor = uvm_reg_field::type_id::create("minor",,get_full_name());
+        m_minor.configure(this, 8, 0, "RO", 0, 8'h1, 1, 0, 1);
+    endfunction: build
+endclass
+
+class reg2 extends uvm_reg;
+  `uvm_object_utils(reg2)
+  uvm_reg_field m_minor;
+  
+  function new(string name = "reg2");
+    super.new(name, 32, build_coverage(UVM_NO_COVERAGE));        
+  endfunction: new
+
+    virtual function void build();
+        m_minor = uvm_reg_field::type_id::create("minor",,get_full_name());
+        m_minor.configure(this, 8, 0, "RO", 0, 8'h1, 1, 0, 1);
+    endfunction: build  
+endclass
+
+class reg3 extends uvm_reg;
+  `uvm_object_utils(reg3)
+  uvm_reg_field m_minor;
+  
+  function new(string name = "reg3");
+    super.new(name, 32, build_coverage(UVM_NO_COVERAGE));        
+  endfunction: new
+
+    virtual function void build();
+        m_minor = uvm_reg_field::type_id::create("minor",,get_full_name());
+        m_minor.configure(this, 8, 0, "RO", 0, 8'h1, 1, 0, 1);
+    endfunction: build  
+endclass
+
+class top_reg_block extends uvm_reg_block;
+  `uvm_object_utils(top_reg_block)
+  rand reg1 m_reg1;
+  rand reg2 m_reg2;
+  rand reg3 m_reg3;
+  	
+  function new(string name = "top_reg_block");
+    super.new(name, build_coverage(UVM_NO_COVERAGE));        
+  endfunction: new
+
+  virtual function void build();
+    this.default_map = create_map("", 0, 4, UVM_LITTLE_ENDIAN, 0);
+    
+    this.m_reg1 = reg1::type_id::create("reg1",,get_full_name());
+    this.m_reg1.configure(this, null, "");
+    this.m_reg1.build();
+    this.default_map.add_reg(this.m_reg1, `UVM_REG_ADDR_WIDTH'h0, "RO", 0);
+    
+    this.m_reg2 = reg2::type_id::create("reg2",,get_full_name());
+    this.m_reg2.configure(this, null, "");
+    this.m_reg2.build();
+    this.default_map.add_reg(this.m_reg2, `UVM_REG_ADDR_WIDTH'h4, "RO", 0);
+    
+    this.m_reg3 = reg3::type_id::create("reg3",,get_full_name());
+    this.m_reg3.configure(this, null, "");
+    this.m_reg3.build();
+    this.default_map.add_reg(this.m_reg3, `UVM_REG_ADDR_WIDTH'h8, "RO", 0);
+  endfunction
+endclass
+
+class top_reg_model extends uvm_reg_block;
+  `uvm_object_utils(top_reg_model)
+  rand top_reg_block m_top_reg_block;
+    
+  function new(string name = "top_reg_model");
+    super.new(name, build_coverage(UVM_NO_COVERAGE));
+  endfunction: new
+
+  function void build();
+    this.default_map = create_map("", 0, 4, UVM_LITTLE_ENDIAN, 0);
+    this.m_top_reg_block = top_reg_block::type_id::create("top_reg_block",,"top_reg_block");
+    this.m_top_reg_block.configure(this, "");
+    this.m_top_reg_block.build();
+    this.default_map.add_submap(this.m_top_reg_block.default_map, `UVM_REG_ADDR_WIDTH'h40000000);    
+  endfunction : build
+endclass
+
+endpackage
+
+//--------------------------------------------------------------------------------------------
+//                                        TB PACKAGE                                          
+//--------------------------------------------------------------------------------------------
+package tb_pkg;
+  import uvm_pkg::*;
+  import ral_pkg::*;
+
+  parameter NO_OF_I2CS = 1;
+  parameter NO_OF_SPIS = 4;
+
+//--------------------------------------
+// tb_reg_block
+//--------------------------------------
+class tb_reg_block extends top_reg_block;
+    `uvm_object_utils(tb_reg_block)
+
+      uvm_reg_map m_i2c_maps [NO_OF_I2CS]; // NO_OF_I2CS = 1
+      uvm_reg_map m_spi_maps [NO_OF_SPIS]; // NO_OF_SPIS = 4
+
+    function new(string name = "tb_reg_block");
+        super.new(name);
+    endfunction: new
+
+   function void build();
+      super.build();      
+      this.add_user_map();
+   endfunction : build
+
+   function void add_user_map();
+      // Create user maps - I2C
+      for(int i = 0; i < NO_OF_I2CS; i++) begin
+        m_i2c_maps[i] = create_map($sformatf("i2c_map_%0d", i), 'h0, 4, UVM_LITTLE_ENDIAN);
+      end
+
+      // Create user maps - SPI
+      for(int i = 0; i < NO_OF_SPIS; i++) begin
+        m_spi_maps[i] = create_map($sformatf("spi_map_%0d", i), 'h0, 4, UVM_LITTLE_ENDIAN);
+      end
+
+      // Copy registers to user maps
+      mirror_regs_to_user_maps(1);
+   endfunction
+
+   function void mirror_regs_to_user_maps(bit include_regs = 1);
+      // registers
+      if(include_regs) begin
+        uvm_reg regs[$];
+        this.get_registers(regs);
+
+        foreach(regs[i]) begin
+          uvm_reg_addr_t offset = regs[i].get_offset(default_map); // !WARNING
+          string         rights = regs[i].get_rights(default_map); // !WARNING
+
+          foreach(m_i2c_maps[j]) begin
+            m_i2c_maps[j].add_reg(regs[i], offset, rights);
+          end // foreach[j]
+
+          foreach(m_spi_maps[k]) begin
+            m_spi_maps[k].add_reg(regs[i], offset, rights);
+          end // foreach[k]
+
+        end // foreach[i]
+
+      end // if
+   endfunction : mirror_regs_to_user_maps
+
+  endclass
+
+//--------------------------------------
+// tb_reg_model
+//--------------------------------------
+class tb_reg_model extends top_reg_model;
+  `uvm_object_utils(tb_reg_model)
+
+  uvm_reg_map m_i2c_maps [NO_OF_I2CS]; // 1
+  uvm_reg_map m_spi_maps [NO_OF_SPIS]; // 4
+
+  uvm_mem cpu_mem;
+  uvm_mem sys_mem;
+    
+  function new(string name = "tb_reg_model");
+    super.new(name);
+  endfunction: new
+
+  function void build();
+    super.build();
+    this.add_user_mem();
+    this.add_user_map();
+  endfunction : build
+
+  function void add_user_mem();
+    // cpu_mem
+    cpu_mem = new(`CPU_MEM_NAME, `CPU_MEM_SIZE, 32, "RW", UVM_NO_COVERAGE);
+    cpu_mem.configure(this, `CPU_MEM_NAME);    
+    this.default_map.add_mem(cpu_mem, (`CPU_MEM_START_ADDR + `CPU_MEM_SIZE));
+
+    // sys_mem
+    sys_mem = new(`SYS_MEM_NAME, `SYS_MEM_SIZE, 32, "RW", UVM_NO_COVERAGE);
+    sys_mem.configure(this, `SYS_MEM_NAME);    
+    this.default_map.add_mem(sys_mem, (`SYS_MEM_START_ADDR + `SYS_MEM_SIZE));
+  endfunction
+  
+  function void add_user_map();
+    // I2C
+    for(int i = 0; i < NO_OF_I2CS; i++) begin
+      m_i2c_maps[i] = create_map($sformatf("i2c_map_%0d", i), 'h0, 4, UVM_LITTLE_ENDIAN);
+      m_i2c_maps[i].add_submap(this.m_top_reg_block.get_map_by_name($sformatf("i2c_map_%0d", i)), 'h0);
+
+      m_i2c_maps[i].add_mem(cpu_mem, (`CPU_MEM_START_ADDR + (i * `CPU_MEM_SIZE) + 'h1000));
+      m_i2c_maps[i].add_mem(sys_mem, (`SYS_MEM_START_ADDR + (i * `SYS_MEM_SIZE) + 'h1000));
+    end
+
+    // SPI
+    for(int i = 0; i < NO_OF_SPIS; i++) begin
+      m_spi_maps[i] = create_map($sformatf("spi_map_%0d", i), 'h0, 4, UVM_LITTLE_ENDIAN);
+      m_spi_maps[i].add_submap(this.m_top_reg_block.get_map_by_name($sformatf("spi_map_%0d", i)), 'h0);
+      
+      m_spi_maps[i].add_mem(cpu_mem, (`CPU_MEM_START_ADDR + (i * `CPU_MEM_SIZE) + 'h2000));
+      m_spi_maps[i].add_mem(sys_mem, (`SYS_MEM_START_ADDR + (i * `SYS_MEM_SIZE) + 'h2000));
+    end
+  endfunction
+endclass
+
+class env extends uvm_env;
+    `uvm_component_utils(env)
+    tb_reg_model m_regmodel;
+    
+    function new(string name = "env", uvm_component parent = null);
+      super.new(name, parent);
+    endfunction
+    
+    function void build_phase(uvm_phase phase);
+      set_type_override_by_type(top_reg_block::get_type(), tb_reg_block::get_type());
+      super.build_phase(phase);
+      m_regmodel = tb_reg_model::type_id::create("m_regmodel", this);      
+      `uvm_info(get_name(), "Building m_regmodel", UVM_LOW)
+      m_regmodel.build();      
+      `uvm_info(get_name(), "Locking m_regmodel", UVM_LOW)
+      m_regmodel.lock_model();      
+    endfunction
+ endclass
+
+endpackage
+
+//--------------------------------------------------------------------------------------------
+//                                        TB MODULE                                           
+//--------------------------------------------------------------------------------------------
+module tb();
+  import uvm_pkg::*;
+  import tb_pkg::*;
+  
+  env m_env;
+  
+  initial begin    
+    m_env = env::type_id::create("m_env", null);
+    run_test();
+    #100 $finish;    
+  end
+endmodule
+
+
+Regards,
+Karan
+--------------------------------------------------------------------------------
+REPLIES (0):
+================================================================================
+
+================================================================================
+TOPIC #7 [ID: 33581] : UVM macro
+Author: verificationstud | Created: 2017-10-08T05:27:37.000Z | Bumped: 2026-09-23T08:03:52.529Z | Posts: 6
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+How can I implement factory registration without using macros.
+--------------------------------------------------------------------------------
+REPLIES (5):
+
+--- Reply #1 by dave_59 at 2017-10-08T05:55:49.000Z ---
+In reply to harinathdigital@gmail.com:
+
+  
+
+      Verification Horizons – 13 Feb 11
+  
+
+  
+    
+
+Parameterized Classes, Static Members and the Factory Macros - Verification...
+
+  Somebody asked me a simple question: Why do need two different macros (`ovm_object_utils and `ovm_object_param_utils) to register classes with the factory,
+
+--- Reply #2 by lalithjithan at 2017-10-08T06:01:11.000Z ---
+class component extends uvm_component;
+typedef uvm_component_registry #(component,“component”) type_id;
+static function type_id get_type();
+return type_id::get();
+endfunction
+function string get_type_name();
+return “component”;
+endfunction
+endclass : component
+
+--- Reply #3 by tan_27 at 2026-09-22T06:36:44.026Z ---
+Could you please explain why do we use type_id?
+What are the static methods inside uvm_component_registry and why is it parameterized with 2 arguments?
+
+--- Reply #4 by dave_59 at 2026-09-23T07:06:52.411Z ---
+The UVM factory has two basic override mechanisms: a type-based override, which undergoes static compilation checks, and a string-based lookup, which can only be checked at runtime. The registry class accepts two arguments, linking the string to a specific class type.
+The factory plays a crucial role in the overall functioning of the UVM, and I can’t provide a comprehensive explanation here. For a detailed understanding, I recommend reading the verification horizon article mentioned above, as well as the DVCon paper it references.
+
+--- Reply #5 by tan_27 at 2026-09-23T08:03:52.529Z ---
+Thank you !
+================================================================================
+
+================================================================================
+TOPIC #8 [ID: 41466] : The Whys of UVM
+Author: scott_barvian | Created: 2023-04-04T20:15:52.000Z | Bumped: 2026-09-18T04:49:24.412Z | Posts: 8
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+This question is for dave_59 and chr_sue and anyone else that may be interested.  I think it belongs in the UVM forum but feel free to move it.
+In the thread “Why do we use drivers?”, you both gave the usual answers.  “It’s a software design paradigm.”  “It’s for reuse.”
+We’re over 20 years into the experiment of UVM and its predecessors.  All the original developers and advocates have moved on, and many are retiring  which makes me feel old.
+The industry still struggles mightily to hire and train verification engineers.  It is still not taught in universities, so new grads always start in design. Most engineers that cross over into doing verification are either a) RTL designers pulled in for lack of anyone else to do the job, or b) experienced RTL designers looking for a new challenge.  All RTL designers. And they all ask the same WHY questions.  Why drivers?  Why agents?  Why analysis ports?  Why the class-based aspects of SV, when I already know how to write clocked RTL to do the job?
+No one ever wrote a book about the “whys” of UVM.  What training that exists, including that on this site, never focused on the “why” or the bad things that can happen when you don’t follow the rules.  Only on the “how”.
+I still cannot answer questions like “Why drivers?” with anything other than “Because that’s how we do it, now go away.”  So designers cheat, they write tests that drive the DUT directly, the projects get done on schedule, and the bad habits are established.
+I don’t know what answer I am expecting, but I would like to know your thoughts.
+--------------------------------------------------------------------------------
+REPLIES (7):
+
+--- Reply #1 by dave_59 at 2023-04-05T03:03:41.000Z ---
+In reply to scott_barvian:
+The Separation of Concerns principle I gave in my answer to “why use drivers” question is a language agnostic and a contemporary principle.
+It’s unfortunate that DVCon just went through a catastrophic loss of proceedings. They’ve recovered most of the papers and posters, but many of the tutorials and workshops that addressed the “why” are gone.
+A few papers that might be worth reading are “First Reports from the UVM Trenches: User-friendly, Versatile and Malleable, or just the Emperor’s New Methodology?” and “UVM Rapid Adoption: A Practical Subset of UVM”
+However, “Because that’s how we do it, now go away.” could be the best answer for certain practices. Sometimes it’s more important to focus on the final decision rather than getting caught up in the argument or discussion that led to it. Take naming conventions like camelCase versus snake_case and other. It’s important to be consistent with the chosen convention making code easier to read and understand amongst a wider group. The same can be said about testbench architecture.
+
+--- Reply #2 by chr_sue at 2023-04-05T09:26:56.000Z ---
+In reply to dave_59:
+For me the UVM has 4 key benefits:
+(1) increasing the verification productivity
+(2) Plug-and-play reuse
+(3) improving the simulation speed
+(4) one verification methodology for all companies
+In my opinion this describes the “WHY”.
+A few more detailed explanations:
+(1) when introducing the UVM in a company it requires more effort as continuing with the old approach. The additional effort is between 1.3 to 1.5 of the old methodology. In the 2nd project it is around 0.8 -0.7. in the 3rd project it goes down to around 0.5 of the effort using the traditional approach. These are numbers from my personal experience in introducing the UVM in companies.
+The minimal prerequisites to the verification engineers is SV and UVM training. Even after the UVM training the engineers will not be able to start aproject on their own. Best is to engange a UVM coach who is helping to startt this new methodology. This coaching effort is not very high but it pays-out in teh 1st project because it helps to follow the basic rules/guidelines of the UVM.
+A good starting point is to use a UVM Framework Generator to create a UVM environment. This has the benfit you can focus on your application specific problems and you do not have to spend a lot of effort to implement all the TLM-related contructs.
+(2) The reuse aspect is the most important means to increase the productivity. And it is a plug-and-play reuse. You do not have to modify anything in your code with the exception of parameter settings.
+(3) The UVM uses heavily TLM approaches. TLM reduces the number of events and improves the simulation speed heavily.
+(4) because it is not a company-specific approach you can ask the UVM community to solve issues you are facing. This is a big difference compared to the traditional apporaches.
+The practice I see is in some way different. Only a few companies are following this strict approach. A lot other companies implementing an approach which is not strict resulting in serious problems.
+
+--- Reply #3 by Jim_Lewis at 2023-04-07T19:01:05.000Z ---
+In reply to chr_sue:
+
+In reply to dave_59:
+(3) improving the simulation speed
+
+Do you have any numbers for this?  Doesn’t the solver add to the overhead of a SystemVerilog simulation?   I have seen the Verilog vs. VHDL comparisons, but I have never seen anything like SystemVerilog vs Verilog.
+
+--- Reply #4 by chr_sue at 2023-04-08T06:33:15.000Z ---
+In reply to Jim Lewis:
+This is a misunderstanding. I do not measure Systemverilog vs. Verilog. What I mean is the UVM is heavily employing a specific software technique - transaction-leve-modelling (TLM) - which is reducing the amount of events tremendously. This results in less activity during the simulation and thus increases the simulation speed. Only the so-called transactors (drivers, monitors) are working on the pin-level with all the events. Depending on the amount of code for transactors and TLM-code the simulation speeds-up.
+But there are no numbers because we had to compare a traditional TB with a UVM envroment with the same behavior. Nobody did implement and check this.
+
+--- Reply #5 by Jim_Lewis at 2023-04-08T14:25:49.000Z ---
+In reply to chr_sue:
+So is your claim about “improving simulation speed” an it ought to do that? Or did you measure the speed of their previous undisciplined SV approach against the new SV approach?
+Maybe someone did a study of simulation speed of SystemVerilog against VHDL?
+TLM can be functional equivalent, cycle equivalent, or even timing equivalent.   I would suspect that once you get to cycle equivalent (which I think you would need to verify a design), that TLM has the same number of events on the interface as an undisciplined a “copy and paste” approach.  Going further, TLM requires additional overhead to hand off the transaction information vs. the “copy and paste” approach.  That said, I doubt the TLM additional overhead is much though - and there is no doubt that the other benefits of TLM out weigh this.
+OTOH, I do agree with your first two claims - as I noted similar items in my response to the “Whys of Drivers” post.
+WRT your 4th claim, SV only makes sense for the Verilog community.  You see this more clearly in the FPGA community where for verification, VHDL is used more often than SV - and UVM is on a decreasing trend where as VHDL’s OSVVM is on an increasing trend.
+  
+
+      Verification Horizons – 21 Nov 22
+  
+
+  
+    
+
+Part 6: The 2022 Wilson Research Group Functional Verification Study -...
+
+  This blog is a continuation of a series of blogs related to the 2022 Wilson Research Group Functional Verification Study. In my previous blog, I discussed
+
+--- Reply #6 by chr_sue at 2023-04-09T14:23:41.000Z ---
+In reply to Jim Lewis:
+I’d not over estimate the increase of the OSVVM. It’s quite new and it’s growing because the VHDL  community does not have to learn another language. Aother reason is EA companies are saying UVM is too complex for FPGA. I do not believe the UVM is too complicated. It is only a question how you are employing it. In my dail<y life as a SV/UVM trainer and a UVM consultant I have seen a lot of companies facing serious issues with the UVM because they do not follow the guidelines and were violating basic rules. The problem is to deal with the freedom in the right way.
+And I have my doubts about the OSVVM. I believe it is not so powerful as the UVM is.
+
+--- Reply #7 by Jim_Lewis at 2026-09-18T04:49:24.412Z ---
+I’d not over estimate the increase of the OSVVM.
+
+Time is the telling indicator.   Now both the 2024 and 2026 Wilson Survey have been published.   What do we see now?   In FPGA, UVM (SystemVerilog) has stayed flat at 48% and OSVVM has continued to grow and has reached 35% - closing in on SystemVerilog.   In ASIC, the survey shows OSVVM has grown to 40%.
+In my daily life as an OSVVM trainer, developer, and consultant, the feed back I have received is that OSVVM is intuitive, powerful, and easy to use and review test cases - and in general, it does not require a coach to be able to use it effectively.
+OSVVM’s capabilities have a diverse range including transaction-level modeling, verification components, co-simulation with software, constrained random test generation, functional coverage modeling, self-checking test support, sparse memory data structures, error tracking and messaging, comprehensive test reporting in HTML and text, and synchronization primitives.
+
+And I have my doubts about the OSVVM. I believe it is not so powerful as the UVM is.
+
+This statement is quite inflammatory.   Have you studied and/or tried OSVVM?   I have seen marketing droids use statements like this to promote SystemVerilog.  Is that your intention?
+================================================================================
+
+================================================================================
+TOPIC #9 [ID: 51741] : How to create, config, and use Agentic IA in a UVM-based Testbench?
+Author: alex_moreno | Created: 2026-09-14T12:56:04.318Z | Bumped: 2026-09-14T12:56:04.479Z | Posts: 1
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+I’m exploring how to integrate Agentic AI into a SystemVerilog/UVM verification environment. The goal is for the agent to assist with tasks such as:
+
+
+Generate the Verification Plan and Test Plan from the spec and a VPlan format.
+
+
+Generate the Testbench, compilation, and Simulation scripts
+
+
+Run simulations, regressions, pass/fail and coverage reports, Debug, JIRAs, gaps
+--------------------------------------------------------------------------------
+REPLIES (0):
+================================================================================
+
+================================================================================
+TOPIC #10 [ID: 51719] : Lifespan of memory of objects created during run_phase
+Author: AD | Created: 2026-08-26T05:22:15.961Z | Bumped: 2026-09-08T20:32:55.825Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+I want to know about lifespan of objects created during run_phase because to compare between 2 methods for receiving data in scoreboard.
+
+
+IP Monitor    : Input monitor will have analysis port so it will broadcast the input
+Scoreboard  : Scoreboard will have uvm_tlm_analysis_fifo
+Right now analysis port has only 1 subscriber so handle of seq_item will only be pass to      scoreboard. Now only  uvm_tlm_analysis_fifo has handle of seq_item sent from input_monitor. So if I do get method on it I will retrieve the handle, and when next time I do get the last handle will no longer be referenced by any variable in TB. So should the memory space of that object destroy instantly or it will be destroyed after run time.(I am aware about provision that SV provides that it depends upon simulator design. If your answer is tool specific then I am specifically asking about Siemens Questa. But I am more interested in generalized answer which method is better which one should I use.)
+
+
+In this method I will create object inside driver s forever loop and IP monitor will pass it’s handle. So every loop will create new object of seq_item and I assume they are getting destroyed after use and get derferenced.
+
+IP Monitor    : Input monitor will have analysis port so it will broadcast the input
+Scoreboard  : Scoreboard will have uvm_analysis_imp_port
+
+In this method I will create a queue to store input then process input(from ip monitor) and output from (op monitor), then process input compare with DUT output and then discard it. This method will surely destroy memory of the object after use.
+In this method I will create object outside driver s forever loop only one time and IP monitor will pass it’s handle and in scoreboard my data will be copied down into seq_item handle and store inside queue so the next time when data gets randomize it will not be corrupted.
+So the comparison is between using this two methods. Because method 2 is of no use if method 1 is memory efficient to write. Because in method 1 you have to provide you own write method implementation in scoreboard and also you have to create a queue insert element into it.
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by dave_59 at 2026-09-01T22:15:45.852Z ---
+You haven’t provided enough information to answer the question. We would need to see some code or at least a bit of pseudo-code. After you perform the get() you now have a handle to the transaction even though it’s gone out of the analysis FIFO.
+
+--- Reply #2 by AD at 2026-09-07T05:05:11.805Z ---
+Input Monitor:
+forever
+begin
+@(intrf.ip_mon_cb); //this will unblock at reactive region of 30
+**my_seq_item = seq_item::type_id::create("my_seq_item");**
+my_seq_item.wr_cs = intrf.ip_mon_cb.wr_cs;
+my_seq_item.rd_cs = intrf.ip_mon_cb.rd_cs;
+my_seq_item.wr_en = intrf.ip_mon_cb.wr_en;
+my_seq_item.rd_en = intrf.ip_mon_cb.rd_en;
+my_seq_item.data_in = intrf.ip_mon_cb.data_in;
+ip_mon_analysis_port.write(my_seq_item);
+//\`uvm_info(get_type_name(),$sformatf("\[%0t\]: IP_MON: WR_CS=%0d RD_CS=%0d WR_EN=%0d RD_EN=%0d DATA_IN=%0d",$time,my_seq_item.wr_cs,my_seq_item.rd_cs,my_seq_item.wr_en,my_seq_item.rd_en,my_seq_item.data_in),UVM_MEDIUM);
+end
+
+I am creating a new object at every clock cycle and writing its handle to the analysis port, and my only subscriber to this analysis port is the scoreboard.
+So in score board side:
+uvm_tlm_analysis_fifo#(seq_item) ip_fifo;
+task run_phase(uvm_phase phase);
+forever
+begin
+op_fifo.get(op);
+ip_fifo.get(ip);
+ref_model();
+chekk();
+end
+endtask
+
+So, on the scoreboard, I am retrieving my data from the FIFO every time. Now, will objects that are dereferenced after getting checked in the scoreboard be immediately destroyed, or will they wait for the run phase to complete before destroying?
+
+--- Reply #3 by dave_59 at 2026-09-08T20:32:55.825Z ---
+Your two methods are basically the same as far as I can see. A FIFO is built using a queue and has the same effect whether using a get() or pop() method. A class object can be destroyed once there is no way to access a reference to it. You should only be concerned that your references get removed.
+================================================================================
+
+================================================================================
+TOPIC #11 [ID: 51728] : How do you evaluate AI tools for UVM/DV work?
+Author: manasb | Created: 2026-09-07T12:59:00.281Z | Bumped: 2026-09-07T12:59:00.591Z | Posts: 1
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone,
+Sorry if this is a dumb question. I’m still pretty new to the verification side of AI tools and was hoping to learn from people here.
+I’ve been trying Claude/GPT for things like UVM code generation and debugging, and sometimes it feels surprisingly good, while other times it confidently generates things that don’t even work. That made me realize I actually have no idea how people in industry evaluate these tools.
+When you try a new model or AI assistant, how do you decide if it’s actually useful?
+Do you have a few designs or testbenches that you always use?
+Do you rely on benchmarks like CVDP or LBC-bench, or do those not matter much in practice?
+Are there any blogs, papers, or people you’d recommend following for honest evaluations instead of vendor demos?
+Thanks!
+--------------------------------------------------------------------------------
+REPLIES (0):
+================================================================================
+
+================================================================================
+TOPIC #12 [ID: 51722] : Difference between switch,crossbar and Interconnect
+Author: Maniteja | Created: 2026-08-31T10:36:56.099Z | Bumped: 2026-08-31T14:35:26.855Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hello Everyone,
+Could anyone please explain the differences among crossbar,switch,interconnect and a bridge in a SoC ?And also When to choose each one of them?
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by cgales at 2026-08-31T14:35:26.855Z ---
+The terms ‘crossbar’, ‘switch’ and ‘interconnect’ are used to describe a module which connects multiple devices which use the same protocol. The devices can create protocol transactions, receive protocol transactions, or both. The module may route transactions based on a specified set of rules, or broadcast them to all devices based on the protocol.
+A ‘bridge’ is typically a module which translates from one transaction type to another. It may also have several connected devices with unique protocols.
+You will need to refer to the device specification to determine exactly what the function is.
+================================================================================
+
+================================================================================
+TOPIC #13 [ID: 51710] : Detection of Interrupt in Monitor
+Author: AGS91 | Created: 2026-07-29T14:29:19.021Z | Bumped: 2026-08-28T10:07:52.082Z | Posts: 8
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+Intention is to detect interrupt assertion within Monitor. Here is my simple attempt: edalink
+I tested the code across the 3 main tools
+On tool1 I observe Null pointer error from line 37 without observing $display messages on line 29 and 33
+On tool2 I observe a Fatal message (Null instance encountered ..) from line 33
+None of the three $display messages are observed ( although 2 of them occur before line 33 )
+On tool3 I observe compilation error “Expressions of real, time, string and event types, as well as dynamic. SystemVerilog types, are not allowed in sampled system functions.”
+Interestingly on commenting line 28 ::
+On tool1 there is no error. Logically it doesn’t make sense why commenting line 28 makes the code work
+On tool2 and tool3 the same respective output is observed
+My questions are as follows
+(Q1) Is there an issue with line 28 ? I added it to ensure get is successful. Without it the get would still be successful as B2 executes after B1 from source code perspective
+(Q2) Can the clocking event (2nd argument) of Sampled value function reference a signal via virtual interface ?
+(Q3) Can the expression (1st argument) of Sampled value function reference a signal via virtual interface ?
+(Q4) Using +define+VINTF1
+Can the clocking event within SVA reference virtual interface signal ? Or is there is a possibility of null pointer error ?
+(Q5) Using +define+VINTF2
+Can the sequence_expresssion within SVA reference virtual interface signal ? As the virtual interface has been fetched, the signal intr would be sampled after the clocking event I believe there should be no null pointer error
+(Q6) Does the LRM restrict referencing virtual interface signals ( as clocking event / signal in sequence_expression / property_expression ) within a concurrent assertion ?
+Thanks in Advance
+AGIS
+--------------------------------------------------------------------------------
+REPLIES (7):
+
+--- Reply #1 by AGS91 at 2026-08-04T13:24:02.394Z ---
+Any suggestions would be appreciated
+
+--- Reply #2 by dave_59 at 2026-08-04T15:52:46.469Z ---
+SystemVerilog prohibits referencing interface members through a virtual interface handle in any context other than procedural code. Sampled value functions like $rose and concurrent assertions generate processes behind the scenes that sample values at time zero and at clocking events outside of procedural code.
+The clocking event itself is not sampled so that should be OK. But I will check that out first.
+
+--- Reply #3 by AGS91 at 2026-08-25T16:42:39.147Z ---
+Apologies for the late response Dave.
+
+
+
+ dave_59:
+
+SystemVerilog prohibits referencing interface members through a virtual interface handle in any context other than procedural code.
+
+
+1800-LRM , 25.9 says
+all the components of the underlying interface instance are directly available 
+to the virtual interface via the dot notation.
+These components can only be used in procedural statements; they cannot be used 
+in continuous assignments or sensitivity lists. 
+
+Hence we observe compilation error for (Q4),(Q5) and (Q6)
+
+
+
+ dave_59:
+
+Sampled value functions like $rose and concurrent assertions generate processes behind the scenes that sample values at time zero and at clocking events outside of procedural code.
+
+
+I was going through LRM Section 16.9.3 but couldn’t find the above quote i.e these functions sample values at time zero. Am I missing something ?
+It’s interesting that although the interface members are referenced via virtual interface in procedural code, tools throw null pointer error at run-time
+(even though the uvm_config_db::get was done prior to referencing it)
+(Q7) Is there a possible alternative to wait(vif_intf.intr == 1) to check for assertion of interrupt signal in Monitor ?
+
+--- Reply #4 by dave_59 at 2026-08-25T20:21:24.539Z ---
+It’s a little convoluted.
+Section 16.9.3 says
+
+When these functions are called at or before the simulation time step in which the first clocking event occurs, the results are computed by comparing the sampled value of the expression with its default sampled value (see 16.5.1).
+
+Then 16.5.1 says
+
+The default sampled value of a static variable is the value assigned in its declaration, or, in the absence of such an assignment, it is the default (or uninitialized) value of the corresponding type (see 6.8, Table 6-7).
+
+And then 6.8 says
+
+Setting the initial value of a static variable as part of the variable declaration (including static class members) shall occur before any initial or always procedures are started
+
+This effectively means these sampled value functions need the value they have before any procedural code starts executing at time 0.
+
+--- Reply #5 by LFT at 2026-08-26T14:30:02.621Z ---
+Dave,
+Three quick questions
+(1)
+
+
+
+ dave_59:
+
+The clocking event itself is not sampled so that should be OK. But I will check that out first.
+
+
+Does this mean that a clocking event in sampled value function could be referenced via virtual interface provided it’s done in a procedural code ?
+(2) Concurrent assertion a1 would be illegal as the clocking event accesses virtual interface signal outside a procedural block. Should it be a compilation error or run-time error ?
+(3) Consider the following concurrent assertion statements
+(a) sva1:assert property( @(posedge clk) a ##1 b);
+
+(b) always@(posedge clk) begin
+        sva2:assert property(a ##1 b);
+    end
+
+As per Section 25.9 of LRM, accessing virtual interface signals would be legal in (b)
+Since (a) and (b) are equivalent, shouldn’t it be legal in (a) as well ?
+
+--- Reply #6 by dave_59 at 2026-08-26T20:19:01.484Z ---
+The link to your EDAPlayground example is no longer accessible. It would be better to paste it directly into the post.
+In (b), it’s still a concurrent assertion embedded inside procedural code, and not a procedural statement. So both are still illegal to reference virtual interface signals.
+
+--- Reply #7 by LFT at 2026-08-28T10:07:52.082Z ---
+dave_59:
+
+The link to your EDAPlayground example is no longer accessible. It would be better to paste it directly into the post.
+
+
+Have updated the post with the constraints
+Wanted to confirm the following
+
+
+
+ dave_59:
+
+The clocking event itself is not sampled so that should be OK. But I will check that out first.
+
+
+(1) Does this mean that a clocking event in a sampled value function could be referenced via virtual interface provided it’s done in a procedural statement ?
+(2) In the edalink mentioned at the top, concurrent assertion a1 is illegal since we access a virtual interface signal outside a procedural block.
+As per LRM should it be considered a compilation error or run-time error ?
+Currently two tools throw a run-time null pointer error i.e run-time error whereas one tool throws a compilation error
+================================================================================
+
+================================================================================
+TOPIC #14 [ID: 37823] : Preparing test plan for SPI protocol in UVM
+Author: BachanShyamP | Created: 2020-07-09T09:20:11.000Z | Bumped: 2026-08-13T19:08:54.829Z | Posts: 6
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+HI,
+I am doing the verification of SPI protocol using UVM.
+So how can i make a test plan for the same?
+--------------------------------------------------------------------------------
+REPLIES (5):
+
+--- Reply #1 by chr_sue at 2020-07-09T14:19:56.000Z ---
+In reply to east_wind:
+A testplan is always based on the verification requirements you have to specify for verifying.
+And it is tool-dependent. Because you have to read in to your simulator. The main simulator provider using different formats for this.
+You can download a testplan for I2C from my webpage
+  
+      
+
+      christoph-suehnel.de
+  
+
+  
+    
+
+Dr. Christoph Suehnel - Verification Planning & Management
+
+  Neue Seite
+
+
+  
+
+  
+    
+    
+  
+
+  
+
+
+This gives you a flavor how it should lokk like for the SPI. I2C is a lot more complicated.
+
+--- Reply #2 by atamle at 2026-08-11T16:45:43.627Z ---
+Hi Dr. Suehnel, The link to your Verification Planning & Management is broken. Would you please send us a new link or send me a copy? Thank you.
+
+--- Reply #3 by pa1_narala at 2026-08-11T17:32:24.310Z ---
+Unable to open
+
+--- Reply #4 by chr_sue at 2026-08-13T12:25:54.153Z ---
+My website is again available now.
+
+--- Reply #5 by atamle at 2026-08-13T19:08:54.829Z ---
+Thank you! Very helpful and useful info. Much appreciated.
+================================================================================
+
+================================================================================
+TOPIC #15 [ID: 39902] : Merits of Overriding Sequence Items
+Author: James.Kolar | Created: 2021-12-21T00:17:42.000Z | Bumped: 2026-08-03T14:55:38.216Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+I am going to strongly disagree with the statement “Therefore, from a practical point of view, sequence_items are unlikely to be overridden” (Cookbook Section UVM/Sequences/Overrides).
+I am going to provide two examples of how type overrides with sequence items has been very useful for me.
+While I do want to test the entire state-space of possible stimulus, I often want to narrow my stimulus for certain tests. By heavily constraining my stimulus I am actually able to hit certain scenarios. An example could only running maximum or minimum size packets for an extended duration. If I need to run a large number of these packets in a row to create a scenario, then this is unlikely to happen without additional constraints. I could do this by writing a new sequence that constructs these derived sequence items that have additional constraints, but that seems like it would be slightly more code and more files than extending a sequence_item and using a type_id_override().
+My other example is that I often find bugs and sometimes I am not responsible for fixing them. However, I still want to find other bugs while that bug is being fixed. Therefore I create a test that exhibits the bug and document it. However, I then introduce new constraints in a derived class to mask the bug and have all my other tests use type overrides to enforce these constraints. This allows me to temporarily mask known issues while I hunt for more bugs or work on adding more coverage.
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by dave_59 at 2021-12-21T02:39:31.000Z ---
+In reply to James.Kolar:
+I agree with your disagreement. They were probably only thinking about overrides that added new   class member variables or methods. Overriding class constraints is a very common factory override for any class with random variables.
+
+--- Reply #2 by AD at 2026-07-31T08:04:08.517Z ---
+Hey Dave,
+I also agree with your point but I didn’t understand you line,
+“They were probably only thinking about overrides that added new class member variables or methods.”
+Can you elaborate more about it.
+Thanks
+
+--- Reply #3 by dave_59 at 2026-08-03T14:55:38.216Z ---
+That section of the cookbook explains how the sequence-to-driver communication is specifically designed for a particular sequence_item. It wouldn’t make sense to add a new variable to a sequence_item unless the driver is also extended to read that variable. However, there are numerous cases where extending a sequence item is beneficial. Many people create base sequence items and extend them for use with a driver, while also extending them differently for use with a monitor by adding responses. Of course, the cases raised by the original poster, which involve extending the sequence item to add constraints, are a common practice. Therefore, the cookbook statement is clearly misleading.
+================================================================================
+
+================================================================================
+TOPIC #16 [ID: 51708] : Question on UVM Phases
+Author: Praveen_Kakodra | Created: 2026-07-24T12:17:14.621Z | Bumped: 2026-07-24T13:46:53.142Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+I have my USB UVC Agent declared as
+class usb_agent #(int XCVR_SELECT_WIDTH) extends vc_agent;
+   ........
+// Inherits 'm_sequencer' which is of Type Parameter of parent class of vc_agent
+   virtual task run_phase(uvm_phase phase);
+     super.run_phase(phase);
+     if( cfg.agent_cfg.is_active && cfg.agent_cfg.start_default_seq) begin
+       fork
+         if( cfg.agent_cfg.agent_type inside { DEV,OTG_A_DEV,OTG_B_DEV } begin
+            dev_seq dev_seq_h = dev_seq::type_id::create("dev_seq");
+            dev_seq.start(m_sequencer);
+         end
+       join
+     end
+   endtask
+endclass
+
+I noticed that there is no objection raised within run_phase
+Within class vc_agent and it’s super classes ( which is extended uvm_component ) I observe that there is no definition of run_phase.
+Task run_phase within uvm_component calls another task run() which simply returns
+Hence call to super.run_phase(phase) essentially calls run_phase defined in class uvm_component which doesn’t raise & drop an objection
+Our test class overrides the pre_reset_phase , reset_phase and main_phase where it raises and drops an objection
+As run_phase executes in parallel with sub-phases, does the sequence started in usb_agent’s run_phase continue execution till the objection is dropped in test’s main_phase ?
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by cgales at 2026-07-24T13:46:53.142Z ---
+The run_phase() will execute in parallel with all of the other run-phases, so the dev_seq should run during the entire run-phase of your simulation.
+The differing use of phases can lead to unpredictable behavior, especially when you bring in VIP from various sources that use phases in other ways than expected. This is why it is strongly recommended to use only the run_phase() and utilize sequences as your phasing (i.e. pre_reset_sequence, reset_sequence, main_sequence, etc.)
+================================================================================
+
+================================================================================
+TOPIC #17 [ID: 29373] : What is the difference between uvm_config_db and uvm_resource_db?
+Author: rajasravan | Created: 2014-04-18T10:10:43.000Z | Bumped: 2026-07-21T14:52:03.963Z | Posts: 23
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi
+I would like to know What is the difference between uvm_config_db and uvm_resource_db ?
+Please let me know the difference between the the two config_db’s, when it can be used and how it is used with an example?
+I went through so many articles but it is vague and unclear.can some one point me with the expamples and usage ?
+-Thanks,
+-Raja.
+--------------------------------------------------------------------------------
+REPLIES (19):
+
+--- Reply #1 by tfitz at 2014-04-18T12:59:05.000Z ---
+Don’t worry about the differences, and just use uvm_config_db.
+uvm_config_db is a convenience layer built on top of uvm_resource_db, but that convenience is very important. In particular, uvm_resource_db uses a “last write wins” approach. The uvm_config_db, on the other hand, looks at where things are in the hierarchy up through end_of_elaboration, so “parent wins.” Once you start start_of_simulation, the config_db becomes “last write wins.”
+
+--- Reply #2 by rajasravan at 2014-04-21T04:17:10.000Z ---
+In reply to tfitz:
+Hi tfitz,
+Thanks alot for the reply.
+It would be really helpful if you can give explaination on this last write approach/last write wins.
+Please can you give with an exmaple if possible to see the difference.
+This would be really helpful.
+-Thanks,
+-Sravan
+
+--- Reply #3 by rajasravan at 2014-04-22T07:49:35.000Z ---
+In reply to rajasravan:
+Can you please comment on this.
+-Thanks,
+-Sravan.
+
+--- Reply #4 by tfitz at 2014-04-22T12:59:22.000Z ---
+In reply to rajasravan:
+The build-time behavior of uvm_config_db is explained in the Advanced UVM video course. If a test and an env both set a config_db value during build-time, the test’s value will be used because it is higher in the component hierarchy. This is what you would expect.
+However, using the uvm_resource_db, since build_phase() is called top-down, the env’s build_phase is called after the test’s, so the env value would overwrite the test value.
+Once start_of_simulation_phase is reached, a write using either the config_db or the resource_db will overwrite whatever is currently in the database for that specific parameter. This is what we mean by “last write wins.”
+
+--- Reply #5 by rajasravan at 2014-04-23T09:52:53.000Z ---
+In reply to tfitz:
+Hi,
+This is really helpful to my understading.And i can see the main difference betwee uvm_config_db and uvm_resource_db is “When you want to share object and access it from different location without using the hierarchy you can use uvm_resource_db.” Can you comment on this?
+uvm_config_db :: set function parameter
+static function void set( 	uvm_component  	cntxt,
+string  	inst_name,
+string  	field_name,
+T  	value 	)
+uvm_resource_db :: set function parameter
+static function void set( 	input  	string  	scope, 	   	
+input  	string  	name, 	   	
+T  	val, 	   	
+input  	uvm_object  	accessor 	 =  	null 	)
+There is no instance name in resource_db.
+-Thanks,
+-Sravan.
+
+--- Reply #6 by tfitz at 2014-04-23T13:00:53.000Z ---
+In reply to rajasravan:
+Using the resource_db requires that the scope (arbitrary string) for the set and get match. For trivial environments this isn’t difficult. However, for complex environments, including IP from different sources, it’s more difficult to manage. That, along with some other non-intuitive behaviors of the resource_db is why you should always just use the config_db.
+I have never written a testbench that required using the resource_db and I suggest you do the same.
+Good luck,
+-Tom
+
+--- Reply #7 by rajasravan at 2014-04-24T08:49:39.000Z ---
+In reply to tfitz:
+Thanks alot Tom.For the valuable & informative reply.
+-Thanks,
+-Sravan.
+
+--- Reply #8 by Sagar_Shah at 2016-05-01T12:03:45.000Z ---
+In reply to tfitz:
+Hi Tom,
+I tried one example with uvm_resource_db.
+But it is not working as you explained for uvm_resource_db during build_phase.
+In uvm_resource_db also top hierarchy win during build_phase.
+class my_agent extends uvm_agent;
+  `uvm_component_utils (my_agent)
+  int var1;
+  function new (string name = "my_agent", uvm_component parent = null);
+   super.new(name, parent);
+  endfunction
+  function void build_phase (uvm_phase phase);
+    super.build_phase (phase);
+    if(!uvm_resource_db #(int)::read_by_name("", "var1", var1, this))
+      `uvm_error ("GET-FAIL", "not able to get value")
+    else 
+      `uvm_info ("GET-PASS", $sformatf("var1=%0d", var1), UVM_NONE)
+  endfunction
+endclass
+
+/////////////////
+class my_env extends uvm_env;
+  `uvm_component_utils (my_env)
+  int var1;
+  my_agent agnt;
+  function new (string name = "my_env", uvm_component parent = null);
+    super.new(name, parent);
+  endfunction
+  function void build_phase (uvm_phase phase);
+    super.build_phase (phase);
+    agnt = my_agent::type_id::create("angt", this);
+    var1 = 60;
+    uvm_resource_db #(int)::set("*", "var1", var1, this);
+    `uvm_info ("SET", $sformatf("From ENV=%0d", var1), UVM_NONE)
+  endfunction
+endclass
+
+/////////////////
+class my_test extends uvm_test;
+  `uvm_component_utils (my_test)
+  int var1;
+  my_env env;
+  function new (string name = "my_test", uvm_component parent = null);
+    super.new(name, parent);
+  endfunction
+  function void build_phase (uvm_phase phase);
+    super.build_phase (phase);
+    env = my_env::type_id::create("env", this);
+    var1 = 70;
+    uvm_resource_db #(int)::set("*", "var1", var1, this);
+    `uvm_info ("SET", $sformatf("From TEST=%0d", var1), UVM_NONE) 
+  endfunction
+  task run_phase (uvm_phase phase);
+    phase.raise_objection(this);
+    #500;
+    phase.drop_objection(this);
+  endtask
+endclass
+
+///////////////
+module top();
+  initial begin
+    run_test("my_test");
+  end
+endmodule
+
+//Output:
+//UVM_INFO @ 0: reporter [RNTST] Running test my_test...
+//UVM_INFO testbench.sv(15) @ 0: uvm_test_top [SET] From TEST=70
+//UVM_INFO design.sv(36) @ 0: uvm_test_top.env [SET] From ENV=60
+//UVM_INFO design.sv(14) @ 0: uvm_test_top.env.angt [GET-PASS] var1=70
+//UVM_INFO /apps/vcsmx/etc/uvm-1.1/src/base/uvm_objection.svh(1267) @ 500: reporter [TEST_DONE] 'run' phase is ready to proceed to the 'extract' phase
+
+
+Here I set value 70 from test, 60 from env, and getting value 70 in agent instead of 60.
+Can you please explain what is wrong I am doing here?
+
+--- Reply #9 by dhserfer at 2016-05-02T00:13:11.000Z ---
+In reply to Sagar Shah:
+Your code appears to be working correctly.  ‘my_test’ is above ‘my_env’.  Also, his suggestion was to NOT use the resource_db.
+From the file resource.svh:
+// Multiple resources that have the same name are stored in a queue.
+// Each resource is pushed into a queue with the first one at the front
+// of the queue and each subsequent one behind it.  The same happens for
+// multiple resources that have the same type.  The resource queues are
+// searched front to back, so those placed earlier in the queue have
+// precedence over those placed later.
+
+--- Reply #10 by chr_sue at 2016-05-02T06:23:36.000Z ---
+In reply to dhserfer:
+The configuration database is implemented on top of the resource database. The resource database
+is a pool of name-value pairs each associated with a scope string.
+The configuration database associates this scope string with full hierarchical names in the component hierarchy such that entriesin the configuration database, but not the resource database, are tied to the component hierarchy.
+
+--- Reply #11 by dhserfer at 2016-05-02T11:10:10.000Z ---
+In reply to chr_sue:
+For the code that is provided, each of the uvm_resource_db::set functions are identical and performed in the build phases of the my_test and my_env components.  If the ‘names’ are the same, don’t they utilize the same queue (and my_test build_phase ‘sets’ the head of the queue)?
+
+--- Reply #12 by chr_sue at 2016-05-02T11:39:10.000Z ---
+In reply to dhserfer:
+The resource_db commands have only two lookup arguments, the scope and the name. Both are strings.
+The accessor, last argument, is used only for auditting. You do not have to provide an actual argument, because it has a default value.
+The config_db commands have 3 lookup arguments, the contxt, the scope and the name. The contxt is not a simple string, it is of type uvm_component. The cntxt and name argument give you more flexibility when defining what you want to set or get. Typical arguments for the contxt are ‘this’, indicating the lookup-path is a relative path from the component where the command was issued and ‘null’ indicating there is nothing above, meaning an absolute path.
+
+--- Reply #13 by peter1 at 2018-09-12T23:56:56.000Z ---
+In reply to chr_sue:
+Hi chr, what it the meaning of the scope in resouce_db?
+why do we need the scope?
+Thanks!
+
+--- Reply #14 by skumarts at 2024-07-23T07:43:55.869Z ---
+@tfitz
+I am facing a similar Problem in my environment what is being discussed here, but i am not able to understand this behavior.
+I am setting a object in the  base_test.sv in the build_phase  using
+uvm_resource_db::set
+uvm_resource_db #(uvm_object)::set(scope, “my_agent”, my_agent, this);
+in my extended base_test    my_base_test extends base_test.sv
+i am setting the same instance name in the build_phase.
+uvm_config_db #(uvm_object)::set(this, “my_env”, “my_agent”, this.new_agent);
+it is never taking the instance new_agent which i am setting from the my_base_test.sv in build phase.
+i also tried to do this in the start_of_simulation phase in my_base_test.sv
+// func: start_of_simulation_phase
+virtual function void start_of_simulation_phase(uvm_phase phase);
+super.start_of_simulation_phase(phase);
+`uvm_info(“mai_base_test”, “Setting arf_agent config from start_of_simulation”, UVM_NONE);
+uvm_config_db #(uvm_object)::set(this, “my_env”, “arf_agent”, this.new_agent);
+endfunction : start_of_simulation_phase
+its not picking new_agent still,
+uvm_resource_db setting in base_test is overriding all other settings , even last write is not taking affect here.
+The way only i got this working was using uvm_config_db::set in the base_test.sv but this base_test.sv is not managed be my, i am trying just to re-use form other tb.
+it seems that if someone is using a uvm_resource_db setting in the base_test.sv,
+we are not able to override this in the extended my_base_test.sv
+i didn’t find any description related resolving multiple uvm_resource_db setting or uvm_config_db setting.
+Thanks for your Help
+
+--- Reply #15 by chr_sue at 2024-07-23T09:18:10.823Z ---
+I’m trying to understand why you are passing uvm_components through your UVM testbench. It does not make really sense in my eyes. uvm_componets will be created at runtime 0. Then they exist until the end of the simulation. In your uvm_config_db calls you are using as type uvm_object, which is not correct. It should be uvm_component. You should clean-up your code and restart again .
+
+--- Reply #16 by skumarts at 2024-07-23T10:45:44.136Z ---
+my_agent is a class, and class get created only when we create them, so they are objects,  if i Replace uvm_config_db #(uvm_object)::   with uvm_config_db #(uvm_Component)::
+Nothing is getting passed to the Destination get function, its a nul_object.
+
+--- Reply #17 by chr_sue at 2024-07-23T11:22:11.521Z ---
+All classes belonging to the testbench topology are bsased on uvm_components. They will be created during buil_phase automatically. They are dynamic but not transient objects. All extensions from uvm_object are transient objects. They are created at any time and will disappear after they are processed/finished.
+
+--- Reply #18 by rawrakesh at 2025-04-24T21:37:15.098Z ---
+This article can help: Difference between uvm_config_db and uvm_resource_db? - THETECHIEBLOG
+
+--- Reply #19 by Amoch at 2025-04-28T16:47:20.191Z ---
+I find the resource db very handy if I want to pass something to a sequence.
+Or you can do the normal “to sequence” UVM gymnastics and go through a component with the config_db to a UVM component with hierarchy.
+================================================================================
+
+================================================================================
+TOPIC #18 [ID: 51703] : Why create method is not part of uvm_object_wrapper?
+Author: HepoH | Created: 2026-07-06T14:14:02.112Z | Bumped: 2026-07-10T19:14:34.004Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+uvm_object_registry and uvm_component_registry implements following methods [IEEE 1800.2-2020, section 8.2.4 and 8.2.3 respectivelly]:
+
+create_object/component
+get_type_name
+get
+create
+set_type_override
+set_inst_override
+initialize
+
+However, only create_* and get_type_name are part of uvm_object_wrapper, which serves as the abstract interface for factory registries [8.3.2].
+My question is: what is the architectural reason for this separation?
+Are the remaining methods intended to be a syntactic sugar over the global uvm_factory singleton, allowing usage such as:
+base_trans::type_id::set_type_override(child_trans::get_type());
+
+instead of directly accessing the factory:
+uvm_factory::get().set_type_override_by_type(
+  base_trans::get_type(),
+  child_trans::get_type()
+);
+
+Or is there a deeper design reason why these methods are not part of uvm_object_wrapper despite being implemented by all registry classes?
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by dave_59 at 2026-07-09T17:25:58.132Z ---
+uvm_object_wrapper is an abstract base class with no parameters. It contains the virtual methods create_* and get_type_name. The other methods are static and use the parameterized extended class type. The create() method must have a return type that matches the parameter type.
+
+--- Reply #2 by HepoH at 2026-07-10T08:44:33.030Z ---
+I see it now, thank you very much!
+Indeed, the get and create methods can’t be placed in uvm_object_wrapper because they depend on the type parameter T. At first, I didn’t understand what the issue was with the static methods set_type_override and set_inst_override, since their prototypes don’t depend on T and static method can be placed in an abstract class. Then I realized that static methods cannot be virtual, so they cannot be overridden by derived classes.
+So, is this more of a technical limitation rather than an intentional design choice?
+
+--- Reply #3 by dave_59 at 2026-07-10T19:14:34.004Z ---
+Of course, I would say it’s by design of the language, not a limitation.
+================================================================================
+
+================================================================================
+TOPIC #19 [ID: 51705] : DisplayPort Protocol (version 1.4)
+Author: RonakPatel123 | Created: 2026-07-07T16:26:20.112Z | Bumped: 2026-07-07T16:26:20.265Z | Posts: 1
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+I have a question regarding Inter-Lane Skew Insertion in DPTX.
+In the attached Figure 2-8 (Section 2.2.1), the spec states that data is “inter-lane skewed before it is handed over to the PHY Layer,” which makes it appear to be a Link Layer function.
+Screenshot 2026-07-07 154053906×901 120 KB
+However, in the attached Figure 3-23 (Section 3.5.1.5.1), Inter-Lane Skew Insertion is shown after the FEC encoder and is explicitly placed within the Main-Link PHY Layer Logical Sub-block, suggesting it is a PHY Layer function.
+Screenshot 2026-07-07 1541481064×758 132 KB
+Therefore, I am confused about the intended architectural partitioning for a practical VIP implementation, should the inter-lane skew be applied:
+
+Before the Link/PHY boundary (In Link Layer), or
+Within the PHY data path (for example, after FEC encoding and before serialization)?
+--------------------------------------------------------------------------------
+REPLIES (0):
+================================================================================
+
+================================================================================
+TOPIC #20 [ID: 51693] : How do we integrate the toolchain with uvm?
+Author: DILEEEP_KUMAR_SARAGADAM | Created: 2026-06-29T12:44:31.477Z | Bumped: 2026-07-02T13:51:33.766Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+hey , i was just wondering to develop a tool-chain for an soc
+but i need to integrate it with uvm tb , how do we do that and if i need to reuse that software part then what to do ?
+i hope for some answer.
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by dave_59 at 2026-07-02T13:51:33.766Z ---
+This question requires more details. Could you please provide more specific information about what you mean by “tool chain”?
+================================================================================
+
+================================================================================
+TOPIC #21 [ID: 51694] : What are the biggest pain points in simulation debugging for DV engineers?
+Author: Aditi03 | Created: 2026-06-29T12:44:46.854Z | Bumped: 2026-07-01T11:59:32.542Z | Posts: 3
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone! I’m a BE ECE student currently learning Design Verification. I’m doing some research on real workflow pain points that DV engineers face — specifically around simulation debugging and waveform analysis.
+Would love to hear from experienced engineers:
+
+
+What slows you down the most during debug?
+
+
+Is tracing failures in waveforms a major time sink?
+
+
+Not selling anything — purely trying to understand real workflows. Any insight is hugely appreciated!
+--------------------------------------------------------------------------------
+REPLIES (2):
+
+--- Reply #1 by AVAQ_Semiconductor at 2026-07-01T06:55:39.607Z ---
+From my experience, the biggest challenge is usually not finding where the failure occurred, but understanding why it happened.
+On a modern SoC verification environment, a single regression failure may involve UVM sequences, scoreboards, assertions, protocol checkers, multiple agents, and millions of waveform transitions. Manually correlating simulator logs, waveforms, and transaction traces can consume far more time than the simulation itself.
+Another pain point is reproducing intermittent failures. Bugs caused by randomization, race conditions, timing dependencies, or seed-specific behavior are often difficult to reproduce consistently, making root-cause analysis much slower.
+I also think better observability is more valuable than simply generating more debug data. Well-written assertions, transaction-level logging, meaningful error messages, and deterministic testbenches can reduce debug time significantly. In my experience, investing in a self-checking environment with good traceability pays off much more than spending hours scrolling through waveforms after every failure.
+Ultimately, simulation speed is important, but debug productivity is what has the biggest impact on verification schedules.
+
+--- Reply #2 by Aditi03 at 2026-07-01T11:59:32.542Z ---
+This is incredibly insightful — thank you! The point about correlating logs, waveforms, and transaction traces manually resonating strongly. Would you say that if a tool could automatically correlate these sources and explain the root cause in plain English, that would genuinely save time even for experienced engineers?
+================================================================================
+
+================================================================================
+TOPIC #22 [ID: 51696] : Monitor-to-Scoreboard Connection
+Author: Hey_Verif26 | Created: 2026-06-30T08:04:05.518Z | Bumped: 2026-07-01T09:59:58.156Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone,
+I’m trying to understand the architectural reason behind the recommended Monitor-to-Scoreboard connection in UVM.
+Case 1 (Directly from Monitor to Scoreboard)
+// env::connect_phase()
+agt.mon.ap.connect(scb.analysis_export);
+
+Case 2 (Through Agent)
+The Agent exposes its own analysis port, and the Environment connects the Agent to the Scoreboard.
+class agent extends uvm_agent;
+  uvm_analysis_port #(seq_item) ap;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    ap = new("ap", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    // Monitor forwards transactions to the agent's analysis port
+    // (implementation omitted for simplicity)
+  endfunction
+endclass
+
+// env::connect_phase()
+agt.ap.connect(scb.analysis_export);
+
+So the transaction flow becomes:
+
+
+Monitor → Agent → Scoreboard
+
+
+instead of Monitor → Scoreboard
+
+
+My questions are:
+
+
+Why is the Agent-level connection considered the recommended UVM architecture?
+
+
+What are the architectural advantages over connecting the Monitor directly to the Scoreboard?
+
+
+Is the main reason encapsulation, loose coupling, reusability, or protocol abstraction?
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by cgales at 2026-06-30T15:17:57.227Z ---
+A scoreboard is typically design specific, not agent specific. This is why it is integrated at the environment level and not the agent level.
+There may be an agent-specific scoreboard, but if that is the case, then it will be created and connected by the agent and not the monitor.
+
+--- Reply #2 by graeme_jessiman at 2026-06-30T20:07:31.056Z ---
+A monitor is a sub-component of the agent (along with other sub-components such as driver, sequencer, etc)
+So it’s typical that the monitor has an analysis port which transactions get sent out on.
+Then there is usually code within the agent (in the connect phase) to connect the monitor analysis port up to an agent level analysis port.
+Within your environment you will instantiate the agent (not the monitor) plus other TLM components such as scoreboards, predictors, etc.  So then you will see in the environment connect phase that you make a connection from the agent analysis port to an analysis export on either a predictor or scoreboard.
+
+--- Reply #3 by Hey_Verif26 at 2026-07-01T09:59:58.156Z ---
+Thanks for the replies — that explains how it works, but I’m still trying to understand why it’s better, not just “cleaner.”
+I get that env only has an agent handle, not a monitor handle. But SystemVerilog still lets me write agt.mon.ap.connect(...) and it works fine — so what actually breaks if I do that?
+My best guess: if the same agent is reused in multiple environments, connecting through agt.ap means monitor-wiring logic lives in one place (inside the agent). Connecting agt.mon.ap directly means that wiring gets copy-pasted into every environment, so any internal change to the monitor means fixing it in N places instead of one.
+Is that the real reason, or is there something else (active/passive agent, factory override, elaboration order) that actually breaks even in a single environment?
+================================================================================
+
+================================================================================
+TOPIC #23 [ID: 31321] : Difference between put_port and get_port?
+Author: ashutosh1122 | Created: 2015-12-16T09:48:10.000Z | Bumped: 2026-06-30T05:05:23.830Z | Posts: 9
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Can anyone please help me in understanding exact difference between put_port and get_port from usage and definition point of view.
+Thanks
+--------------------------------------------------------------------------------
+REPLIES (8):
+
+--- Reply #1 by kapil_24 at 2015-12-16T10:18:50.000Z ---
+In reply to ashutosh1122:
+In UVM, PORT  is always an initiator of a request. It has a symbol of Square.
+Export is always a provider of that request.
+So put_port() method is used to send data/transaction to a consumer which has corresponding export.
+Similarly, get_port() method is used to fetch some data/transaction from the consumer which has the corresponding Export (symbolizes with circle).
+For more details and expample you can refer section 2.3.1.3 of UVM Verification Methodology 1.2 User’s Guide’2015.
+Hope it will help you.
+
+--- Reply #2 by sa5691 at 2015-12-16T10:35:10.000Z ---
+In reply to kapil_kumar@mentor.com:
+“Absolutely helpful”!!
+
+--- Reply #3 by ashutosh1122 at 2015-12-16T12:15:02.000Z ---
+okies…so is it like we will be having separate physical connections for put_port and get_port?
+producer                  |         consumer
+uvm_put_port #(t) put_port;    |        uvm_put_export #(t,consumer) put_export;
+uvm_get_export #(t) get_export         uvm_get_port #(t) get_port;
+|
+|
+|
+
+--- Reply #4 by kapil_24 at 2015-12-16T13:22:26.000Z ---
+In reply to ashutosh1122:
+Yes We need separate connections for Port to Export.
+
+--- Reply #5 by ashutosh1122 at 2015-12-17T05:15:00.000Z ---
+Thanks a lot :)
+
+--- Reply #6 by trushali at 2026-06-24T10:10:02.335Z ---
+I understand that put_port() is used to send a transaction to a provider and get_port() is used to retrieve a transaction from a provider. However, I’m still trying to understand the practical usage of each.
+Could you please explain:
+
+
+In what situations would we choose a put_port over a get_port?
+
+
+Can you provide some real-world UVM/testbench examples where a component sends data using put() versus fetches data using get()?
+
+
+From a design perspective, how do we decide whether the producer should push the data (put) or the consumer should pull the data (get)?
+
+
+Also, someone can explain for peek.
+
+
+I’m looking for the intuition behind when each mechanism is preferred.
+
+--- Reply #7 by chr_sue at 2026-06-25T15:57:54.285Z ---
+I’d recommend to read the UVM Cookbook or attend a UVM training course.
+
+--- Reply #8 by trushali at 2026-06-30T05:05:23.830Z ---
+Thank you for the suggestion. I looked through the UVM Cookbook, but I couldn’t find much theoretical explanation about when to use put(), get(), and peek() from a design or practical perspective.
+I’m specifically trying to understand the intuition behind choosing one mechanism over another, along with some real-world UVM/testbench use cases.
+If anyone has insights or examples, I’d really appreciate the explanation.
+================================================================================
+
+================================================================================
+TOPIC #24 [ID: 51692] : Why are UVM User-Defined Phase Classes Implemented as Singletons?
+Author: Hey_Verif26 | Created: 2026-06-29T08:18:33.958Z | Bumped: 2026-06-29T15:43:12.475Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone,
+I’m trying to understand the design decision behind user-defined phases in UVM.
+Most examples (and the built-in UVM phases) implement the custom phase class as a Singleton, for example by using a static get() method and a protected new() constructor.
+My questions are:
+
+
+Why does UVM recommend or require user-defined phase classes to be Singleton?
+
+
+What would actually happen if I didn’t implement my custom phase as a Singleton and instead created phase objects using new()?
+
+
+Is there any issue with the phase scheduler, phase state, objections, or schedule graph if multiple instances of the same custom phase exist?
+
+
+Is the Singleton pattern a strict UVM requirement, or is it simply a recommended design pattern?
+
+
+I’m looking for the reasoning from the UVM architecture and source code perspective (IEEE 1800.2-2020), rather than just “because all examples do it.”
+I’d really appreciate explanations based on the UVM scheduler and uvm_domain/uvm_phase implementation.
+Thanks!
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by dave_59 at 2026-06-29T15:43:12.475Z ---
+It’s a requirement. This singleton pattern is used extensively throughout UVM because it establishes a single object that serves as a unique reference point for comparisons. In essence, you create an object whose handle represents an object type. This handle can be passed as an argument to methods and can be compared with other handles.
+If you didn’t use a singleton, you’d be wasting resources because there’s no logical reason to have multiple objects of the same type. Additionally, you’d have to create a unique identifier for each type, and you wouldn’t be able to verify its uniqueness until runtime.
+================================================================================
+
+================================================================================
+TOPIC #25 [ID: 51685] : Clarification regarding task run_phase() in UVM
+Author: vishnu1 | Created: 2026-06-25T21:41:16.706Z | Bumped: 2026-06-26T08:18:48.566Z | Posts: 2
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+In the configure_phase of my UVM testbench, I configure some registers and then spawn a monitoring thread using a forever loop inside a fork ... join_none block. This thread starts and waits for a specific design signal to go high. When  simulation transitions from the configure_phase to the main_phase, will this background thread stay active, or will it be killed automatically by the UVM phase controller?
+--------------------------------------------------------------------------------
+REPLIES (1):
+
+--- Reply #1 by dave_59 at 2026-06-26T08:18:48.566Z ---
+All processes created by a phase will get terminated when that phase ends. I highly recommend using only the run_phase() and then sequences to control the flow of your test bench.
+================================================================================
+
+================================================================================
+TOPIC #26 [ID: 51683] : implement a reference counter 
+Author: hasi | Created: 2026-06-23T17:56:22.046Z | Bumped: 2026-06-25T15:56:25.591Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi,
+I want to implement a reference counter for the duct in UVM environment. I do not know where to aadd this counter. This reference counter needs to track the dut counter whenever I call it, meaning I will be doing a comparison between them to see if they are in sync. I start the dut counter by sending a transaction to the driver, which will assert a start signal in the dut, so it can start.
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by chr_sue at 2026-06-24T14:44:47.109Z ---
+You can easily implement a uvm_component object as your reference model in the environment and feed ist with the retrieved transaction.
+
+--- Reply #2 by hasi at 2026-06-24T19:16:33.812Z ---
+Can I implement the counter using object? and then i can add a reference counter their. then how do i run the counter ? like do i have to use the same clk from dut counter clk or use $reslrime() to do the count computation.
+
+--- Reply #3 by chr_sue at 2026-06-25T15:56:25.591Z ---
+Your counter reference model belongs to the TB architecture. It should be of type uvm_component.
+You can feed it with tansactions.
+================================================================================
+
+================================================================================
+TOPIC #27 [ID: 51678] : Where to implement memory read/write operations in UVM agent when observing packet transactions in monitor?
+Author: nirbhaythakkar123 | Created: 2026-06-19T14:48:38.552Z | Bumped: 2026-06-23T18:20:19.221Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone!
+I’m working on a VIP where I’m observing packet transactions on my monitor, and I’m wondering if you folks could help me think through the architecture a bit.
+Here’s what I’ve got:
+
+
+A shared memory_model sitting in the environment (which is a uvm_object containing support for read and write operations)
+
+
+An agent with driver, monitor, and sequencer
+
+
+Monitor Samples the request from below layers
+
+
+Driver drives the response packet to the below layers
+
+
+Each packet has a request (READ/WRITE) with some address/data info
+
+
+The thing is, I need to update the memory based on what’s in these packets, but I’m not 100% sure where to actually call those memory operations.
+
+Where should I actually perform the memory read/write operations?
+
+Should I be doing this in the:
+
+
+Driver (before driving the response stimulus)?
+
+
+Monitor (after I observe the transaction)?
+
+
+Sequence (after fetching the packet from the monitor generating requests)?
+
+
+Somewhere else entirely?
+
+
+I want to make sure its reusable across multiple agents and doesn’t create weird coupling issues. What have you found works well?
+2. What about error injection – where does that live?
+If I want to inject errors (for response generation), is it better to:
+
+
+Handle it in the driver or monitor on whichever generates the response after the read and write operation?
+
+
+Create a separate error injection sequence?
+
+
+3. Is it okay to call the memory model directly from the monitor?
+I’m wondering if it’s fine to have the monitor just hold a reference to the environment’s memory_model and call it directly… or is that UVM-compatible?
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by yourcheers1 at 2026-06-20T19:21:42.359Z ---
+These are more of a architectural choices.
+As per UVM:
+
+monitor output is used to update the memory.
+Error injection is done in Driver.
+
+Regarding the flow; should it be in separate sequence or separate test, that you need think the bigger picture and decide.
+
+
+No. Monitor just monitors the transaction and broadcasts. Updates should be part of some other component in env or scoreboard.
+
+--- Reply #2 by nirbhaythakkar123 at 2026-06-22T06:24:34.963Z ---
+Thank you for the feedback. Based on UVM methodology and our use case, here’s something I would like to say:
+Since memory operations must be performed by agent components (not the environment or scoreboard directly), which are highly responsible for the same , I must use a driver or a monitor, or maybe a sequence, to call the memory model and perform the write/read operation.
+I must write/read via agent components as this is a slave/sink agent which will process the request and generate a response too.
+
+--- Reply #3 by MichaelP at 2026-06-23T18:20:19.221Z ---
+You’ve asked many good questions, and I hope I can contribute meaningfully to this thread.
+
+
+First, it would be helpful to both of us if you could provide a block diagram of your testbench components and the DUT you are verifying.
+
+
+A monitor is a passive component by nature and is instantiated inside a UVM agent. It should NOT perform any active processing (such as updating a shared memory model). It should only collect transactions from the interface signals (input/output ports of the DUT interface) according to the protocol/handshake applied to that interface (e.g., AXI, APB, AHB, I2C, UART, ready/valid, etc.), and broadcast them to all components subscribed to the monitor’s TLM analysis port.
+
+
+Regarding your question: “Where should I actually perform the memory read/write operations?” It would help if you could provide a sketch of your testbench. Does your VIP work in slave mode? If so, in some cases the slave VIP might include a memory model. In any case, I would avoid updating the memory model within the sequence or driver, as this may cause race conditions.
+
+
+Regarding your question: “What about error injection – where does that live?” You could add support for it in your reference model as another form of traffic, so that error scenarios are handled naturally without requiring new sequences or tests.
+================================================================================
+
+================================================================================
+TOPIC #28 [ID: 51668] : Using uvm field automation macros in uvm_object extended types
+Author: Praveen_Kakodra | Created: 2026-06-12T13:33:03.742Z | Bumped: 2026-06-23T15:17:52.985Z | Posts: 4
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi Moderators,
+In my legacy Tb the top_cfg class has the following code
+class top_cfg extends base_cfg; // where base_cfg extends uvm_object
+
+`uvm_object_utils_begin(top_cfg)
+ `uvm_field_object(dig_xyz_cfg,UVM_ALL_ON|UVM_REFERENCE);
+ `uvm_field_sarray_object(clkmon_cfg,UVM_ALL_ON|UVM_NO_PRINT|UVM_REFERENCE);
+`uvm_object_utils_end
+
+Generally I avoid defining these macros as I am aware that this forum discourages use of it.
+However, since the legacy Tb uses it, I need to use to set respective properties
+[Q1] Unlike component types where user would call super.build_phase() which internally calls apply_config_settings() how would UVM internally fetch these configurations in uvm_object class types ?
+[Q2] Assuming obj. of top_cfg is created in top_env, how could one set these properties from test using uvm_config_db ?
+uvm_config_db#(<arg1>)::set(this,"<arg2>", "<arg3>", <arg4>);
+
+I believe arg2 would be env.top_cfg_name (where top_cfg_name is name arg. during create)
+[Q3] What would arg1 and arg3 be ?
+Thanks in Advance
+--------------------------------------------------------------------------------
+REPLIES (3):
+
+--- Reply #1 by dave_59 at 2026-06-12T19:47:40.723Z ---
+The code generated by the UVM field macros for configuration is useless for non-component objects. You will need to manually set() and get() their values from the configuration database, just as if you had never used the field macros.
+arg1 would be the same type as the field variable.
+arg3 would be the name of the field variable.
+arg2 depends on the relative locations of the calls to the set() and get() methods. Additionally, it may influence whether you use this or null as the first argument.
+
+--- Reply #2 by Praveen_Kakodra at 2026-06-23T12:18:54.893Z ---
+Hi Dave,
+
+
+
+ dave_59:
+
+The code generated by the UVM field macros for configuration is useless for non-component objects.
+
+
+I am not clear on non-component objects.
+(1) Does the instantiation of top_cfg decide whether it’s component based object (when instantiated in component) or non-component based object (when instantiated in another object) ?
+(2) What’s the difference between `uvm_field_sarray_object and `uvm_field_object ?
+Thanks
+
+--- Reply #3 by dave_59 at 2026-06-23T15:17:52.985Z ---
+Since top_cfg is not an extension of uvm_component, it is a non-component object. Consequently, you cannot call the apply_config_settings() method, which is a method of uvm_component.
+ `uvm_field_sarray_object is used for a class member that is declared as a statically sized array of uvm_objects.
+================================================================================
+
+================================================================================
+TOPIC #29 [ID: 51671] : Using uvm_config_db::get(null, ...) Inside a UVM Sequence (uvm_object)
+Author: Hey_Verif26 | Created: 2026-06-15T05:28:58.833Z | Bumped: 2026-06-15T19:56:23.242Z | Posts: 3
+--------------------------------------------------------------------------------
+QUESTION (Post 1):
+Hi everyone,
+I was reading Sunburst papers and found the recommendation that config_db should generally not be used inside uvm_objects such as sequences and sequence_items because they are not part of the UVM component hierarchy.
+To understand this better, I did the following experiment.
+In my test, I set a value using:
+uvm_config_db#(int)::set(null, “*”, “a”, 10);
+Then inside a sequence (derived from uvm_sequence), I tried two different get() calls:
+
+Using this:    uvm_config_db#(int)::get(this, “”, “a”, B);
+
+This failed to compile because get() expects a uvm_component context, while a sequence is a uvm_object.
+
+Using null:  uvm_config_db#(int)::get(null, “”, “a”, B);
+
+This worked successfully, and the sequence was able to retrieve the value.
+From this observation, it seems that config_db access from a sequence is technically possible when using null as the context, even though using this is illegal.
+My question is:
+
+
+What are the advantages and disadvantages of using get(null, …) inside a sequence or other uvm_objects?
+
+
+Is this considered acceptable UVM methodology, or should it still be avoided?
+
+
+Does using null effectively turn the lookup into a global search and therefore reduce reusability/debuggability?
+
+
+In real projects, would you recommend using get(null, …) from sequences, or is it better to pass configuration data through sequence fields, resources, or some other mechanism?
+
+
+I would appreciate understanding not only whether this works, but also the methodology implications and best practices used in production UVM environments.
+Thanks!
+--------------------------------------------------------------------------------
+REPLIES (2):
+
+--- Reply #1 by cgales at 2026-06-15T15:20:03.776Z ---
+You can use ‘m_sequencer’ as the context instead of ‘this’ or ‘null’. This allows you to target a configuration object to a specific sequencer (which applies to all sequences running on the sequencer).
+
+--- Reply #2 by dave_59 at 2026-06-15T19:56:23.242Z ---
+You should limit the use of uvm_config_db or uvm_resource_db on objects that are repeatedly constructed, like sequences and transaction items. You can use a configuration object that has all the settings you need. Pass the handle of that configuration object into the sequence or item as they are constructed.
+================================================================================

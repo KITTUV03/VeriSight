@@ -1,0 +1,20 @@
+{
+  "id": 51722,
+  "title": "Difference between switch,crossbar and Interconnect",
+  "slug": "difference-between-switch-crossbar-and-interconnect",
+  "created_at": "2026-08-31T10:36:56.099Z",
+  "bumped_at": "2026-08-31T14:35:26.855Z",
+  "posts_count": 2,
+  "question_raw": "<p>Hello Everyone,</p>\n<p>Could anyone please explain the differences among crossbar,switch,interconnect and a bridge in a SoC ?And also When to choose each one of them?</p>",
+  "question_text": "Hello Everyone,\nCould anyone please explain the differences among crossbar,switch,interconnect and a bridge in a SoC ?And also When to choose each one of them?",
+  "author": "Maniteja",
+  "replies": [
+    {
+      "id": 157026,
+      "author": "cgales",
+      "raw": "<p>The terms ‘crossbar’, ‘switch’ and ‘interconnect’ are used to describe a module which connects multiple devices which use the same protocol. The devices can create protocol transactions, receive protocol transactions, or both. The module may route transactions based on a specified set of rules, or broadcast them to all devices based on the protocol.</p>\n<p>A ‘bridge’ is typically a module which translates from one transaction type to another. It may also have several connected devices with unique protocols.</p>\n<p>You will need to refer to the device specification to determine exactly what the function is.</p>",
+      "text": "The terms ‘crossbar’, ‘switch’ and ‘interconnect’ are used to describe a module which connects multiple devices which use the same protocol. The devices can create protocol transactions, receive protocol transactions, or both. The module may route transactions based on a specified set of rules, or broadcast them to all devices based on the protocol.\nA ‘bridge’ is typically a module which translates from one transaction type to another. It may also have several connected devices with unique protocols.\nYou will need to refer to the device specification to determine exactly what the function is.",
+      "created_at": "2026-08-31T14:35:26.855Z"
+    }
+  ]
+}

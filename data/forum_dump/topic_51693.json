@@ -1,0 +1,20 @@
+{
+  "id": 51693,
+  "title": "How do we integrate the toolchain with uvm?",
+  "slug": "how-do-we-integrate-the-toolchain-with-uvm",
+  "created_at": "2026-06-29T12:44:31.477Z",
+  "bumped_at": "2026-07-02T13:51:33.766Z",
+  "posts_count": 2,
+  "question_raw": "<p>hey , i was just wondering to develop a tool-chain for an soc<br>\nbut i need to integrate it with uvm tb , how do we do that and if i need to reuse that software part then what to do ?<br>\ni hope for some answer.</p>",
+  "question_text": "hey , i was just wondering to develop a tool-chain for an soc\nbut i need to integrate it with uvm tb , how do we do that and if i need to reuse that software part then what to do ?\ni hope for some answer.",
+  "author": "DILEEEP_KUMAR_SARAGADAM",
+  "replies": [
+    {
+      "id": 156929,
+      "author": "dave_59",
+      "raw": "<p>This question requires more details. Could you please provide more specific information about what you mean by “tool chain”?</p>",
+      "text": "This question requires more details. Could you please provide more specific information about what you mean by “tool chain”?",
+      "created_at": "2026-07-02T13:51:33.766Z"
+    }
+  ]
+}

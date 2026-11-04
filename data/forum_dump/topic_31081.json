@@ -1,0 +1,104 @@
+{
+  "id": 31081,
+  "title": "P_sequencer and m_sequencer",
+  "slug": "p-sequencer-and-m-sequencer",
+  "created_at": "2015-10-01T04:35:55.000Z",
+  "bumped_at": "2026-04-28T14:56:15.128Z",
+  "posts_count": 14,
+  "question_raw": "<p>Hi,</p>\n<p>Can someone tell me What is the key difference between p and m sequencers? And also give me an example WHERE &amp; WHEN we can use these sequencers?</p>",
+  "question_text": "Hi,\nCan someone tell me What is the key difference between p and m sequencers? And also give me an example WHERE & WHEN we can use these sequencers?",
+  "author": "Anudeep_J",
+  "replies": [
+    {
+      "id": 95562,
+      "author": "cgales",
+      "raw": "<p>Read this <a href=\"https://verificationacademy.com/cookbook/sequences/api\" rel=\"noopener nofollow ugc\">UVM Cookbook</a> article which describes the m_sequencer handle.</p>\n<p>The p_sequencer handle is the same as the m_sequencer handle, except it is type-specific to the sequencer. However, it is highly recommended that you never use p_sequencer due to re-use concerns. If you need to get configuration information into your sequence, use the uvm_config_db and the m_sequencer handle.</p>",
+      "text": "Read this UVM Cookbook article which describes the m_sequencer handle.\nThe p_sequencer handle is the same as the m_sequencer handle, except it is type-specific to the sequencer. However, it is highly recommended that you never use p_sequencer due to re-use concerns. If you need to get configuration information into your sequence, use the uvm_config_db and the m_sequencer handle.",
+      "created_at": "2015-10-01T12:58:32.000Z"
+    },
+    {
+      "id": 95563,
+      "author": "Anudeep_J",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/2\">cgales</a>:</font></em></p>\n<p>I read it but I dint get the difference exactly.</p>",
+      "text": "In reply to cgales:\nI read it but I dint get the difference exactly.",
+      "created_at": "2015-10-02T09:52:03.000Z"
+    },
+    {
+      "id": 95564,
+      "author": "UjjwalKaushik",
+      "raw": "<p>m_sequencer is the default handle for uvm_vitual_sequencer and p_sequencer is the hook up for child sequencer.</p>\n<p>m_sequencer is the generic uvm_sequencer pointer. it will always exist for the uvm_sequence and is initialized when the sequence is started.</p>\n<p>p_sequencer is a typed-specific sequencer pointer, created by registering the sequence to the sequencer using macros. It will not exist if we have not registered the sequence with macros.<br>\nAs it is type-specific we can access almost everything added to the sequencer.</p>\n<p>try to avoid using p_sequencer.</p>\n<p>Regards<br>\nUjjwal</p>",
+      "text": "m_sequencer is the default handle for uvm_vitual_sequencer and p_sequencer is the hook up for child sequencer.\nm_sequencer is the generic uvm_sequencer pointer. it will always exist for the uvm_sequence and is initialized when the sequence is started.\np_sequencer is a typed-specific sequencer pointer, created by registering the sequence to the sequencer using macros. It will not exist if we have not registered the sequence with macros.\nAs it is type-specific we can access almost everything added to the sequencer.\ntry to avoid using p_sequencer.\nRegards\nUjjwal",
+      "created_at": "2015-10-06T17:20:42.000Z"
+    },
+    {
+      "id": 95565,
+      "author": "syedtaahirahmed",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/4\">Ujjwal Kaushik</a>:</font></em></p>\n<p>Can you explain it with one example?</p>",
+      "text": "In reply to Ujjwal Kaushik:\nCan you explain it with one example?",
+      "created_at": "2015-10-19T13:58:50.000Z"
+    },
+    {
+      "id": 95566,
+      "author": "AnkurJain4",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/5\">syed taahir ahmed</a>:</font></em></p>\n<p><a href=\"http://cluelogic.com/2011/07/uvm-tutorial-for-candy-lovers-transactions-and-sequences/\" class=\"onebox\" target=\"_blank\" rel=\"noopener nofollow ugc\">http://cluelogic.com/2011/07/uvm-tutorial-for-candy-lovers-transactions-and-sequences/</a></p>\n<p>Go through this. Specially the post and comments below on this page.</p>",
+      "text": "In reply to syed taahir ahmed:\nhttp://cluelogic.com/2011/07/uvm-tutorial-for-candy-lovers-transactions-and-sequences/\nGo through this. Specially the post and comments below on this page.",
+      "created_at": "2015-10-20T11:26:33.000Z"
+    },
+    {
+      "id": 95567,
+      "author": "syedtaahirahmed",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/6\">Ankur Jain4</a>:</font></em></p>\n<p>Thanks Ankur.</p>",
+      "text": "In reply to Ankur Jain4:\nThanks Ankur.",
+      "created_at": "2015-10-21T03:36:58.000Z"
+    },
+    {
+      "id": 95568,
+      "author": "bmorris",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/7\">cgales</a>:</font></em></p>\n<p>Just to be clear, when you say use m_sequencer to get configuration information, do you mean something like:</p>\n<pre><code class=\"lang-verilog\">class seq_plb_base extends uvm_sequence #(plb_transaction);\n  `uvm_object_utils(seq_plb_base);\n  const string report_id=\"SEQ\";\n\n  plb_agent_configuration cfg;\n\n  function new(string name=\"\");\n    super.new(name);\n  endfunction\n\n  virtual task body();\n    if( !uvm_config_db #( plb_agent_configuration )::get( m_sequencer, \"\", \"AGENT_CONFIG\", cfg ))\n      `uvm_fatal(report_id, \"cannot find resource AGENT_CONFIG\" )\n    // .. do stuff\n\n  endtask\n\nendclass\n</code></pre>\n<p>But, as soon as I enter the work of transient dynamic objects like this, does performance not dictate that I should avoid using the config_db?  I seems simpler to simply use p_sequencer.cfg (which is assigned once, in the agent).</p>\n<p>An even more drastic situation: I extend a transaction, and apply constraints to it based on some configuration variable.  If I rely on the database in that case, I’m really up the creek for performance.  Example, I am generating IP packets, so I extend ip_transaction, and add a constraint that the destination IP address should be … some distribution or another.  That distribution is based off IP addresses that were randomized in the test.  That’s not really something I’d like to pull from DB every single time I create a packet.  What do you think?</p>",
+      "text": "In reply to cgales:\nJust to be clear, when you say use m_sequencer to get configuration information, do you mean something like:\nclass seq_plb_base extends uvm_sequence #(plb_transaction);\n  `uvm_object_utils(seq_plb_base);\n  const string report_id=\"SEQ\";\n\n  plb_agent_configuration cfg;\n\n  function new(string name=\"\");\n    super.new(name);\n  endfunction\n\n  virtual task body();\n    if( !uvm_config_db #( plb_agent_configuration )::get( m_sequencer, \"\", \"AGENT_CONFIG\", cfg ))\n      `uvm_fatal(report_id, \"cannot find resource AGENT_CONFIG\" )\n    // .. do stuff\n\n  endtask\n\nendclass\n\nBut, as soon as I enter the work of transient dynamic objects like this, does performance not dictate that I should avoid using the config_db?  I seems simpler to simply use p_sequencer.cfg (which is assigned once, in the agent).\nAn even more drastic situation: I extend a transaction, and apply constraints to it based on some configuration variable.  If I rely on the database in that case, I’m really up the creek for performance.  Example, I am generating IP packets, so I extend ip_transaction, and add a constraint that the destination IP address should be … some distribution or another.  That distribution is based off IP addresses that were randomized in the test.  That’s not really something I’d like to pull from DB every single time I create a packet.  What do you think?",
+      "created_at": "2015-10-22T16:22:28.000Z"
+    },
+    {
+      "id": 95569,
+      "author": "cgales",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/8\">bmorris</a>:</font></em></p>\n<p>There are several approaches that I’ve seen to getting configuration information into a sequence/sequence_item:</p>\n<ol>\n<li>\n<p>Use the uvm_config_db() with the m_sequencer. This is very flexible and allows the object to be ‘self configuring’ and have no additional configuration requirements on the parent sequence/test. However, this method can add some significant overhead if you do large numbers of sequences/sequence_items.</p>\n</li>\n<li>\n<p>Have the parent sequence/test set the configuration handles after creating the sequence/sequence_item. This can reduce the uvm_config_db() accesses, but adds the requirements that the parent set these objects prior to starting the sequence. This precludes the use of the `uvm_do… macros, but we don’t like them anyway.</p>\n</li>\n<li>\n<p>Have the sequence get the config objects directly from the p_sequencer. This will reduce the uvm_config_db() accesses, but will require the use of a p_sequencer which is highly discouraged due to re-usability concerns.</p>\n</li>\n</ol>\n<p>I prefer option 2 myself, but either 1 or 2 is recommended.</p>",
+      "text": "In reply to bmorris:\nThere are several approaches that I’ve seen to getting configuration information into a sequence/sequence_item:\n\n\nUse the uvm_config_db() with the m_sequencer. This is very flexible and allows the object to be ‘self configuring’ and have no additional configuration requirements on the parent sequence/test. However, this method can add some significant overhead if you do large numbers of sequences/sequence_items.\n\n\nHave the parent sequence/test set the configuration handles after creating the sequence/sequence_item. This can reduce the uvm_config_db() accesses, but adds the requirements that the parent set these objects prior to starting the sequence. This precludes the use of the `uvm_do… macros, but we don’t like them anyway.\n\n\nHave the sequence get the config objects directly from the p_sequencer. This will reduce the uvm_config_db() accesses, but will require the use of a p_sequencer which is highly discouraged due to re-usability concerns.\n\n\nI prefer option 2 myself, but either 1 or 2 is recommended.",
+      "created_at": "2015-10-22T16:54:54.000Z"
+    },
+    {
+      "id": 95570,
+      "author": "bmorris",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/9\">cgales</a>:</font></em></p>\n<p>Understood.  Just to be fully explicit, why does using the p_sequencer reduce the re-usability?</p>",
+      "text": "In reply to cgales:\nUnderstood.  Just to be fully explicit, why does using the p_sequencer reduce the re-usability?",
+      "created_at": "2015-10-22T19:51:45.000Z"
+    },
+    {
+      "id": 95571,
+      "author": "cgales",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/10\">bmorris</a>:</font></em></p>\n<p>Using a p_sequencer requires that the sequence be run on a sequencer of a specific type (or base type). This will limit your ability to run the sequence on other sequencers.</p>\n<p>My preference is to always create a generic uvm_sequencer typed with the specific uvm_sequence_item (or generic uvm_sequence_item for a virtual sequencer). This simplifies the requirement to make an agent or environment specific sequencer. Also, I have seen environments where they will create a specific sequencer and override the run_phase() method (because every component needs a run_phase()…). Trying to debug that issue is fun.</p>\n<p>For portability, your sequence will be only limited to a sequencer that is typed to your sequence_item, instead of being limited to a sequencer of your p_sequencer type. It’s a subtle difference and won’t make a difference in 90% of environments, but it’s a pain to go back and re-architect if you hit the corner case.</p>",
+      "text": "In reply to bmorris:\nUsing a p_sequencer requires that the sequence be run on a sequencer of a specific type (or base type). This will limit your ability to run the sequence on other sequencers.\nMy preference is to always create a generic uvm_sequencer typed with the specific uvm_sequence_item (or generic uvm_sequence_item for a virtual sequencer). This simplifies the requirement to make an agent or environment specific sequencer. Also, I have seen environments where they will create a specific sequencer and override the run_phase() method (because every component needs a run_phase()…). Trying to debug that issue is fun.\nFor portability, your sequence will be only limited to a sequencer that is typed to your sequence_item, instead of being limited to a sequencer of your p_sequencer type. It’s a subtle difference and won’t make a difference in 90% of environments, but it’s a pain to go back and re-architect if you hit the corner case.",
+      "created_at": "2015-10-22T20:24:13.000Z"
+    },
+    {
+      "id": 95572,
+      "author": "bmorris",
+      "raw": "<p><em><font size=\"12\">In reply to <a href=\"/forums/t/p-sequencer-and-m-sequencer/31081/11\">cgales</a>:</font></em></p>\n<blockquote>\n<p>Also, I have seen environments where they will create a specific sequencer and override the run_phase() method (because every component needs a run_phase()…). Trying to debug that issue is fun.</p>\n</blockquote>\n<p>That never crossed my mind; lol</p>\n<blockquote>\n<p>For portability, your sequence will be only limited to a sequencer that is typed to your sequence_item, instead of being limited to a sequencer of your p_sequencer type. It’s a subtle difference and won’t make a difference in 90% of environments, but it’s a pain to go back and re-architect if you hit the corner case.</p>\n</blockquote>\n<p>I can’t picture when this could happen right at the moment, but see where you are coming from.  Thanks</p>",
+      "text": "In reply to cgales:\n\nAlso, I have seen environments where they will create a specific sequencer and override the run_phase() method (because every component needs a run_phase()…). Trying to debug that issue is fun.\n\nThat never crossed my mind; lol\n\nFor portability, your sequence will be only limited to a sequencer that is typed to your sequence_item, instead of being limited to a sequencer of your p_sequencer type. It’s a subtle difference and won’t make a difference in 90% of environments, but it’s a pain to go back and re-architect if you hit the corner case.\n\nI can’t picture when this could happen right at the moment, but see where you are coming from.  Thanks",
+      "created_at": "2015-10-22T21:41:31.000Z"
+    },
+    {
+      "id": 155807,
+      "author": "Ankit_jha",
+      "raw": "<p>m_sequencer  is a base (parent) type.p_sequencer is an extended(child) type .m_sequencer is a handle of “uvm_sequencer_base” that is the base of “uvm_sequencer”.p_sequencer is a user-defined handle.When we start a sequence,we provide an object  handle of our user_defind_sequencer . In the start method extended  class instance  is assigned to the base handle called m_sequencer . So a static casting is required to base an object to extend the handle.If p_sequencer is defined in the macro that is the p_sequencer function then define m_sequencer back to the p_sequencer using dynamic casting($cast).</p>",
+      "text": "m_sequencer  is a base (parent) type.p_sequencer is an extended(child) type .m_sequencer is a handle of “uvm_sequencer_base” that is the base of “uvm_sequencer”.p_sequencer is a user-defined handle.When we start a sequence,we provide an object  handle of our user_defind_sequencer . In the start method extended  class instance  is assigned to the base handle called m_sequencer . So a static casting is required to base an object to extend the handle.If p_sequencer is defined in the macro that is the p_sequencer function then define m_sequencer back to the p_sequencer using dynamic casting($cast).",
+      "created_at": "2025-09-01T07:33:13.343Z"
+    },
+    {
+      "id": 156719,
+      "author": "ajoshi",
+      "raw": "<p>Is there any specific reason to avoid using p_sequencer.</p>\n<p>Regards,<br>\nAbhinandan</p>",
+      "text": "Is there any specific reason to avoid using p_sequencer.\nRegards,\nAbhinandan",
+      "created_at": "2026-04-28T14:56:15.128Z"
+    }
+  ]
+}

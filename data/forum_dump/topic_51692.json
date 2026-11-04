@@ -1,0 +1,20 @@
+{
+  "id": 51692,
+  "title": "Why are UVM User-Defined Phase Classes Implemented as Singletons?",
+  "slug": "why-are-uvm-user-defined-phase-classes-implemented-as-singletons",
+  "created_at": "2026-06-29T08:18:33.958Z",
+  "bumped_at": "2026-06-29T15:43:12.475Z",
+  "posts_count": 2,
+  "question_raw": "<p>Hi everyone,</p>\n<p>I’m trying to understand the design decision behind user-defined phases in UVM.</p>\n<p>Most examples (and the built-in UVM phases) implement the custom phase class as a <strong>Singleton</strong>, for example by using a <code>static get()</code> method and a <code>protected new()</code> constructor.</p>\n<p>My questions are:</p>\n<ol>\n<li>\n<p>Why does UVM recommend or require user-defined phase classes to be Singleton?</p>\n</li>\n<li>\n<p>What would actually happen if I didn’t implement my custom phase as a Singleton and instead created phase objects using <code>new()</code>?</p>\n</li>\n<li>\n<p>Is there any issue with the phase scheduler, phase state, objections, or schedule graph if multiple instances of the same custom phase exist?</p>\n</li>\n<li>\n<p>Is the Singleton pattern a strict UVM requirement, or is it simply a recommended design pattern?</p>\n</li>\n</ol>\n<p>I’m looking for the reasoning from the UVM architecture and source code perspective (IEEE 1800.2-2020), rather than just “because all examples do it.”</p>\n<p>I’d really appreciate explanations based on the UVM scheduler and <code>uvm_domain</code>/<code>uvm_phase</code> implementation.</p>\n<p>Thanks!</p>",
+  "question_text": "Hi everyone,\nI’m trying to understand the design decision behind user-defined phases in UVM.\nMost examples (and the built-in UVM phases) implement the custom phase class as a Singleton, for example by using a static get() method and a protected new() constructor.\nMy questions are:\n\n\nWhy does UVM recommend or require user-defined phase classes to be Singleton?\n\n\nWhat would actually happen if I didn’t implement my custom phase as a Singleton and instead created phase objects using new()?\n\n\nIs there any issue with the phase scheduler, phase state, objections, or schedule graph if multiple instances of the same custom phase exist?\n\n\nIs the Singleton pattern a strict UVM requirement, or is it simply a recommended design pattern?\n\n\nI’m looking for the reasoning from the UVM architecture and source code perspective (IEEE 1800.2-2020), rather than just “because all examples do it.”\nI’d really appreciate explanations based on the UVM scheduler and uvm_domain/uvm_phase implementation.\nThanks!",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156909,
+      "author": "dave_59",
+      "raw": "<p>It’s a requirement. This singleton pattern is used extensively throughout UVM because it establishes a single object that serves as a unique reference point for comparisons. In essence, you create an object whose handle represents an object type. This handle can be passed as an argument to methods and can be compared with other handles.</p>\n<p>If you didn’t use a singleton, you’d be wasting resources because there’s no logical reason to have multiple objects of the same type. Additionally, you’d have to create a unique identifier for each type, and you wouldn’t be able to verify its uniqueness until runtime.</p>",
+      "text": "It’s a requirement. This singleton pattern is used extensively throughout UVM because it establishes a single object that serves as a unique reference point for comparisons. In essence, you create an object whose handle represents an object type. This handle can be passed as an argument to methods and can be compared with other handles.\nIf you didn’t use a singleton, you’d be wasting resources because there’s no logical reason to have multiple objects of the same type. Additionally, you’d have to create a unique identifier for each type, and you wouldn’t be able to verify its uniqueness until runtime.",
+      "created_at": "2026-06-29T15:43:12.475Z"
+    }
+  ]
+}

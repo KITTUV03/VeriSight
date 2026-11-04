@@ -1,0 +1,20 @@
+{
+  "id": 51685,
+  "title": "Clarification regarding task run_phase() in UVM",
+  "slug": "clarification-regarding-task-run-phase-in-uvm",
+  "created_at": "2026-06-25T21:41:16.706Z",
+  "bumped_at": "2026-06-26T08:18:48.566Z",
+  "posts_count": 2,
+  "question_raw": "<p>In the <code>configure_phase</code> of my UVM testbench, I configure some registers and then spawn a monitoring thread using a <code>forever</code> loop inside a <code>fork ... join_none</code> block. This thread starts and waits for a specific design signal to go high. When  simulation transitions from the <code>configure_phase</code> to the <code>main_phase</code>, will this background thread stay active, or will it be killed automatically by the UVM phase controller?</p>",
+  "question_text": "In the configure_phase of my UVM testbench, I configure some registers and then spawn a monitoring thread using a forever loop inside a fork ... join_none block. This thread starts and waits for a specific design signal to go high. When  simulation transitions from the configure_phase to the main_phase, will this background thread stay active, or will it be killed automatically by the UVM phase controller?",
+  "author": "vishnu1",
+  "replies": [
+    {
+      "id": 156890,
+      "author": "dave_59",
+      "raw": "<p>All processes created by a phase will get terminated when that phase ends. I highly recommend using only the run_phase() and then sequences to control the flow of your test bench.</p>",
+      "text": "All processes created by a phase will get terminated when that phase ends. I highly recommend using only the run_phase() and then sequences to control the flow of your test bench.",
+      "created_at": "2026-06-26T08:18:48.566Z"
+    }
+  ]
+}

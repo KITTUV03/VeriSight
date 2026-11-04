@@ -1,0 +1,27 @@
+{
+  "id": 51671,
+  "title": "Using uvm_config_db::get(null, ...) Inside a UVM Sequence (uvm_object)",
+  "slug": "using-uvm-config-db-get-null-inside-a-uvm-sequence-uvm-object",
+  "created_at": "2026-06-15T05:28:58.833Z",
+  "bumped_at": "2026-06-15T19:56:23.242Z",
+  "posts_count": 3,
+  "question_raw": "<p>Hi everyone,</p>\n<p>I was reading Sunburst papers and found the recommendation that config_db should generally not be used inside uvm_objects such as sequences and sequence_items because they are not part of the UVM component hierarchy.</p>\n<p>To understand this better, I did the following experiment.</p>\n<p>In my test, I set a value using:</p>\n<p>uvm_config_db#(int)::set(null, “*”, “a”, 10);</p>\n<p>Then inside a sequence (derived from uvm_sequence), I tried two different get() calls:</p>\n<ol>\n<li>Using this:    uvm_config_db#(int)::get(this, “”, “a”, B);</li>\n</ol>\n<p>This failed to compile because get() expects a uvm_component context, while a sequence is a uvm_object.</p>\n<ol start=\"2\">\n<li>Using null:  uvm_config_db#(int)::get(null, “”, “a”, B);</li>\n</ol>\n<p>This worked successfully, and the sequence was able to retrieve the value.</p>\n<p>From this observation, it seems that config_db access from a sequence is technically possible when using null as the context, even though using this is illegal.</p>\n<p>My question is:</p>\n<ul>\n<li>\n<p>What are the advantages and disadvantages of using get(null, …) inside a sequence or other uvm_objects?</p>\n</li>\n<li>\n<p>Is this considered acceptable UVM methodology, or should it still be avoided?</p>\n</li>\n<li>\n<p>Does using null effectively turn the lookup into a global search and therefore reduce reusability/debuggability?</p>\n</li>\n<li>\n<p>In real projects, would you recommend using get(null, …) from sequences, or is it better to pass configuration data through sequence fields, resources, or some other mechanism?</p>\n</li>\n</ul>\n<p>I would appreciate understanding not only whether this works, but also the methodology implications and best practices used in production UVM environments.</p>\n<p>Thanks!</p>",
+  "question_text": "Hi everyone,\nI was reading Sunburst papers and found the recommendation that config_db should generally not be used inside uvm_objects such as sequences and sequence_items because they are not part of the UVM component hierarchy.\nTo understand this better, I did the following experiment.\nIn my test, I set a value using:\nuvm_config_db#(int)::set(null, “*”, “a”, 10);\nThen inside a sequence (derived from uvm_sequence), I tried two different get() calls:\n\nUsing this:    uvm_config_db#(int)::get(this, “”, “a”, B);\n\nThis failed to compile because get() expects a uvm_component context, while a sequence is a uvm_object.\n\nUsing null:  uvm_config_db#(int)::get(null, “”, “a”, B);\n\nThis worked successfully, and the sequence was able to retrieve the value.\nFrom this observation, it seems that config_db access from a sequence is technically possible when using null as the context, even though using this is illegal.\nMy question is:\n\n\nWhat are the advantages and disadvantages of using get(null, …) inside a sequence or other uvm_objects?\n\n\nIs this considered acceptable UVM methodology, or should it still be avoided?\n\n\nDoes using null effectively turn the lookup into a global search and therefore reduce reusability/debuggability?\n\n\nIn real projects, would you recommend using get(null, …) from sequences, or is it better to pass configuration data through sequence fields, resources, or some other mechanism?\n\n\nI would appreciate understanding not only whether this works, but also the methodology implications and best practices used in production UVM environments.\nThanks!",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156857,
+      "author": "cgales",
+      "raw": "<p>You can use ‘m_sequencer’ as the context instead of ‘this’ or ‘null’. This allows you to target a configuration object to a specific sequencer (which applies to all sequences running on the sequencer).</p>",
+      "text": "You can use ‘m_sequencer’ as the context instead of ‘this’ or ‘null’. This allows you to target a configuration object to a specific sequencer (which applies to all sequences running on the sequencer).",
+      "created_at": "2026-06-15T15:20:03.776Z"
+    },
+    {
+      "id": 156860,
+      "author": "dave_59",
+      "raw": "<p>You should limit the use of uvm_config_db or uvm_resource_db on objects that are repeatedly constructed, like sequences and transaction items. You can use a configuration object that has all the settings you need. Pass the handle of that configuration object into the sequence or item as they are constructed.</p>",
+      "text": "You should limit the use of uvm_config_db or uvm_resource_db on objects that are repeatedly constructed, like sequences and transaction items. You can use a configuration object that has all the settings you need. Pass the handle of that configuration object into the sequence or item as they are constructed.",
+      "created_at": "2026-06-15T19:56:23.242Z"
+    }
+  ]
+}

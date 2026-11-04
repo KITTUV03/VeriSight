@@ -1,0 +1,34 @@
+{
+  "id": 51703,
+  "title": "Why create method is not part of uvm_object_wrapper?",
+  "slug": "why-create-method-is-not-part-of-uvm-object-wrapper",
+  "created_at": "2026-07-06T14:14:02.112Z",
+  "bumped_at": "2026-07-10T19:14:34.004Z",
+  "posts_count": 4,
+  "question_raw": "<p><code>uvm_object_registry</code> and <code>uvm_component_registry</code> implements following methods [IEEE 1800.2-2020, section 8.2.4 and 8.2.3 respectivelly]:</p>\n<ul>\n<li><code>create_object/component</code></li>\n<li><code>get_type_name</code></li>\n<li><code>get</code></li>\n<li><code>create</code></li>\n<li><code>set_type_override</code></li>\n<li><code>set_inst_override</code></li>\n<li><code>initialize</code></li>\n</ul>\n<p>However, only <code>create_*</code> and <code>get_type_name</code> are part of <code>uvm_object_wrapper</code>, which serves as the abstract interface for factory registries [8.3.2].</p>\n<p>My question is: what is the architectural reason for this separation?</p>\n<p>Are the remaining methods intended to be a syntactic sugar over the global <code>uvm_factory</code> singleton, allowing usage such as:</p>\n<pre data-code-wrap=\"SystemVerilog\"><code class=\"lang-SystemVerilog\">base_trans::type_id::set_type_override(child_trans::get_type());\n</code></pre>\n<p>instead of directly accessing the factory:</p>\n<pre data-code-wrap=\"SystemVerilog\"><code class=\"lang-SystemVerilog\">uvm_factory::get().set_type_override_by_type(\n  base_trans::get_type(),\n  child_trans::get_type()\n);\n</code></pre>\n<p>Or is there a deeper design reason why these methods are not part of <code>uvm_object_wrapper</code> despite being implemented by all registry classes?</p>",
+  "question_text": "uvm_object_registry and uvm_component_registry implements following methods [IEEE 1800.2-2020, section 8.2.4 and 8.2.3 respectivelly]:\n\ncreate_object/component\nget_type_name\nget\ncreate\nset_type_override\nset_inst_override\ninitialize\n\nHowever, only create_* and get_type_name are part of uvm_object_wrapper, which serves as the abstract interface for factory registries [8.3.2].\nMy question is: what is the architectural reason for this separation?\nAre the remaining methods intended to be a syntactic sugar over the global uvm_factory singleton, allowing usage such as:\nbase_trans::type_id::set_type_override(child_trans::get_type());\n\ninstead of directly accessing the factory:\nuvm_factory::get().set_type_override_by_type(\n  base_trans::get_type(),\n  child_trans::get_type()\n);\n\nOr is there a deeper design reason why these methods are not part of uvm_object_wrapper despite being implemented by all registry classes?",
+  "author": "HepoH",
+  "replies": [
+    {
+      "id": 156949,
+      "author": "dave_59",
+      "raw": "<p><code>uvm_object_wrapper</code> is an abstract base class with no parameters. It contains the virtual methods <code>create_*</code> and <code>get_type_name</code>. The other methods are static and use the parameterized extended class type. The <code>create()</code> method must have a return type that matches the parameter type.</p>",
+      "text": "uvm_object_wrapper is an abstract base class with no parameters. It contains the virtual methods create_* and get_type_name. The other methods are static and use the parameterized extended class type. The create() method must have a return type that matches the parameter type.",
+      "created_at": "2026-07-09T17:25:58.132Z"
+    },
+    {
+      "id": 156950,
+      "author": "HepoH",
+      "raw": "<p>I see it now, thank you very much!</p>\n<p>Indeed, the <code>get</code> and <code>create</code> methods can’t be placed in <code>uvm_object_wrapper</code> because they depend on the type parameter <code>T</code>. At first, I didn’t understand what the issue was with the static methods <code>set_type_override</code> and <code>set_inst_override</code>, since their prototypes don’t depend on <code>T</code> and static method can be placed in an abstract class. Then I realized that static methods cannot be virtual, so they cannot be overridden by derived classes.</p>\n<p>So, is this more of a technical limitation rather than an intentional design choice?</p>",
+      "text": "I see it now, thank you very much!\nIndeed, the get and create methods can’t be placed in uvm_object_wrapper because they depend on the type parameter T. At first, I didn’t understand what the issue was with the static methods set_type_override and set_inst_override, since their prototypes don’t depend on T and static method can be placed in an abstract class. Then I realized that static methods cannot be virtual, so they cannot be overridden by derived classes.\nSo, is this more of a technical limitation rather than an intentional design choice?",
+      "created_at": "2026-07-10T08:44:33.030Z"
+    },
+    {
+      "id": 156953,
+      "author": "dave_59",
+      "raw": "<p>Of course, I would say it’s by design of the language, not a limitation. <img src=\"https://verificationacademy.com/forums/images/emoji/apple/grinning_face.png?v=15\" title=\":grinning_face:\" class=\"emoji\" alt=\":grinning_face:\" loading=\"lazy\" width=\"20\" height=\"20\"></p>",
+      "text": "Of course, I would say it’s by design of the language, not a limitation.",
+      "created_at": "2026-07-10T19:14:34.004Z"
+    }
+  ]
+}

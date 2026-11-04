@@ -1,0 +1,34 @@
+{
+  "id": 51657,
+  "title": "UVM Sequencer Arbitration: Is Sequence Priority Used During Queue Insertion or During Grant Selection?",
+  "slug": "uvm-sequencer-arbitration-is-sequence-priority-used-during-queue-insertion-or-during-grant-selection",
+  "created_at": "2026-06-05T11:23:23.809Z",
+  "bumped_at": "2026-06-08T14:24:37.932Z",
+  "posts_count": 4,
+  "question_raw": "<p>When we assign a priority through the <code>start()</code> method, is the sequence stored in the sequencer’s queue according to that priority immediately, or does the sequencer store all sequence requests first and then later use the priority during arbitration to decide which sequence gets the grant?</p>",
+  "question_text": "When we assign a priority through the start() method, is the sequence stored in the sequencer’s queue according to that priority immediately, or does the sequencer store all sequence requests first and then later use the priority during arbitration to decide which sequence gets the grant?",
+  "author": "Hey_Verif26",
+  "replies": [
+    {
+      "id": 156814,
+      "author": "dave_59",
+      "raw": "<p>The <code>start()</code> method simply launches the sequence by calling its <code>body()</code> method; it does not participate in sequencer arbitration. Arbitration is deferred until the sequence requests access to the driver by calling <code>start_item()</code> (preferred) or <code>wait_for_grant()</code>. If another sequence currently has priority, the requesting sequence blocks until the sequencer grants it access.</p>",
+      "text": "The start() method simply launches the sequence by calling its body() method; it does not participate in sequencer arbitration. Arbitration is deferred until the sequence requests access to the driver by calling start_item() (preferred) or wait_for_grant(). If another sequence currently has priority, the requesting sequence blocks until the sequencer grants it access.",
+      "created_at": "2026-06-06T17:40:53.891Z"
+    },
+    {
+      "id": 156821,
+      "author": "Amit_9183",
+      "raw": "<p>So you mean sequencer start arbitration when sequence(s) call start_item() ? Arbitration is not started by driver when it calls get_next_item() or get() or peek() ?</p>\n<p>Why sequencer need a request FIFO because at one time only one sequence item is selected after arbitration among multiple sequences ?</p>",
+      "text": "So you mean sequencer start arbitration when sequence(s) call start_item() ? Arbitration is not started by driver when it calls get_next_item() or get() or peek() ?\nWhy sequencer need a request FIFO because at one time only one sequence item is selected after arbitration among multiple sequences ?",
+      "created_at": "2026-06-08T10:15:40.141Z"
+    },
+    {
+      "id": 156823,
+      "author": "dave_59",
+      "raw": "<p>Arbitration starts when the driver requests an item. I was being brief because the OP was already involved in a more detailed discussion in <a href=\"https://verificationacademy.com/forums/t/why-does-uvm-need-both-wait-for-grant-and-wait-for-item-done/51652\">another thread</a> and I assumed that context.</p>\n<p>Priority is used during grant selection, not queue insertion. Requests are queued in arrival order; arbitration determines which pending request gets granted.</p>",
+      "text": "Arbitration starts when the driver requests an item. I was being brief because the OP was already involved in a more detailed discussion in another thread and I assumed that context.\nPriority is used during grant selection, not queue insertion. Requests are queued in arrival order; arbitration determines which pending request gets granted.",
+      "created_at": "2026-06-08T14:24:37.932Z"
+    }
+  ]
+}
